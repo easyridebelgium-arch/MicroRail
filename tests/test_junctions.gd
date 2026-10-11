@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_routing_switch()
 	_test_routing_crossing()
 	_test_simple_routing()
+	_test_drawing()
 	print("%d checks, %d failed" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -134,6 +135,9 @@ func _test_routing_switch() -> void:
 	check(branch["switches"] == {Vector2i(5, 0): 1}, "branch route sets the switch to branch")
 	check(branch["cells"].has(Vector2i(6, 1)) and not branch["cells"].has(Vector2i(6, 0)), "branch route leaves the main line at the switch")
 
+	check(Router.switch_settings(tracks, branch["cells"]) == {Vector2i(5, 0): 1}, "switch_settings reads the branch setting from route cells")
+	check(Router.switch_settings(tracks, through["cells"]) == {Vector2i(5, 0): 0}, "switch_settings reads the through setting from route cells")
+
 	var back: Dictionary = Router.find_path(tracks, Vector2i(10, 1), Vector2i(0, 0))
 	check(not back["cells"].is_empty() and back["switches"].is_empty(), "trailing back through the points needs no setting")
 
@@ -181,3 +185,14 @@ func _test_simple_routing() -> void:
 
 	tracks[Vector2i(2, 0)] = true
 	check(Router.find_route(tracks, Vector2i(0, 0), Vector2i(5, 0)).is_empty(), "mismatched edge breaks the route")
+
+
+func _test_drawing() -> void:
+	var simple: Dictionary = Geometry.drawing_data(false, 32.0)
+	check(not simple.is_empty() and simple["extra"].is_empty(), "a simple tile has one rail path")
+	var switch: Dictionary = Geometry.drawing_data("junction_6_2_3", 32.0)
+	check(switch["extra"].size() == 1 and not switch["left"].is_empty() and not switch["extra"][0]["left"].is_empty(), "a switch draws two paths")
+	var crossing: Dictionary = Geometry.drawing_data("cross_0_2", 32.0)
+	check(crossing["extra"].size() == 1, "a crossing draws two lines")
+	check(Geometry.drawing_data("junction_0_4_1", 32.0).is_empty(), "an invalid tile draws nothing")
+	check(Geometry.drawing_pairs("junction_6_2_3") == [[W, E], [W, SE]], "switch pairs are stem-through and stem-branch")

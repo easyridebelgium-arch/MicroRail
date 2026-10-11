@@ -32,17 +32,30 @@ cannot change line.
   the cells. Planning ignores current switch positions and reports the settings a
   route needs, so toggling a switch never deletes a service route.
 
+## Done in step 2 (also not yet run in Godot)
+
+- **Drawing:** switches draw two rail paths and crossings two lines
+  (`TrackGeometry.drawing_pairs`, `drawing_data` with an `"extra"` list). A
+  switch shows its position with a filled marker on the open exit and a ring at
+  the stem (shape as well as colour).
+- **Switch positions follow routes:** `switch_states` is `{cell: 0 or 1}`;
+  `_check_route` sets each switch to match the passenger and freight routes that
+  use it (`RailRouter.switch_settings`). A switch no route uses keeps its
+  position. Trains still follow their planned cell lists, so a position is
+  currently display and bookkeeping, not a control.
+- **Saves are version 18:** a `switches` block of `[x, y, state]`, validated as a
+  whole list (switch tiles only, state 0 or 1, no duplicates) before loading;
+  version 17 saves upgrade with an empty list; tiles with three or four ports are
+  accepted when loading.
+
 ## Still to do (in order)
 
-1. Builder: an explicit rule for turning an existing straight into a switch, and
-   for crossings (today crossing an existing line is rejected).
-2. Drawing: `drawing_data` returns nothing for switches and crossings.
-3. `switch_states` in `main.gd`: `{cell: 0 or 1}`, saved as a `switches` block
-   (save version 17, migration from 16, validation), included in Undo/Redo, changed
-   through the command queue, recorded as a `SWITCH_THROWN` event.
-4. Trains: set facing switches along their route; refuse to move a switch under a
-   train (a reservation check later).
-5. Interface: click a switch to toggle it, with a visible state.
-6. `main.gd` currently accepts only two-port tiles when loading a save
-   (`TrackGeometry.connections(value).size() == 2`), so switches cannot be loaded
-   until step 3.
+1. **A way to create switches.** Planned: a Switch tool that turns a straight
+   tile into a switch (click again to cycle the variants, and back to a
+   straight), through the command queue, with Undo/Redo and a cost. Crossings and
+   branching from the Connect/Draw tools come after.
+2. Switch changes recorded as a `SWITCH_THROWN` event; a manual toggle once there
+   is something for it to control (reservations and signals).
+3. Trains set facing switches along their route and refuse to move a switch under
+   a train (reservation check).
+4. Interface: click a switch to toggle it, with a visible state.

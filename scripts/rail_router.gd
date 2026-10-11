@@ -115,6 +115,26 @@ static func _build_result(tracks: Dictionary, last: Vector3i, previous: Dictiona
 	return {"cells": cells, "switches": switches}
 
 
+## The switch settings a list of route cells needs: {cell: 0 or 1} for every
+## switch the route enters through its stem. Trailing moves and crossings need
+## none. The first and last cell are skipped (no side of arrival or departure).
+static func switch_settings(tracks: Dictionary, cells: Array[Vector2i]) -> Dictionary:
+	var result: Dictionary = {}
+
+	for index in range(1, cells.size() - 1):
+		var cell: Vector2i = cells[index]
+
+		if not tracks.has(cell):
+			continue
+
+		var needed: int = Geometry.state_for(tracks[cell], cells[index - 1] - cell, cells[index + 1] - cell)
+
+		if needed >= 0:
+			result[cell] = needed
+
+	return result
+
+
 static func make_path(cells: Array[Vector2i], tile_size: float) -> Curve2D:
 	var path := Curve2D.new()
 	path.bake_interval = 1.0

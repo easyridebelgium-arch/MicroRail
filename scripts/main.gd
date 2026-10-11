@@ -93,7 +93,7 @@ const GameSettings = preload("res://scripts/core/game_settings.gd")
 const InputActions = preload("res://scripts/core/input_actions.gd")
 const Palette = preload("res://scripts/core/palette.gd")
 const SettingsDialog = preload("res://scripts/settings_dialog.gd")
-const SAVE_VERSION: int = 17
+const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const TOOLBAR_ICON_SHEET = preload("res://assets/ui/icons/toolbar.svg")
 const NetworkMap = preload("res://scripts/network_map.gd")
@@ -101,8 +101,10 @@ const ScenarioGoals = preload("res://scripts/scenario_goals.gd")
 
 # A false value means horizontal; true means vertical.
 var tracks: Dictionary = {}
-# Junction switch states: {cell: [active_port_a, active_port_b]}
+# Switch positions for drawing: {cell: 0 (through) or 1 (branch)}. Trains follow
+# their planned routes; each switch is set to match the routes that use it.
 var switch_states: Dictionary = {}
+var freight_route_cells: Array[Vector2i] = []
 var draw_track_mode: bool = false
 var build_stroke: Array[Vector2i] = []
 var build_plan: Dictionary = {}
@@ -395,6 +397,7 @@ func _check_route(force_reset: bool = false) -> void:
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
 	_refresh_freight_route(new_route)
+	_refresh_switch_states(new_route)
 	passenger_route_error = built["error"]
 	if not force_reset and new_route == route_cells:
 		return
@@ -692,6 +695,23 @@ func _draw_track(cell: Vector2i, track_type: Variant, preview: bool) -> void:
 		draw_line(sleepers[index], sleepers[index + 1], sleeper_color, 4.0)
 	draw_polyline(geometry["left"], rail_color, 2.0)
 	draw_polyline(geometry["right"], rail_color, 2.0)
+
+	# Switches and crossings have further rails.
+	for extra in geometry.get("extra", []):
+		var extra_sleepers: PackedVector2Array = extra["sleepers"]
+		for index in range(0, extra_sleepers.size(), 2):
+			draw_line(extra_sleepers[index], extra_sleepers[index + 1], sleeper_color, 4.0)
+		draw_polyline(extra["left"], rail_color, 2.0)
+		draw_polyline(extra["right"], rail_color, 2.0)
+
+	# A switch shows where it is set: a filled marker on the open exit, with a
+	# ring at the stem so the state is not carried by colour alone.
+	if not preview and TrackGeometry.is_switch(track_type):
+		var ports: Array[Vector2i] = TrackGeometry.connections(track_type)
+		var open_exit: Vector2i = ports[2] if int(switch_states.get(cell, 0)) == 1 else ports[1]
+		var middle: Vector2 = Vector2.ONE * TILE_SIZE / 2.0
+		draw_circle(middle + Vector2(open_exit) * TILE_SIZE * 0.3, 4.0, Palette.get_color(Palette.Role.FACILITY_STATION))
+		draw_arc(middle + Vector2(ports[0]) * TILE_SIZE * 0.3, 4.0, 0.0, TAU, 12, Palette.get_color(Palette.Role.FACILITY_STATION), 1.5)
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -909,6 +929,7 @@ func _save_game() -> void:
 	var data: Dictionary = {
 		"version": SAVE_VERSION,
 		"tracks": saved_tracks,
+		"switches": _saved_switches(),
 		"route_distance": route_distance,
 		"state": state,
 		"freight": freight_train.save_state(),
@@ -963,6 +984,46 @@ func _save_game() -> void:
 
 	_show_notice("Game saved.")
 	
+# [[x, y, state], ...] for every switch tile.
+func _saved_switches() -> Array:
+	var saved: Array = []
+
+	for cell in tracks:
+		if TrackGeometry.is_switch(tracks[cell]):
+			saved.append([cell.x, cell.y, int(switch_states.get(cell, 0))])
+
+	return saved
+
+
+# Whole-list check: every entry is a switch tile in `checked_tracks`, with
+# state 0 or 1, and no tile appears twice.
+func _is_valid_switch_list(value: Variant, checked_tracks: Dictionary) -> bool:
+	if not value is Array:
+		return false
+
+	var seen: Dictionary = {}
+
+	for entry in value:
+		if not entry is Array or entry.size() != 3:
+			return false
+
+		for part in entry:
+			if not _is_valid_number(part) or float(part) != floor(float(part)):
+				return false
+
+		var cell := Vector2i(int(entry[0]), int(entry[1]))
+
+		if seen.has(cell) or not checked_tracks.has(cell) or not TrackGeometry.is_switch(checked_tracks[cell]):
+			return false
+
+		if int(entry[2]) != 0 and int(entry[2]) != 1:
+			return false
+
+		seen[cell] = true
+
+	return true
+
+
 func _is_valid_number(value: Variant) -> bool:
 	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
 		return false
@@ -1129,6 +1190,9 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 		checked_tracks[cell] = entry[2]
 
+	if not _is_valid_switch_list(data.get("switches"), checked_tracks):
+		return false
+
 	# Every facility must retain its horizontal platform track.
 	for station in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
 		if not checked_tracks.has(station):
@@ -1209,6 +1273,10 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		return
 	# Commit only after validating every service and train.
 	tracks = loaded_tracks
+	switch_states = {}
+	for entry in data["switches"]:
+		switch_states[Vector2i(int(entry[0]), int(entry[1]))] = int(entry[2])
+	freight_route_cells = loaded_freight_cells
 	services = data["services"].duplicate(true)
 	fleet = Fleet.from_save(data["fleet"])
 	_apply_fleet_specs()
@@ -1247,7 +1315,8 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 
 
 func _is_valid_track_type(value: Variant) -> bool:
-	return TrackGeometry.connections(value).size() == 2
+	var port_count: int = TrackGeometry.connections(value).size()
+	return port_count >= 2 and port_count <= 4
 
 
 func _update_train_transform() -> void:
@@ -1936,7 +2005,22 @@ func _refresh_freight_route(passenger_cells: Array[Vector2i]) -> void:
 		passenger_cells
 	)
 
+	freight_route_cells = cells
 	freight_train.set_route(cells, float(TILE_SIZE))
+
+
+# Sets every switch to match the routes that use it; switches no route uses
+# keep their position.
+func _refresh_switch_states(passenger_cells: Array[Vector2i]) -> void:
+	var settings: Dictionary = RailRouter.switch_settings(tracks, freight_route_cells)
+	settings.merge(RailRouter.switch_settings(tracks, passenger_cells), true)
+	var updated: Dictionary = {}
+
+	for cell in tracks:
+		if TrackGeometry.is_switch(tracks[cell]):
+			updated[cell] = int(settings.get(cell, switch_states.get(cell, 0)))
+
+	switch_states = updated
 
 
 func _on_logs_delivered(amount: int) -> void:

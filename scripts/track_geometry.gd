@@ -231,13 +231,44 @@ static func centerline(entry: Vector2i, exit_port: Vector2i, tile_size: float) -
 	return points
 
 
+## The port pairs that are drawn as rails: one for a simple tile, stem-through
+## and stem-branch for a switch, the two lines for a crossing.
+static func drawing_pairs(track_type: Variant) -> Array:
+	var ports: Array[Vector2i] = connections(track_type)
+
+	if ports.size() == 2:
+		return [[ports[0], ports[1]]]
+
+	if is_switch(track_type):
+		return [[ports[0], ports[1]], [ports[0], ports[2]]]
+
+	if is_crossing(track_type):
+		return [[ports[0], ports[1]], [ports[2], ports[3]]]
+
+	return []
+
+
+## Rail outlines for a tile: {"left", "right", "sleepers"} for the first path
+## plus "extra", the same dictionaries for any further paths (switch branch,
+## second crossing line). Empty for an unknown tile.
 static func drawing_data(track_type: Variant, tile_size: float) -> Dictionary:
 	var key: String = str(track_type) + ":" + str(tile_size)
 	if _drawing_cache.has(key):
 		return _drawing_cache[key]
-	var ports: Array[Vector2i] = connections(track_type)
-	if ports.size() != 2:
+	var pairs: Array = drawing_pairs(track_type)
+	if pairs.is_empty():
 		return {}
+	var result: Dictionary = _pair_geometry(pairs[0][0], pairs[0][1], tile_size)
+	var extra: Array = []
+	for index in range(1, pairs.size()):
+		extra.append(_pair_geometry(pairs[index][0], pairs[index][1], tile_size))
+	result["extra"] = extra
+	_drawing_cache[key] = result
+	return result
+
+
+static func _pair_geometry(first_port: Vector2i, second_port: Vector2i, tile_size: float) -> Dictionary:
+	var ports: Array[Vector2i] = [first_port, second_port]
 	var points: PackedVector2Array = centerline(ports[0], ports[1], tile_size)
 	var left := PackedVector2Array()
 	var right := PackedVector2Array()
@@ -265,6 +296,4 @@ static func drawing_data(track_type: Variant, tile_size: float) -> Dictionary:
 		sleepers.append(center - normal * 10.0)
 		sleepers.append(center + normal * 10.0)
 		distance += 8.0
-	var result: Dictionary = {"left": left, "right": right, "sleepers": sleepers}
-	_drawing_cache[key] = result
-	return result
+	return {"left": left, "right": right, "sleepers": sleepers}

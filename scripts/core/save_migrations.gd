@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 17
+const CURRENT_VERSION: int = 18
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -71,6 +71,8 @@ static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 			return _v15_to_v16(data)
 		16:
 			return _v16_to_v17(data)
+		17:
+			return _v17_to_v18(data)
 
 	# Unreachable while every version between OLDEST and CURRENT has a step.
 	return data
@@ -110,6 +112,13 @@ static func _v16_to_v17(data: Dictionary) -> Dictionary:
 	if data.has("sim") and data["sim"] is Dictionary:
 		if not data["sim"].has("commands"):
 			data["sim"]["commands"] = {"next_seq": 1, "pending": []}
+	return data
+
+
+# v18 adds switch tiles; "switches" lists [x, y, state] for each switch.
+static func _v17_to_v18(data: Dictionary) -> Dictionary:
+	if not data.has("switches"):
+		data["switches"] = []
 	return data
 
 

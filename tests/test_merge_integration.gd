@@ -48,7 +48,7 @@ func _run() -> void:
 	game.sim_rng.randi()
 	game._save_game()
 	var base: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SAVE_PATH))
-	check(int(base["version"]) == 16 and base.has("sim") and base.has("fleet"), "Combined save must have one v16 schema with fleet and simulation blocks")
+	check(int(base["version"]) == Migrations.CURRENT_VERSION and base.has("sim") and base.has("fleet") and base.has("switches"), "Combined save must have the current schema with fleet, simulation and switch blocks")
 	var expected_random: int = game.sim_rng.randi()
 	game._load_game()
 	check(game.sim_rng.randi() == expected_random, "Merged save must continue the exact RNG stream")

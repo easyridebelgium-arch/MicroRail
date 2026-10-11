@@ -72,7 +72,7 @@ must not claim to predict traffic conflicts without the reservation layer.
 | Deadlock detection and emergency recovery | Detect circular waits, identify involved trains/blocks and offer safe hold, turn-back, reroute or recovery actions. | Continuous actual wait cycles are detected after three simulation seconds. Traffic reverses the selected train in place, retaining its path and load until it physically returns to its departure stop, then holds it. Manual Hold/Resume is also available. Automatic turn-back, alternate routing and full reversal-location rules remain later work. See [deadlock recovery](DEADLOCKS.md). Full shunting and yard operations arrive later. |
 | Construction planning and conflict preview | Draft ghost tracks, stations, bridges, signals and blueprints before committing; show cost and affected services. | Reservation conflicts require the reservation layer. Add grade, ownership, signal overlap and travel-time warnings as those systems arrive. Preview and commit must use the same validation rules. |
 | Corridor selection and batch tools | Upgrade long segments, double-track, electrify, add signals/platforms or demolish in bulk. | Extend drag-demolition after junctions stabilise. Respect active reservations, show the full cost and support grouped Undo. Each upgrade type depends on its underlying system. |
-| Track inspection and route overlays | Toggle service paths, block occupancy, reservations, signals, speed limits and congestion; later add gradients, electrification, ownership and condition. | Use real simulation data in a collapsible overlay panel. Never substitute decorative colours for operational state. |
+| Track inspection and route overlays | Toggle service paths, block occupancy, reservations, signals, speed limits and congestion; later add gradients, electrification, ownership and condition. | Implemented: collapsible service-path filtering, actual signal-block IDs/authority, hatched reservations and directional affected-service construction reports. Speed limits, congestion and richer planning remain future work. Never substitute decorative colours for operational state. |
 | Search, filtering, pinning and jump-to | Find trains, stations, industries, services and later contracts; filter by type or status, highlight routes and maintain watchlists. | Build on stable identities and named objects. Search results and problem lists link directly to the map or inspector. |
 | Advisory pathfinding | Recommend a route between stations with cost, travel time and supported conflict warnings without building it. | Reuse route and construction validation. Start with read-only advice; reserve shared pathfinding work for any later rival AI. |
 | Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Consume the event stream and save preferences. Provide non-colour and non-audio cues, and coordinate pause behaviour with no-pause challenges. |
@@ -221,7 +221,9 @@ ahead on the current leg stops trains in place; a gap behind does not interrupt
 delivery. After turning, the new leg is checked again. Shuttle/Loop route modes
 and closing-leg waypoints are integrated. Multiple independent passenger services
 now run together on shared tracks with selected passing-loop paths and signal
-boundaries. Next: route/reservation inspection overlays, affected-service
-construction feedback and richer planning previews.
+boundaries. Route inspection, signal-block authority overlays and directional
+affected-service construction feedback are now implemented; see
+[network inspection and testing](NETWORK_INSPECTION.md). Next: measured waiting and
+congestion indicators, searchable problems/alerts and richer planning previews.
 Predictive traffic advice waits for timetable/demand data; multiple trains per
 service follow the independent-service model. See [reservation behaviour and checks](RESERVATIONS.md).

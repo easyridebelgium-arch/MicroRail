@@ -22,6 +22,14 @@ const OPERATING_COST_PER_SECOND: int = 1
 const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
+const ConstructionImpact = preload("res://scripts/core/construction_impact.gd")
+const InspectionPanel = preload("res://scripts/inspection_panel.gd")
+var demolition_blocked: Dictionary = {}
+var construction_analyzer = ConstructionImpact.new()
+var inspection_button: Button
+var inspection_panel: PanelContainer
+var construction_feedback: Dictionary = {"affected": [], "blocked": {}}
+
 const PassengerService = preload("res://scripts/passenger_service.gd")
 const ServiceRoutes = preload("res://scripts/service_routes.gd")
 const RouteEditor = preload("res://scripts/route_editor.gd")
@@ -290,6 +298,7 @@ func _ready() -> void:
 	_apply_fleet_specs()
 	_setup_settings_dialog()
 	_setup_reservation_overlay()
+	_setup_inspection()
 	_setup_traffic_dialog()
 	_setup_signal_tool()
 	_setup_speed_control()
@@ -318,6 +327,7 @@ func _process(delta: float) -> void:
 			_run_due_commands()
 			_simulation_step(SimClock.TICK_SECONDS)
 
+	_update_inspection()
 	_update_instructions()
 	_update_toolbar()
 	_update_station_inspector()
@@ -374,12 +384,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		is_dragging = false
 		is_panning = false
 		demolition_cells.clear()
+		demolition_blocked.clear()
 		_reset_camera()
 		return
 
 	if event.is_action_pressed(InputActions.CANCEL):
 		is_dragging = false
 		demolition_cells.clear()
+		demolition_blocked.clear()
 		return
 
 	if event.is_action_pressed(InputActions.TOGGLE_INSPECT):
@@ -402,6 +414,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if is_dragging and demolition_mode:
 				is_dragging = false
 				demolition_cells.clear()
+				demolition_blocked.clear()
 				return
 
 			if inspect_mode:
@@ -421,6 +434,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _can_build_at(cell):
 				demolition_mode = false
 				demolition_cells.clear()
+				demolition_blocked.clear()
 				drag_start = cell
 				build_stroke.assign([cell])
 				is_dragging = true
@@ -439,6 +453,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if is_dragging:
 				is_dragging = false
 				demolition_cells.clear()
+				demolition_blocked.clear()
 				return
 
 			if not _is_inside_map(cell):
@@ -449,6 +464,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			drag_start = cell
 			demolition_last_cell = cell
 			demolition_cells.clear()
+			demolition_blocked.clear()
 			_collect_demolition_cells(cell)
 
 		if event.is_action_released(InputActions.DEMOLISH):
@@ -606,6 +622,11 @@ func _update_instructions() -> void:
 	if preview_cost > 0 and preview_cost > money:
 		affordability = " — insufficient funds"
 
+	if is_dragging and not construction_feedback.affected.is_empty():
+		direction += " | Affects %d services (details: Overlays)" % construction_feedback.affected.size()
+	if is_dragging and not construction_feedback.blocked.is_empty():
+		direction += " | %d reserved tiles cannot be edited" % construction_feedback.blocked.size()
+
 	var status_line: String = "%s | Cell: %d,%d | Build: £%d%s | %s" % [
 		direction,
 		hovered_cell.x,
@@ -680,6 +701,9 @@ func _layout_header() -> void:
 
 	if station_panel != null:
 		station_panel.offset_top = header_height + (16.0 * scale)
+	if inspection_panel != null:
+		inspection_panel.offset_top = header_height + 8.0 * scale
+		inspection_panel.offset_bottom = maxf(inspection_panel.offset_top + 80.0, get_viewport_rect().size.y - 64.0 * scale)
 
 	# Left column: objectives, then the network map in whatever height is left
 	# above the bottom buttons. Recomputed every frame (cheap, and it follows
@@ -715,6 +739,7 @@ func _draw() -> void:
 	_draw_grid()
 	for cell in tracks:
 		_draw_track(cell, tracks[cell], false)
+	_draw_inspection_paths()
 	_draw_station(STATION_A, "Station A")
 	_draw_station(STATION_B, "Station B")
 	_draw_station(STATION_C, "Station C")
@@ -1633,6 +1658,7 @@ func _toggle_switch_tool() -> void:
 	_close_station_inspector()
 	is_dragging = false
 	demolition_cells.clear()
+	demolition_blocked.clear()
 	build_plan.clear()
 	_update_toolbar()
 
@@ -1709,6 +1735,7 @@ func _input(event: InputEvent) -> void:
 		):
 			is_dragging = false
 			demolition_cells.clear()
+			demolition_blocked.clear()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -1884,6 +1911,7 @@ func _inspect_station_at(cell: Vector2i) -> void:
 
 		if cell == station or inside_station_grounds:
 			selected_station = station
+			if inspection_button != null: inspection_button.button_pressed = false
 			station_panel.show()
 			_update_station_inspector()
 			return
@@ -2674,6 +2702,8 @@ func _collect_demolition_cells(target: Vector2i) -> void:
 
 			cell = Vector2i(point.round())
 
+		if tracks.has(cell) and reservations.owners.has(cell) and not _is_station_space(cell) and cell not in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
+			demolition_blocked[cell] = reservations.owners[cell]
 		if _can_demolish(cell):
 			demolition_cells[cell] = true
 
@@ -2691,6 +2721,7 @@ func _finish_demolition(target: Vector2i) -> void:
 			cells.append([cell.x, cell.y])
 
 	demolition_cells.clear()
+	demolition_blocked.clear()
 
 	if cells.is_empty():
 		queue_redraw()
@@ -2964,6 +2995,7 @@ func _open_settings() -> void:
 	is_dragging = false
 	is_panning = false
 	demolition_cells.clear()
+	demolition_blocked.clear()
 	build_plan.clear()
 	settings_dialog.open_dialog()
 
@@ -3112,6 +3144,7 @@ func _on_map_navigation_requested(world_position: Vector2) -> void:
 	is_dragging = false
 	is_panning = false
 	demolition_cells.clear()
+	demolition_blocked.clear()
 
 	camera.position = world_position
 	camera.force_update_scroll()
@@ -3342,6 +3375,7 @@ func _open_routes_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 	is_dragging = false
 	is_panning = false
 	demolition_cells.clear()
+	demolition_blocked.clear()
 	build_plan.clear()
 	_close_station_inspector()
 	_update_toolbar()
@@ -3415,6 +3449,7 @@ func _open_fleet_editor() -> void:
 	is_dragging = false
 	is_panning = false
 	demolition_cells.clear()
+	demolition_blocked.clear()
 	build_plan.clear()
 	_close_station_inspector()
 	_update_toolbar()
@@ -3740,6 +3775,7 @@ func _open_traffic_dialog() -> void:
 	is_dragging = false
 	is_panning = false
 	demolition_cells.clear()
+	demolition_blocked.clear()
 	build_plan.clear()
 	_close_station_inspector()
 	_rebuild_reservations()
@@ -3993,3 +4029,119 @@ func upgrade_fleet_train(id: int, kind: String) -> String:
 	_apply_fleet_specs()
 	_record_event(EventLog.UPGRADE_BOUGHT, str(id), {"kind": kind, "level": level + 1, "price": price})
 	return "%s upgrade bought for £%d." % [kind.capitalize(), price]
+
+
+# Snapshots intentionally expose retained geometry, including broken track.
+func inspection_trains() -> Array:
+	var result: Array = []
+	for key in service_keys():
+		var assigned: Dictionary = Fleet.assigned(fleet, key)
+		if assigned.is_empty(): continue
+		var cells: Array[Vector2i]
+		var path: Curve2D
+		var distance: float
+		var target: float
+		if key == "passenger":
+			cells = route_cells
+			path = route_path
+			distance = route_distance
+			target = _passenger_target_distance() if not stop_distances.is_empty() else 0.0
+		elif key == "freight":
+			cells = freight_train.route_cells
+			path = freight_train.route_path
+			distance = freight_train.distance_along_route
+			target = path.get_baked_length() if freight_train.to_terminal else 0.0
+		else:
+			var running = passenger_services[key]
+			cells = running.cells
+			path = running.path
+			distance = running.distance
+			target = running.target_distance() if not running.distances.is_empty() else 0.0
+		result.append({"key": key, "id": int(assigned.id), "name": str(services[key].name), "cells": cells, "path": path, "distance": distance, "target": target})
+	return result
+
+func _setup_inspection() -> void:
+	inspection_panel = InspectionPanel.new()
+	inspection_panel.name = "InspectionPanel"
+	$Interface.add_child(inspection_panel)
+	inspection_panel.anchor_left = 1.0
+	inspection_panel.anchor_right = 1.0
+	inspection_panel.offset_left = -300
+	inspection_panel.offset_right = -12
+	inspection_panel.hide()
+	inspection_panel.changed.connect(queue_redraw)
+	inspection_button = Button.new()
+	inspection_button.text = "Overlays"
+	inspection_button.toggle_mode = true
+	inspection_button.focus_mode = Control.FOCUS_NONE
+	inspection_button.tooltip_text = "Actual service paths, signal blocks and construction impact. Reservations has its own hatched toggle."
+	inspection_button.toggled.connect(func(enabled: bool) -> void:
+		inspection_panel.visible = enabled
+		if enabled: station_panel.hide())
+	$Interface/HeaderBox/Toolbar.add_child(inspection_button)
+
+func _update_inspection() -> void:
+	var trains := inspection_trains()
+	var changes: Dictionary = {}
+	if is_dragging:
+		if demolition_mode:
+			for cell in demolition_cells: changes[cell] = null
+		else:
+			changes = build_plan.get("changes", {})
+	construction_feedback = construction_analyzer.analyze(tracks, changes, trains, reservations.owners, float(TILE_SIZE)) if not changes.is_empty() else {"affected": [], "blocked": {}}
+	if is_dragging and demolition_mode:
+		for cell in demolition_blocked:
+			if reservations.owners.has(cell): construction_feedback.blocked[cell] = reservations.owners[cell]
+	if inspection_panel == null or not inspection_panel.visible: return
+	var lines: PackedStringArray = ["Paths: retained train routes; gaps remain visible. Squares mark route origins; circles mark the next destination. Labels use permanent train IDs.", "Reservations: use the toolbar toggle for hatched ownership."]
+	if inspection_panel.blocks:
+		lines.append("Blocks: dotted outlines, B = block ID. Authority includes reservations; it does not mean every tile is occupied.")
+	lines.append("Cell %d,%d" % [hovered_cell.x, hovered_cell.y])
+	if reservations.occupied_owners.has(hovered_cell):
+		lines.append("Occupied by train #%d" % int(reservations.occupied_owners[hovered_cell]))
+	elif reservations.owners.has(hovered_cell):
+		lines.append("Reserved by train #%d" % int(reservations.owners[hovered_cell]))
+	if block_signals.cell_blocks.has(hovered_cell):
+		var block: int = block_signals.cell_blocks[hovered_cell]
+		var ids: PackedStringArray = []
+		for id in block_signals.block_owners.get(block, {}): ids.append("#%d" % int(id))
+		lines.append("Block B%d authority: %s" % [block, ", ".join(ids) if not ids.is_empty() else "none"])
+	if is_dragging:
+		lines.append("Preview only; traffic may change before release.")
+		for affected in construction_feedback.affected:
+			lines.append("#%d %s: %s" % [affected.id, affected.name, affected.effect])
+		for cell in construction_feedback.blocked:
+			lines.append("%d,%d reserved by #%d; cannot edit" % [cell.x, cell.y, int(construction_feedback.blocked[cell])])
+		if construction_feedback.affected.is_empty(): lines.append("No retained service path crosses this edit.")
+	inspection_panel.refresh(trains, "\n\n".join(lines))
+
+func _draw_inspection_paths() -> void:
+	if inspection_panel == null: return
+	if inspection_panel.blocks:
+		for cell in block_signals.cell_blocks:
+			var origin := Vector2(cell) * TILE_SIZE
+			var block: int = block_signals.cell_blocks[cell]
+			for edge in [Vector2.RIGHT, Vector2.DOWN]:
+				var start: Vector2 = origin + edge * TILE_SIZE
+				var along: Vector2 = Vector2.DOWN if edge == Vector2.RIGHT else Vector2.RIGHT
+				for offset in range(0, TILE_SIZE, 8):
+					draw_line(start + along * offset, start + along * (offset + 4), Color.WHITE, 1.0)
+			draw_string(ThemeDB.fallback_font, origin + Vector2(2, 29), "B%d" % block, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
+	if not inspection_panel.routes: return
+	for train in inspection_trains():
+		if not inspection_panel.selected_service.is_empty() and train.key != inspection_panel.selected_service: continue
+		var path: Curve2D = train.path
+		if path.point_count < 2: continue
+		var length := path.get_baked_length()
+		var tint: Color = Palette.get_color(Palette.Role.HOVER_OK)
+		# Dash patterns differ by permanent ID, so colour is never the sole key.
+		var spacing := 12.0 + float(int(train.id) % 3) * 4.0
+		var distance := 0.0
+		while distance < length:
+			draw_line(path.sample_baked(distance), path.sample_baked(minf(distance + spacing * 0.6, length)), tint, 3.0)
+			distance += spacing
+		var origin := path.sample_baked(0.0)
+		draw_rect(Rect2(origin - Vector2(5, 5), Vector2(10, 10)), Color.WHITE, false, 2.0)
+		draw_arc(path.sample_baked(train.target), 7, 0, TAU, 16, Color.WHITE, 2.0)
+		var label := path.sample_baked(train.distance) + Vector2(8, -12 - int(train.id) % 3 * 12)
+		draw_string(ThemeDB.fallback_font, label, "#%d %s" % [train.id, train.name], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)

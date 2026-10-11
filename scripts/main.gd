@@ -22,6 +22,9 @@ const OPERATING_COST_PER_SECOND: int = 1
 const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
+const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
+var notifications = NotificationPolicy.new()
+
 const TrafficMetrics = preload("res://scripts/core/traffic_metrics.gd")
 const ProblemsDialog = preload("res://scripts/problems_dialog.gd")
 var traffic_metrics = TrafficMetrics.new()
@@ -331,10 +334,12 @@ func _process(delta: float) -> void:
 	# The simulation advances in fixed steps, whatever the frame rate.
 	if not paused:
 		for _step in sim_clock.advance(delta):
+			if paused: break
 			sim_clock.begin_tick()
 			_run_due_commands()
 			_simulation_step(SimClock.TICK_SECONDS)
 
+	_flush_notifications()
 	_update_inspection()
 	_update_instructions()
 	_update_toolbar()
@@ -363,10 +368,12 @@ func _simulation_step(step_seconds: float) -> void:
 	traffic_metrics.update(sim_clock.tick, reservation_trains.keys(), traffic_wait_samples)
 	_check_scenario_objectives()
 	_refresh_directional_routes()
+	_flush_notifications()
 
 
 func _record_event(type: String, subject: String, data: Dictionary = {}) -> void:
-	event_log.record(sim_clock.tick, type, subject, data)
+	var event: Dictionary = event_log.record(sim_clock.tick, type, subject, data)
+	notifications.consume(event, GameSettings.notification_rules)
 
 
 # True while a dialog owns the keyboard, so game shortcuts stay quiet.
@@ -616,7 +623,7 @@ func _update_instructions() -> void:
 	var status: String = _passenger_service_status()
 
 	if paused:
-		status = "Paused. Press Space to resume."
+		status = "Paused. Press %s to resume." % InputActions.key_label(InputActions.TOGGLE_PAUSE)
 
 	if notice_remaining > 0.0:
 		status = notice
@@ -1576,6 +1583,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	sim_clock.restore_state(data["sim"]["clock"])
 	sim_rng.restore_state(data["sim"]["rng"])
 	event_log.restore_state(data["sim"]["events"])
+	notifications.reset()
 	traffic_metrics.reset()
 	traffic_wait_samples.clear()
 
@@ -3723,7 +3731,6 @@ func _update_deadlocks() -> void:
 	deadlocks.update(movement_blocks, sim_clock.tick)
 	for cycle in deadlocks.new_cycles:
 		_record_event(EventLog.DEADLOCK_DETECTED, "network", {"trains": cycle.duplicate(), "reason": "Trains are waiting on each other; open Traffic for reversal."})
-		_show_notice("Deadlock detected. Open Traffic to inspect and reverse a train safely.")
 	for cycle in deadlocks.cleared_cycles:
 		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle.duplicate()})
 	if traffic_button != null:
@@ -4269,3 +4276,13 @@ func locate_problem(row: Dictionary) -> bool:
 	else: camera.position = _cell_center(row.cell)
 	camera.force_update_scroll()
 	return true
+
+
+func _flush_notifications() -> void:
+	var alert: Dictionary = notifications.take()
+	if alert.is_empty(): return
+	if alert.pause:
+		paused = true
+		_show_notice("Paused by alert: " + str(alert.text) + ". Resume with " + InputActions.key_label(InputActions.TOGGLE_PAUSE) + ".")
+	else:
+		_show_notice(str(alert.text))

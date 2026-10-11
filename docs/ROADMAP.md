@@ -75,7 +75,7 @@ must not claim to predict traffic conflicts without the reservation layer.
 | Track inspection and route overlays | Toggle service paths, block occupancy, reservations, signals, speed limits and congestion; later add gradients, electrification, ownership and condition. | Implemented: collapsible service-path filtering, actual signal-block IDs/authority, hatched reservations, directional affected-service construction reports and measured waiting by conflict cell. Speed limits, occupancy/utilisation measurements and richer planning remain future work. Never substitute decorative colours for operational state. |
 | Search, filtering, pinning and jump-to | Find trains, stations, industries, services and later contracts; filter by type or status, highlight routes and maintain watchlists. | Implemented: searchable current problems and recent incidents, train/service names, severity filters and map location for original and independent trains. Global object search, pinning and watchlists remain planned. |
 | Advisory pathfinding | Recommend a route between stations with cost, travel time and supported conflict warnings without building it. | Reuse route and construction validation. Start with read-only advice; reserve shared pathfinding work for any later rival AI. |
-| Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Implemented: current problem counts and severity-filtered historical incident browsing from the saved event stream. Notification preferences, acknowledgement and automatic pause rules remain planned. Provide non-colour and non-audio cues, and coordinate pause behaviour with no-pause challenges. |
+| Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Implemented: current problem counts and severity-filtered historical incident browsing from the saved event stream. Implemented: saved per-category Off/Notice/Notice + pause preferences for waiting, deadlock and recovery events, with pause applied after a complete fixed tick. Acknowledgement, watchlists and per-train rules remain planned; see [notifications](NOTIFICATIONS.md). Provide non-colour and non-audio cues, and coordinate pause behaviour with no-pause challenges. |
 | Passing loops and multiple platforms | Reduce bottlenecks and let faster services pass slower trains. | Depends on junctions, reservations and platform assignment. |
 | Route performance panel and company dashboard | Compare income, running costs, occupancy, waiting passengers and delays. Expand into historical graphs of profit, ridership, occupancy and punctuality per route and across the company. | Attribute costs and deliveries to services and individual trains. Start recording bounded historical data early; add delay statistics when timetables are introduced. |
 | Custom livery | Add selectable fleet colour palettes to the existing individual train names. | Stable identities and train renaming are implemented. Palette-friendly artwork and readable service indicators remain to be added. |
@@ -225,7 +225,9 @@ boundaries. Route inspection, signal-block authority overlays and directional
 affected-service construction feedback are now implemented; see
 [network inspection and testing](NETWORK_INSPECTION.md). Measured traffic waiting,
 a bounded recent-wait overlay, searchable current problems and historical incidents
-are now implemented; see [problems and waiting](PROBLEMS_AND_WAITING.md). Next:
-notification preferences and richer reservation-aware planning/batch tools.
+are now implemented; see [problems and waiting](PROBLEMS_AND_WAITING.md).
+Operational notification preferences and safe fixed-tick automatic pause are now
+implemented; see [notification controls](NOTIFICATIONS.md). Next: richer
+reservation-aware planning and corridor/batch tools.
 Predictive traffic advice waits for timetable/demand data; multiple trains per
 service follow the independent-service model. See [reservation behaviour and checks](RESERVATIONS.md).

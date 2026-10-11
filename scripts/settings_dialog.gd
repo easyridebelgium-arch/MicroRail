@@ -7,6 +7,8 @@ signal settings_applied
 const Settings = preload("res://scripts/core/game_settings.gd")
 const Actions = preload("res://scripts/core/input_actions.gd")
 
+var notification_choices: Dictionary = {}
+
 var scale_choice: OptionButton
 var palette_choice: OptionButton
 var reduced_motion_check: CheckBox
@@ -58,6 +60,21 @@ func configure() -> void:
 	compact_header_check = CheckBox.new()
 	compact_header_check.text = "Compact header (always on at 175% and above)"
 	box.add_child(compact_header_check)
+
+	box.add_child(_heading("Operational alerts"))
+	var explanation := Label.new()
+	explanation.text = "Choose notices or automatic pause for new incidents. All incidents stay in Problems history. Build and objective feedback keep their existing controls."
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(explanation)
+	for category in Settings.NotificationPolicy.ORDER:
+		var label := Label.new()
+		label.text = Settings.NotificationPolicy.LABELS[category]
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(label)
+		var choice := OptionButton.new()
+		for mode in ["Off", "Notice", "Notice + pause"]: choice.add_item(mode)
+		box.add_child(choice)
+		notification_choices[category] = choice
 
 	box.add_child(_heading("Keys — click one, then press the new key"))
 
@@ -127,6 +144,9 @@ func open_dialog() -> void:
 	palette_choice.select(Settings.palette_mode)
 	reduced_motion_check.button_pressed = Settings.reduced_motion
 	compact_header_check.button_pressed = Settings.compact_header
+	var rules := Settings.NotificationPolicy.normalize(Settings.notification_rules)
+	for category in notification_choices:
+		notification_choices[category].select(int(rules[category]))
 	draft_bindings = Actions.export_bindings()
 	draft_mouse_bindings = Actions.export_mouse_bindings()
 	capturing_action = &""
@@ -327,6 +347,8 @@ func _apply() -> void:
 	Settings.palette_mode = maxi(palette_choice.selected, 0)
 	Settings.reduced_motion = reduced_motion_check.button_pressed
 	Settings.compact_header = compact_header_check.button_pressed
+	for category in notification_choices:
+		Settings.notification_rules[category] = notification_choices[category].selected
 
 	Actions.apply_bindings(draft_bindings)
 	Actions.apply_mouse_bindings(draft_mouse_bindings)

@@ -6,6 +6,9 @@ extends RefCounted
 ## All members are static, so any script can read them without an autoload:
 ##     if GameSettings.reduced_motion: ...
 
+const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
+static var notification_rules: Dictionary = NotificationPolicy.defaults()
+
 const SETTINGS_PATH: String = "user://settings.cfg"
 
 ## Offered scales. The window scales everything; main.gd cancels that for the
@@ -53,6 +56,8 @@ static func load_settings() -> void:
 	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
 	compact_header = bool(config.get_value("display", "compact_header", false))
 
+	notification_rules = NotificationPolicy.normalize(config.get_value("notifications", "rules", {}))
+
 	var saved_bindings: Variant = config.get_value("input", "bindings", {})
 	key_bindings = saved_bindings if saved_bindings is Dictionary else {}
 	var saved_mouse: Variant = config.get_value("input", "mouse_bindings", {})
@@ -69,6 +74,7 @@ static func save_settings() -> bool:
 	config.set_value("display", "compact_header", compact_header)
 	config.set_value("input", "bindings", key_bindings)
 	config.set_value("input", "mouse_bindings", mouse_bindings)
+	config.set_value("notifications", "rules", NotificationPolicy.normalize(notification_rules))
 
 	return config.save(SETTINGS_PATH) == OK
 

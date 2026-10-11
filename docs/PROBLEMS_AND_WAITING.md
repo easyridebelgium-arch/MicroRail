@@ -39,8 +39,9 @@ train has been stored or removed, a recorded track location is used instead. An
 incident without a surviving train or recorded location cannot be located. Existing
 saved event history is reused; this step introduces no save-format change.
 
-This is the first problem/incident browser. Notification preferences, automatic
-pause rules, acknowledgement and watchlists remain later steps.
+The next update adds [notification preferences and automatic pause](NOTIFICATIONS.md)
+for live waiting, deadlock and recovery events. Acknowledgement and watchlists remain
+later steps.
 
 ## Measured waiting
 

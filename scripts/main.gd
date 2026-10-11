@@ -101,6 +101,8 @@ const ScenarioGoals = preload("res://scripts/scenario_goals.gd")
 
 # A false value means horizontal; true means vertical.
 var tracks: Dictionary = {}
+# Junction switch states: {cell: [active_port_a, active_port_b]}
+var switch_states: Dictionary = {}
 var draw_track_mode: bool = false
 var build_stroke: Array[Vector2i] = []
 var build_plan: Dictionary = {}

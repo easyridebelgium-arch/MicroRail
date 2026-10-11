@@ -8,10 +8,13 @@ static func connections(track_type: Variant) -> Array[Vector2i]:
 	return Geometry.connections(track_type)
 
 
+## Find a route using active connections at junctions.
+## switch_states: {cell: [active_port_a, active_port_b]} for junctions
 static func find_route(
 	tracks: Dictionary,
 	start: Vector2i,
-	destination: Vector2i
+	destination: Vector2i,
+	switch_states: Dictionary = {}
 ) -> Array[Vector2i]:
 	var empty_route: Array[Vector2i] = []
 
@@ -37,14 +40,30 @@ static func find_route(
 			route.reverse()
 			return route
 
-		for direction in connections(tracks[current]):
+		# Get active connections for this cell (use switch state if it's a junction)
+		var current_type: Variant = tracks[current]
+		var current_connections: Array[Vector2i]
+		if Geometry.is_junction(current_type) and switch_states.has(current):
+			current_connections = Geometry.active_connections(current_type, switch_states[current])
+		else:
+			current_connections = connections(current_type)
+
+		for direction in current_connections:
 			var neighbor: Vector2i = current + direction
 
 			if visited.has(neighbor) or not tracks.has(neighbor):
 				continue
 
+			# Get active connections for neighbor
+			var neighbor_type: Variant = tracks[neighbor]
+			var neighbor_connections: Array[Vector2i]
+			if Geometry.is_junction(neighbor_type) and switch_states.has(neighbor):
+				neighbor_connections = Geometry.active_connections(neighbor_type, switch_states[neighbor])
+			else:
+				neighbor_connections = connections(neighbor_type)
+
 			# Both pieces must connect across their shared edge.
-			if not connections(tracks[neighbor]).has(-direction):
+			if not neighbor_connections.has(-direction):
 				continue
 
 			visited[neighbor] = true

@@ -1,8 +1,8 @@
 # Phase 0 - Foundations
 
-Status: first version written against the scripts supplied on 11 Oct 2026.
-**It has not been run in Godot yet.** Work through the checklist at the end
-before building Phase 1 on top of it.
+Status: integrated with the merged fleet and route code and checked headlessly in
+Godot 4.6.3. Foundation module and merge integration tests pass. Windows/Godot 4.7
+visual interaction and the remaining accessibility work still need verification.
 
 ## What was added
 
@@ -18,18 +18,25 @@ before building Phase 1 on top of it.
 | `scripts/settings_dialog.gd` | Settings window: scale, palette, reduced motion, keys |
 | `tests/phase0_selftest.gd` | Headless checks for the modules above |
 
-Patched files (replace your copies; `phase0-changes.diff` shows every change):
-`main.gd`, `freight_train.gd`, `network_map.gd`.
+The running code is under `scripts/`. The `patched/` folder and
+`phase0-changes.diff` are historical copies, not installation instructions for the
+merged game. `patched/.gdignore` keeps those backups out of Godot imports; do not
+copy them over the current scripts.
 
 ## What changed in behaviour
 
 - **Simulation steps are fixed at 1/60 s** instead of using each frame's
-  `delta`. Timers, movement and income now give the same result at any frame
-  rate. Rendering, camera, notices and UI still use the real frame time.
-- **Saves are version 15.** Version 14 saves still load: they are upgraded in
-  memory and get a fixed RNG seed and an empty event log. Saving again writes
-  v15, and your previous save is copied to the backup slot as before. Saves
-  older than 14 are rejected, as before.
+  `delta`. Integration tests compare timers and moving trains at 30, 60 and
+  120 FPS. Long stalls deliberately drop excess catch-up time; this is not yet
+  a full deterministic command/replay system. Rendering, camera, notices and UI
+  still use real frame time.
+- **Saves are version 16**, defined only by `SaveMigrations.CURRENT_VERSION`.
+  Version 14 route saves and both version 15 variants (fleet-only and
+  simulation-only) migrate in memory. Existing data is preserved; missing
+  systems receive defaults. Pre-fleet saves reconstruct starter-train upgrades
+  and their purchase costs. Validation completes before the live game changes.
+  Saving again writes v16 and retains the previous save as a backup. Saves older
+  than 14, future versions and invalid current-format data are rejected.
 - **Keys go through the InputMap.** Defaults match the old keys (Space, M, G,
   I, Home, Esc, WASD/arrows, Shift). Letter shortcuts follow the letter
   printed on the key; camera movement follows the physical key position (WASD
@@ -64,7 +71,7 @@ Patched files (replace your copies; `phase0-changes.diff` shows every change):
 
 - **Interface scale scales the whole view** (map and interface together), and
   stops at 150%. At 200% the header text and toolbar do not fit; they need
-  reflowing (Phase 1). A scale for the interface only needs the hard-coded
+  reflowing (remaining Phase 0 work). A scale for the interface only needs the hard-coded
   offsets in `main.gd` replaced by containers.
 - **Mouse input is still hard-coded** (left build, right demolish, middle pan,
   wheel zoom). Move these to actions before adding controller support.
@@ -95,7 +102,7 @@ It should print `N checks, 0 failed`. Then play and check:
 3. Pause (Space), map (M), goals (G), inspect (I), Home, Esc and WASD all work.
 4. Save, quit, load: trains, money and objectives are restored.
 5. Load a **version 14 save** (keep a copy first): it loads with an
-   "Upgraded from save version 14" notice, then saves as v15.
+   "Upgraded from save version 14" notice, then saves as v16.
 6. Settings: pick 125%/150% scale; switch to Colour-blind safe and check the
    build preview, invalid cells, both trains and the map; remap a key, press
    Apply, restart, confirm it persisted; "Restore default keys" works.

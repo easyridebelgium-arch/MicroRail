@@ -10,7 +10,8 @@ extends RefCounted
 ## The first release of this system starts at version 14 (the last format
 ## before migrations existed); older formats cannot be reconstructed.
 
-const CURRENT_VERSION: int = 15
+const Fleet = preload("res://scripts/fleet.gd")
+const CURRENT_VERSION: int = 16
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -66,6 +67,8 @@ static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 	match from_version:
 		14:
 			return _v14_to_v15(data)
+		15:
+			return _v15_to_v16(data)
 
 	# Unreachable while every version between OLDEST and CURRENT has a step.
 	return data
@@ -74,6 +77,29 @@ static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 # v15 adds the "sim" block: fixed-step clock, seeded RNG and event stream.
 static func _v14_to_v15(data: Dictionary) -> Dictionary:
 	data["sim"] = default_sim_state()
+	return data
+
+## Two development branches used v15: fleet-only and simulation-only.
+## Preserve existing blocks; initialise only systems absent in that format.
+## The game validates the complete migrated result before applying any state.
+static func _v15_to_v16(data: Dictionary) -> Dictionary:
+	if not data.has("sim"):
+		data["sim"] = default_sim_state()
+	if not data.has("fleet"):
+		data["fleet"] = Fleet.defaults()
+		if data.get("state") is Dictionary and data.get("freight") is Dictionary:
+			var passenger: Dictionary = Fleet.assigned(data["fleet"], "passenger")
+			var freight: Dictionary = Fleet.assigned(data["fleet"], "freight")
+			passenger["capacity_level"] = data["state"].get("capacity_upgrade_level")
+			passenger["speed_level"] = data["state"].get("speed_upgrade_level")
+			freight["capacity_level"] = data["freight"].get("capacity_level")
+			freight["speed_level"] = data["freight"].get("speed_level")
+		if data.get("state") is Dictionary:
+			# Starter trains were free; installed upgrades were purchased.
+			data["state"]["total_vehicle_cost"] = 0
+			if Fleet.is_valid(data["fleet"]):
+				for train in data["fleet"]["trains"]:
+					data["state"]["total_vehicle_cost"] += Fleet.sale_price(train) * 2 - int(Fleet.MODELS[train["model"]]["price"])
 	return data
 
 

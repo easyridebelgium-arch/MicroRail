@@ -7,8 +7,8 @@ Each train has a permanent ID, a model and its own speed/capacity upgrades.
 
 1. Close Godot. In GitHub Desktop select `codex/mouse-track-building`, then click
    Fetch origin and Pull origin. Reopen the existing project and run it.
-2. Start a fresh game. Save version 15 contains fleet ownership and assignments;
-   older development saves are intentionally not migrated.
+2. Start fresh or load a supported save. The merged format is version 16; route
+   version 14 and both version 15 development formats migrate when loaded.
 3. Open **Fleet**. The game pauses. You begin with one Passenger Shuttle and one
    Log Hauler already assigned to their services, included in the starting game.
 4. Choose **Fast Passenger — £650**, then click **Buy**. It appears as Stored.

@@ -84,7 +84,6 @@ const LOGS_PER_BATCH: int = 5
 const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
-const SAVE_VERSION: int = 15
 const SimClock = preload("res://scripts/core/sim_clock.gd")
 const SimRng = preload("res://scripts/core/sim_rng.gd")
 const EventLog = preload("res://scripts/core/event_log.gd")
@@ -262,14 +261,6 @@ func _process(delta: float) -> void:
 
 	# The simulation advances in fixed steps, whatever the frame rate.
 	if not paused:
-		_generate_passengers(delta)
-		_produce_logs(delta)
-		forest_stock -= freight_train.advance(delta, forest_stock)
-
-		if _passenger_service_is_active():
-			_move_train(delta)
-			_charge_operating_cost(delta)
-		_check_scenario_objectives()
 		for _step in sim_clock.advance(delta):
 			sim_clock.begin_tick()
 			_simulation_step(SimClock.TICK_SECONDS)
@@ -300,26 +291,10 @@ func _record_event(type: String, subject: String, data: Dictionary = {}) -> void
 
 # True while a dialog owns the keyboard, so game shortcuts stay quiet.
 func _modal_open() -> bool:
-	if route_editor != null and route_editor.visible:
-		return true
-
-	return settings_dialog != null and settings_dialog.visible
+	return _management_window_is_open() or (settings_dialog != null and settings_dialog.visible)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _management_window_is_open():
-		return
-	if event is InputEventKey:
-		if event.pressed and not event.echo:
-			if event.keycode == KEY_M:
-				_toggle_network_map()
-				return
-			if event.keycode == KEY_HOME:
-				is_dragging = false
-				is_panning = false
-				demolition_cells.clear()
-				_reset_camera()
-				return
 	if _modal_open():
 		return
 
@@ -526,7 +501,6 @@ func _update_instructions() -> void:
 	instructions.text = (
 		"Left-drag: automatic track | Right-drag: remove"
 		+ " | Right-click: cancel | Use toolbar to choose Connect or Draw"
-		+ " | Space: pause | Esc: cancel"
 		+ " | %s: pause | %s: cancel" % [
 			InputActions.key_label(InputActions.TOGGLE_PAUSE),
 			InputActions.key_label(InputActions.CANCEL)
@@ -585,7 +559,6 @@ func _draw() -> void:
 		for cell in build_plan.get("invalid", {}):
 			_draw_invalid_build_cell(cell)
 	elif _is_inside_map(hovered_cell):
-		var color := Color(0.35, 0.9, 0.55, 0.45) if _can_build_at(hovered_cell) else Color(1.0, 0.2, 0.15, 0.6)
 		var color: Color = Palette.get_color(Palette.Role.HOVER_OK if _can_build_at(hovered_cell) else Palette.Role.HOVER_BAD)
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
 	_draw_train()
@@ -633,11 +606,6 @@ func _draw_track(cell: Vector2i, track_type: Variant, preview: bool) -> void:
 	if geometry.is_empty():
 		return
 	draw_set_transform(Vector2(cell) * TILE_SIZE)
-	var rail_color: Color = PREVIEW_COLOR if preview else RAIL_COLOR
-	var sleeper_color: Color = SLEEPER_COLOR
-	if preview:
-		sleeper_color.a = 0.5
-		draw_rect(Rect2(Vector2.ZERO, Vector2.ONE * TILE_SIZE), Color(0.35, 0.9, 0.55, 0.12))
 	var rail_color: Color = Palette.get_color(Palette.Role.PREVIEW) if preview else RAIL_COLOR
 	var sleeper_color: Color = SLEEPER_COLOR
 	if preview:
@@ -821,7 +789,7 @@ func _save_game() -> void:
 		"freight": freight_train.save_state(),
 		"scenario_stage": scenario_goals.current_index,
 		"services": services.duplicate(true),
-		"fleet": fleet.duplicate(true)
+		"fleet": fleet.duplicate(true),
 		"sim": {
 			"clock": sim_clock.save_state(),
 			"rng": sim_rng.save_state(),
@@ -878,7 +846,6 @@ func _is_valid_number(value: Variant) -> bool:
 
 func _is_valid_save(data: Dictionary) -> bool:
 	if not ServiceRoutes.is_valid(data.get("services")) or not Fleet.is_valid(data.get("fleet")):
-	if not ServiceRoutes.is_valid(data.get("services")):
 		return false
 	var sim: Variant = data.get("sim")
 	if not sim is Dictionary:
@@ -1069,9 +1036,6 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	if parser.parse(contents) != OK or not parser.data is Dictionary:
 		_show_notice("The save file could not be read.")
 		return
-	var data: Dictionary = parser.data
-	if not _is_valid_number(data.get("version")) or float(data["version"]) != float(SAVE_VERSION):
-		_show_notice("This save is from another development version. Start a new game.")
 	var migration: Dictionary = SaveMigrations.migrate(parser.data)
 	if not migration["ok"]:
 		_show_notice(migration["error"])
@@ -1115,7 +1079,6 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	var loaded_freight_cells: Array[Vector2i] = _find_freight_route(loaded_tracks, loaded_cells)
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
 	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"])):
-	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length()):
 		_show_notice("Saved freight train state is invalid.")
 		return
 	# Commit only after validating every service and train.
@@ -1139,7 +1102,6 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	freight_train.set_route(loaded_freight_cells, float(TILE_SIZE))
 	freight_train.restore_state(data["freight"])
 	scenario_goals.current_index = int(data["scenario_stage"])
-	_show_notice("Previous save loaded." if save_path == SAVE_BACKUP_PATH else "Game loaded.")
 	sim_clock.restore_state(data["sim"]["clock"])
 	sim_rng.restore_state(data["sim"]["rng"])
 	event_log.restore_state(data["sim"]["events"])
@@ -1255,7 +1217,6 @@ func _update_toolbar() -> void:
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
-	if _management_window_is_open():
 	if _modal_open():
 		return
 	if event is InputEventMouseButton:
@@ -1561,9 +1522,6 @@ func _update_upgrade_button(
 
 func _draw_invalid_build_cell(cell: Vector2i) -> void:
 	var origin: Vector2 = Vector2(cell) * TILE_SIZE
-	draw_rect(Rect2(origin, Vector2.ONE * TILE_SIZE), Color(1.0, 0.15, 0.1, 0.3))
-	draw_line(origin + Vector2(6, 6), origin + Vector2(TILE_SIZE - 6, TILE_SIZE - 6), Color(1.0, 0.3, 0.25), 2.0)
-	draw_line(origin + Vector2(TILE_SIZE - 6, 6), origin + Vector2(6, TILE_SIZE - 6), Color(1.0, 0.3, 0.25), 2.0)
 	var mark_color: Color = Palette.get_color(Palette.Role.BAD_MARK)
 	draw_rect(Rect2(origin, Vector2.ONE * TILE_SIZE), Palette.get_color(Palette.Role.BAD_FILL))
 	draw_line(origin + Vector2(6, 6), origin + Vector2(TILE_SIZE - 6, TILE_SIZE - 6), mark_color, 2.0)
@@ -1708,7 +1666,6 @@ func _update_freight_inspector() -> void:
 	if rule_index >= 0:
 		freight_rule_option.select(rule_index)
 	var train_status: String = services["freight"]["name"] + " / " + Fleet.assigned(fleet, "freight")["name"] + " — " + freight_train.status_text()
-	var train_status: String = services["freight"]["name"] + " — " + freight_train.status_text()
 
 	if paused:
 		train_status = "Paused — " + train_status
@@ -1779,7 +1736,6 @@ func _update_freight_inspector() -> void:
 	]
 		
 func _move_camera_with_keyboard(delta: float) -> void:
-	if _management_window_is_open():
 	if _modal_open():
 		return
 	# Avoid shifting an unfinished construction preview.

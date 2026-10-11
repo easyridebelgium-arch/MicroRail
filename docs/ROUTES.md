@@ -2,8 +2,8 @@
 
 Use GitHub Desktop to select `codex/mouse-track-building`, Fetch origin, then
 Pull origin. Close Godot before pulling and reopen the existing project afterward.
-The current fleet update uses save version 15. Start a fresh game; older saves are
-not migrated. See [Fleet management](FLEET.md) for purchasing and assigning trains.
+The merged update uses save version 16. Version 14 and both version 15 development
+formats migrate on loading; earlier formats are not supported. See [Fleet management](FLEET.md) for purchasing and assigning trains.
 
 ## Try a three-stop passenger service
 

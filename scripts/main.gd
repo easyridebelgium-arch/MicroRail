@@ -86,6 +86,8 @@ const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
 const SimClock = preload("res://scripts/core/sim_clock.gd")
+const DeadlockMonitor = preload("res://scripts/core/deadlock_monitor.gd")
+const TrafficDialog = preload("res://scripts/traffic_dialog.gd")
 const Reservations = preload("res://scripts/core/track_reservations.gd")
 const CommandQueue = preload("res://scripts/core/command_queue.gd")
 const SimRng = preload("res://scripts/core/sim_rng.gd")
@@ -107,6 +109,10 @@ var tracks: Dictionary = {}
 # lock the switch and set it for their actual movement.
 var switch_states: Dictionary = {}
 var reservations = Reservations.new()
+var deadlocks = DeadlockMonitor.new()
+var movement_blocks: Dictionary = {}
+var traffic_dialog: ConfirmationDialog
+var traffic_button: Button
 var reservation_overlay: bool = false
 var reservation_waits: Dictionary = {}
 var freight_route_cells: Array[Vector2i] = []
@@ -264,6 +270,7 @@ func _ready() -> void:
 	_apply_fleet_specs()
 	_setup_settings_dialog()
 	_setup_reservation_overlay()
+	_setup_traffic_dialog()
 	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
@@ -301,12 +308,14 @@ func _simulation_step(step_seconds: float) -> void:
 	_generate_passengers(step_seconds)
 	_produce_logs(step_seconds)
 	_rebuild_reservations(true)
+	movement_blocks.clear()
 	forest_stock -= freight_train.advance(step_seconds, forest_stock)
 
 	if _passenger_service_is_active():
 		_move_train(step_seconds)
 		_charge_operating_cost(step_seconds)
 
+	_update_deadlocks()
 	_check_scenario_objectives()
 
 
@@ -407,12 +416,15 @@ func _unhandled_input(event: InputEvent) -> void:
 				_finish_demolition(cell)
 
 func _check_route(force_reset: bool = false) -> void:
+	var previous_freight: Array[Vector2i] = freight_route_cells.duplicate()
 	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE))
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
 	_refresh_freight_route(new_route)
 	_refresh_switch_states(new_route)
 	passenger_route_error = built["error"]
+	if previous_freight != freight_route_cells or force_reset or new_route != route_cells:
+		_reset_traffic_state("Service paths changed")
 	if not force_reset and new_route == route_cells:
 		_rebuild_reservations()
 		return
@@ -957,7 +969,9 @@ func _generate_passengers(delta: float) -> void:
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
 		for key in ServiceRoutes.STATIONS:
-			_set_waiting(key, mini(_waiting(key) + PASSENGERS_PER_BATCH, MAX_STATION_QUEUE))
+			# Returned passengers may exceed normal station capacity. Never discard
+			# that queue while limiting new arrivals.
+			_set_waiting(key, maxi(_waiting(key), mini(_waiting(key) + PASSENGERS_PER_BATCH, MAX_STATION_QUEUE)))
 
 
 func _board_passengers() -> void:
@@ -1384,8 +1398,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	_update_train_transform()
 	freight_train.set_route(loaded_freight_cells, float(TILE_SIZE))
 	freight_train.restore_state(data["freight"])
-	reservation_waits.clear()
-	freight_train.reservation_wait = ""
+	_reset_traffic_state()
 	_rebuild_reservations()
 	scenario_goals.current_index = int(data["scenario_stage"])
 	sim_clock.restore_state(data["sim"]["clock"])
@@ -3154,7 +3167,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible)
+	return (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()
@@ -3336,6 +3349,8 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 		var conflict: Dictionary = reservations.waits.get(id, {})
 		var cell: Vector2i = conflict.get("cell", Vector2i(-1, -1))
 		var owner := int(conflict.get("owner", -1))
+		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001 and owner > 0:
+			movement_blocks[id] = owner
 		var other := Fleet.find(fleet, owner)
 		var name: String = str(other.get("name", "another train"))
 		var place := "switch" if TrackGeometry.is_switch(tracks.get(cell)) else "track"
@@ -3369,3 +3384,111 @@ func _draw_reservations() -> void:
 			if offset > 0:
 				draw_line(origin + Vector2(0, offset), origin + Vector2(TILE_SIZE - offset, TILE_SIZE), Color(1, 1, 1, 0.45))
 		draw_string(ThemeDB.fallback_font, origin + Vector2(2, 13), "#%d" % int(reservations.owners[cell]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+
+
+func _reset_traffic_state(reason: String = "") -> void:
+	if not reason.is_empty():
+		for cycle in deadlocks.cycles:
+			_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle.duplicate(), "reason": reason})
+	deadlocks.reset()
+	movement_blocks.clear()
+	reservation_waits.clear()
+	if freight_train != null:
+		freight_train.reservation_wait = ""
+	if traffic_button != null:
+		traffic_button.text = "Traffic"
+
+func _update_deadlocks() -> void:
+	deadlocks.update(movement_blocks, sim_clock.tick)
+	for cycle in deadlocks.new_cycles:
+		_record_event(EventLog.DEADLOCK_DETECTED, "network", {"trains": cycle.duplicate(), "reason": "Trains are waiting on each other; open Traffic for recovery."})
+		_show_notice("Deadlock detected. Open Traffic to inspect and recall a train safely.")
+	for cycle in deadlocks.cleared_cycles:
+		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle.duplicate()})
+	if traffic_button != null:
+		traffic_button.text = "Traffic (%d)" % deadlocks.cycles.size() if not deadlocks.cycles.is_empty() else "Traffic"
+
+func traffic_summary() -> String:
+	var lines: PackedStringArray = []
+	if deadlocks.cycles.is_empty():
+		lines.append("No confirmed deadlock. A cycle must stay blocked for three simulation seconds; loading, station dwell and a single wait are not deadlocks.")
+	else:
+		for cycle in deadlocks.cycles:
+			var names: PackedStringArray = []
+			for id in cycle:
+				var train := Fleet.find(fleet, int(id))
+				names.append("#%d %s" % [int(id), train.get("name", "Unknown train")])
+			lines.append("Deadlock: " + " ↔ ".join(names))
+	for service in ["passenger", "freight"]:
+		var train := Fleet.assigned(fleet, service)
+		lines.append("#%d %s: %s" % [int(train["id"]), train["name"], reservation_waits.get(service, "Not held by another train")])
+	return "\n\n".join(lines)
+
+func recall_deadlocked_train(id: int) -> String:
+	if not paused:
+		return "Pause before recalling a train."
+	if not deadlocks.contains(id):
+		return "This train is not involved in a confirmed deadlock."
+	var train := Fleet.find(fleet, id)
+	var service: String = str(train.get("service", ""))
+	if not service in ["passenger", "freight"]:
+		return "Select an assigned passenger or freight train."
+	var home: Vector2 = _cell_center(ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["cell"]) if service == "passenger" else freight_train.home_position
+	var path: Curve2D = route_path if service == "passenger" else freight_train.route_path
+	path = _reservation_path(path, home)
+	_rebuild_reservations()
+	# Validate the entire destination footprint before changing cargo, money,
+	# positions or service state. There is no "force" option.
+	for cell in reservations.footprint(path, 0.0, float(TILE_SIZE)):
+		var owner := int(reservations.owners.get(cell, id))
+		if owner != id:
+			return "Recall refused: the first stop is occupied or locked by train #%d. Try recalling the other train." % owner
+	var returned := 0
+	if service == "passenger":
+		returned = passengers_on_train
+		_return_onboard_passengers()
+		route_distance = 0.0
+		passenger_stop_index = 0
+		travelling_to_b = true
+		wait_remaining = 0.0
+		train_needs_boarding = true
+		passenger_service_enabled = false
+		_update_train_transform()
+	else:
+		freight_train.distance_along_route = 0.0
+		freight_train.to_terminal = true
+		freight_train.dwell = 0.0
+		freight_train.service_enabled = false
+		freight_train._update_transform()
+	var old_cycles: Array = deadlocks.cycles.duplicate(true)
+	_reset_traffic_state()
+	_rebuild_reservations()
+	_record_event(EventLog.TRAIN_RECOVERED, str(id), {"service": service, "passengers_returned": returned, "cargo_retained": freight_train.cargo if service == "freight" else 0})
+	for cycle in old_cycles:
+		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle, "recalled": id})
+	_update_toolbar()
+	_update_station_inspector()
+	queue_redraw()
+	return "#%d %s recalled to its first stop; service stopped. Close and resume to clear traffic. Enable it later in Fleet." % [id, train["name"]]
+
+func _setup_traffic_dialog() -> void:
+	traffic_dialog = TrafficDialog.new()
+	traffic_dialog.configure(self)
+	$Interface.add_child(traffic_dialog)
+	traffic_button = Button.new()
+	traffic_button.text = "Traffic"
+	traffic_button.focus_mode = Control.FOCUS_NONE
+	traffic_button.tooltip_text = "Inspect blocked trains and safely recall a train in a confirmed deadlock"
+	traffic_button.pressed.connect(_open_traffic_dialog)
+	$Interface/HeaderBox/Toolbar.add_child(traffic_button)
+
+func _open_traffic_dialog() -> void:
+	paused = true
+	is_dragging = false
+	is_panning = false
+	demolition_cells.clear()
+	build_plan.clear()
+	_close_station_inspector()
+	_rebuild_reservations()
+	_update_toolbar()
+	traffic_dialog.open_dialog()

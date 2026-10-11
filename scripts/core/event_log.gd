@@ -11,6 +11,9 @@ signal event_recorded(event: Dictionary)
 
 # Event types. Add new ones here so names stay consistent.
 const TRAIN_DEPARTED: String = "train_departed"
+const DEADLOCK_DETECTED: String = "deadlock_detected"
+const DEADLOCK_CLEARED: String = "deadlock_cleared"
+const TRAIN_RECOVERED: String = "train_recovered"
 const TRAIN_WAITING: String = "train_waiting"
 const TRAIN_ARRIVED: String = "train_arrived"
 const CARGO_DELIVERED: String = "cargo_delivered"
@@ -113,6 +116,12 @@ static func summary(event: Dictionary) -> String:
 	var who: String = str(event.get("subject", ""))
 
 	match kind:
+		DEADLOCK_DETECTED:
+			return "Deadlock detected: open Traffic for recovery"
+		DEADLOCK_CLEARED:
+			return "Deadlock cleared"
+		TRAIN_RECOVERED:
+			return "Train #%s recalled; service stopped" % who
 		TRAIN_WAITING:
 			return "Train #%s: %s" % [who, data.get("reason", "Waiting for track")]
 		TRAIN_DEPARTED:

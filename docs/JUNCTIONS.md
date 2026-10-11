@@ -57,6 +57,7 @@ integrated. Reserved track cannot be changed.
 
 ## Next steps
 
-Deadlock detection/recovery and signals build on the shared reservation layer.
+Basic [deadlock detection and emergency recall](DEADLOCKS.md) are integrated.
+Signals and dispatch controls build on the shared reservation layer next.
 Manual dispatch and switch-position controls must respect those locks. Crossing
 placement and branching directly from Connect/Draw remain later building tools.

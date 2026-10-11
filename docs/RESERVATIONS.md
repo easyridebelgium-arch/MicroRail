@@ -33,8 +33,10 @@ shortest port-valid path; passenger tiles and platforms are no longer excluded.
 The schema remains **v18**. Reservations are transient and are reconstructed from
 restored fleet IDs, paths, positions and direction before any train moves.
 
-This is collision prevention, not deadlock recovery or signals. Opposing trains
-on a single track can wait indefinitely. A passing loop helps only when the
+Opposing trains on a single track can wait indefinitely without player action.
+[Deadlock detection and safe emergency recall](DEADLOCKS.md) now identify sustained
+mutual waits and let the player clear them. Signals and automatic rerouting remain
+subsequent work. A passing loop helps only when the
 planned services actually use separate paths; this version does not automatically
 reroute a held train into an alternate loop. Lower IDs win simultaneous requests;
 priority classes and fairness policies come later. There is still one running

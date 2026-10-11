@@ -32,20 +32,27 @@ copy them over the current scripts.
   120 FPS. Long stalls deliberately drop excess catch-up time; this is not yet
   a full deterministic command/replay system. Rendering, camera, notices and UI
   still use real frame time.
-- **Saves are version 16**, defined only by `SaveMigrations.CURRENT_VERSION`.
+- **Saves are version 17**, defined only by `SaveMigrations.CURRENT_VERSION`.
   Version 14 route saves and both version 15 variants (fleet-only and
-  simulation-only) migrate in memory. Existing data is preserved; missing
-  systems receive defaults. Pre-fleet saves reconstruct starter-train upgrades
-  and their purchase costs. Validation completes before the live game changes.
-  Saving again writes v16 and retains the previous save as a backup. Saves older
-  than 14, future versions and invalid current-format data are rejected.
+  simulation-only) migrate in memory. Version 16 saves add the command queue.
+  Existing data is preserved; missing systems receive defaults. Pre-fleet saves
+  reconstruct starter-train upgrades and their purchase costs. Validation
+  completes before the live game changes. Saving again writes v17 and retains
+  the previous save as a backup. Saves older than 14, future versions and
+  invalid current-format data are rejected.
 - **Keys go through the InputMap.** Defaults match the old keys (Space, M, G,
   I, Home, Esc, WASD/arrows, Shift). Letter shortcuts follow the letter
   printed on the key; camera movement follows the physical key position (WASD
   stays under the left hand on AZERTY and other layouts).
+- **Mouse buttons go through the InputMap.** Build (left), demolish (right),
+  pan (middle), zoom in (wheel up) and zoom out (wheel down) are now remappable
+  in the settings dialog alongside keyboard commands.
 - **New Settings button** in the toolbar (next to Routes).
 - **Trains, build preview and map markers use the palette.** Default colours
   are unchanged.
+- **UI scale now supports 200%** with a 175% step. The compact header mode
+  activates at 175% instead of 150%. All UI offsets scale with the interface
+  factor.
 
 ## Rules for new code
 
@@ -74,10 +81,8 @@ copy them over the current scripts.
 - **Build and demolish use the command queue.** While the game runs they wait
   for the start of the next simulation step; while paused they run at once.
   Upgrades, purchases, Undo/Redo, route and fleet changes already require the
-  game to be paused, so they act directly and never wait. The queue is not
-  saved: saving runs any waiting command first and loading clears it. A
-  `commands` block in the save (version 17) is only needed if commands ever wait
-  longer than one step. Tests: `test_command_queue.gd` (27 checks),
+  game to be paused, so they act directly and never wait. The queue is now
+  saved in version 17 and restored on load. Tests: `test_command_queue.gd` (27 checks),
   `test_command_wiring.gd`, `test_mouse_tracks.gd` and
   `test_merge_integration.gd` pass (11 Oct 2026).
 - **Paused edits are not logged.** They run immediately and are not recorded

@@ -10,7 +10,7 @@ const SETTINGS_PATH: String = "user://settings.cfg"
 
 ## Offered scales. The window scales everything; main.gd cancels that for the
 ## map camera, so only the interface grows.
-const UI_SCALES: Array[float] = [1.0, 1.25, 1.5, 2.0]
+const UI_SCALES: Array[float] = [1.0, 1.25, 1.5, 1.75, 2.0]
 
 enum PaletteMode {
 	DEFAULT,
@@ -28,7 +28,7 @@ static var ui_scale: float = 1.0
 static var palette_mode: int = PaletteMode.DEFAULT
 static var reduced_motion: bool = false
 
-## Hides the title and key hints and shortens the status text. Always on at 150%
+## Hides the title and key hints and shortens the status text. Always on at 175%
 ## and above, where the header would otherwise fill the window.
 static var compact_header: bool = false
 
@@ -79,7 +79,7 @@ static func apply(window: Window) -> void:
 
 
 static func use_compact_header() -> bool:
-	return compact_header or ui_scale >= 1.5
+	return compact_header or ui_scale >= 1.75
 
 
 static func nearest_scale(value: float) -> float:

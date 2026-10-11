@@ -15,6 +15,7 @@ var key_grid: GridContainer
 var status: Label
 
 var draft_bindings: Dictionary = {}
+var draft_mouse_bindings: Dictionary = {}
 var key_buttons: Dictionary = {}
 var capturing_action: StringName = &""
 
@@ -55,7 +56,7 @@ func configure() -> void:
 	box.add_child(reduced_motion_check)
 
 	compact_header_check = CheckBox.new()
-	compact_header_check.text = "Compact header (always on at 150% and above)"
+	compact_header_check.text = "Compact header (always on at 175% and above)"
 	box.add_child(compact_header_check)
 
 	box.add_child(_heading("Keys — click one, then press the new key"))
@@ -85,6 +86,33 @@ func configure() -> void:
 	reset_button.pressed.connect(_reset_keys)
 	box.add_child(reset_button)
 
+	box.add_child(_heading("Mouse buttons — click one, then press the new button"))
+
+	var mouse_grid: GridContainer = GridContainer.new()
+	mouse_grid.columns = 2
+	mouse_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mouse_grid.add_theme_constant_override("h_separation", 16)
+	box.add_child(mouse_grid)
+
+	for action in Actions.MOUSE_ORDER:
+		var action_label := Label.new()
+		action_label.text = Actions.label(action)
+		action_label.custom_minimum_size.x = 200
+		mouse_grid.add_child(action_label)
+
+		var button := Button.new()
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(_begin_mouse_capture.bind(action))
+		mouse_grid.add_child(button)
+		key_buttons[action] = button
+
+	var reset_mouse_button := Button.new()
+	reset_mouse_button.text = "Restore default mouse buttons"
+	reset_mouse_button.focus_mode = Control.FOCUS_NONE
+	reset_mouse_button.pressed.connect(_reset_mouse_buttons)
+	box.add_child(reset_mouse_button)
+
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.custom_minimum_size = Vector2(0, 44)
@@ -100,10 +128,12 @@ func open_dialog() -> void:
 	reduced_motion_check.button_pressed = Settings.reduced_motion
 	compact_header_check.button_pressed = Settings.compact_header
 	draft_bindings = Actions.export_bindings()
+	draft_mouse_bindings = Actions.export_mouse_bindings()
 	capturing_action = &""
 	status.text = ""
 	_refresh_key_buttons()
-	popup_centered_clamped(Vector2i(560, 520), 0.95)
+	_refresh_mouse_buttons()
+	popup_centered_clamped(Vector2i(560, 600), 0.95)
 
 
 func _heading(text_value: String) -> Label:
@@ -130,6 +160,23 @@ func _refresh_key_buttons() -> void:
 		button.text = " / ".join(names) if not names.is_empty() else "unbound"
 
 
+func _refresh_mouse_buttons() -> void:
+	for action in Actions.MOUSE_ORDER:
+		var button: Button = key_buttons[action]
+
+		if action == capturing_action:
+			button.text = "Press a button…"
+			continue
+
+		var codes: Array = draft_mouse_bindings.get(str(action), [])
+		var names: PackedStringArray = []
+
+		for code in codes:
+			names.append(Actions.mouse_button_text(int(code)))
+
+		button.text = " / ".join(names) if not names.is_empty() else "unbound"
+
+
 func _begin_capture(action: StringName) -> void:
 	capturing_action = action
 	status.text = "Press the new key for “%s”. (Esc closes this window without applying.)" % Actions.label(action)
@@ -147,8 +194,45 @@ func _reset_keys() -> void:
 	_refresh_key_buttons()
 
 
+func _begin_mouse_capture(action: StringName) -> void:
+	capturing_action = action
+	status.text = "Press the new mouse button for “%s”. (Esc closes this window without applying.)" % Actions.label(action)
+	_refresh_mouse_buttons()
+
+
+func _reset_mouse_buttons() -> void:
+	draft_mouse_bindings = Actions.default_mouse_bindings()
+	capturing_action = &""
+	status.text = "Default mouse buttons restored. Press Apply to keep them."
+	_refresh_mouse_buttons()
+
+
 func _input(event: InputEvent) -> void:
 	if capturing_action == &"" or not visible:
+		return
+
+	if Actions.uses_mouse(capturing_action):
+		var mouse_event := event as InputEventMouseButton
+
+		if mouse_event == null or not mouse_event.pressed:
+			return
+
+		get_viewport().set_input_as_handled()
+
+		if mouse_event.button_index == KEY_ESCAPE:
+			status.text = "Mouse button change cancelled."
+			_stop_capture()
+			_refresh_mouse_buttons()
+			return
+
+		var code: int = int(mouse_event.button_index)
+
+		if code <= 0:
+			return
+
+		_assign_mouse_button(capturing_action, code)
+		_stop_capture()
+		_refresh_mouse_buttons()
 		return
 
 	var key_event := event as InputEventKey
@@ -206,6 +290,35 @@ func _assign_key(action: StringName, code: int) -> void:
 		status.text = "“%s” is now %s (taken from “%s”). Press Apply to keep it." % [Actions.label(action), key_name, moved_from]
 
 
+# The new mouse button becomes the action's first binding. Any other action using the
+# same button loses it, so one button never triggers two commands.
+func _assign_mouse_button(action: StringName, code: int) -> void:
+	var moved_from: String = ""
+
+	for other in Actions.MOUSE_ORDER:
+		if other == action:
+			continue
+
+		var other_codes: Array = draft_mouse_bindings.get(str(other), [])
+
+		if other_codes.has(code):
+			other_codes.erase(code)
+			draft_mouse_bindings[str(other)] = other_codes
+			moved_from = Actions.label(other)
+
+	var codes: Array = draft_mouse_bindings.get(str(action), [])
+	codes.erase(code)
+	codes.push_front(code)
+	draft_mouse_bindings[str(action)] = codes
+
+	var button_name: String = Actions.mouse_button_text(code)
+
+	if moved_from.is_empty():
+		status.text = "“%s” is now %s. Press Apply to keep it." % [Actions.label(action), button_name]
+	else:
+		status.text = "“%s” is now %s (taken from “%s”). Press Apply to keep it." % [Actions.label(action), button_name, moved_from]
+
+
 func _apply() -> void:
 	_stop_capture()
 
@@ -216,7 +329,9 @@ func _apply() -> void:
 	Settings.compact_header = compact_header_check.button_pressed
 
 	Actions.apply_bindings(draft_bindings)
+	Actions.apply_mouse_bindings(draft_mouse_bindings)
 	Settings.key_bindings = Actions.export_bindings()
+	Settings.mouse_bindings = Actions.export_mouse_bindings()
 
 	var saved: bool = Settings.save_settings()
 	settings_applied.emit()

@@ -93,7 +93,7 @@ const GameSettings = preload("res://scripts/core/game_settings.gd")
 const InputActions = preload("res://scripts/core/input_actions.gd")
 const Palette = preload("res://scripts/core/palette.gd")
 const SettingsDialog = preload("res://scripts/settings_dialog.gd")
-const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
+const SAVE_VERSION: int = 17
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const TOOLBAR_ICON_SHEET = preload("res://assets/ui/icons/toolbar.svg")
 const NetworkMap = preload("res://scripts/network_map.gd")
@@ -225,6 +225,7 @@ func _ready() -> void:
 	GameSettings.load_settings()
 	InputActions.register_defaults()
 	InputActions.apply_bindings(GameSettings.key_bindings)
+	InputActions.apply_mouse_bindings(GameSettings.mouse_bindings)
 	GameSettings.apply(get_window())
 
 	# A new game gets a fresh seed; loading a save restores the saved one.
@@ -339,53 +340,52 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var cell: Vector2i = _mouse_to_cell()
 
-		if event.button_index == MOUSE_BUTTON_LEFT:
+		if event.is_action_pressed(InputActions.BUILD):
 			# Left-click cancels an active demolition gesture.
 			if is_dragging and demolition_mode:
-				if event.pressed:
-					is_dragging = false
-					demolition_cells.clear()
+				is_dragging = false
+				demolition_cells.clear()
 				return
 
 			if inspect_mode:
-				if event.pressed:
-					_inspect_station_at(cell)
+				_inspect_station_at(cell)
 				return
 
-			if event.pressed:
-				if _can_build_at(cell):
-					demolition_mode = false
-					demolition_cells.clear()
-					drag_start = cell
-					build_stroke.assign([cell])
-					is_dragging = true
-					_refresh_build_plan(cell, true)
-			elif is_dragging:
+			if _can_build_at(cell):
+				demolition_mode = false
+				demolition_cells.clear()
+				drag_start = cell
+				build_stroke.assign([cell])
+				is_dragging = true
+				_refresh_build_plan(cell, true)
+
+		if event.is_action_released(InputActions.BUILD):
+			if is_dragging:
 				_finish_track_drag(cell)
 
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			if event.pressed:
-				if inspect_mode:
-					_close_station_inspector()
-					return
+		if event.is_action_pressed(InputActions.DEMOLISH):
+			if inspect_mode:
+				_close_station_inspector()
+				return
 
-				# Right-click still cancels a construction preview.
-				if is_dragging:
-					is_dragging = false
-					demolition_cells.clear()
-					return
-
-				if not _is_inside_map(cell):
-					return
-
-				demolition_mode = true
-				is_dragging = true
-				drag_start = cell
-				demolition_last_cell = cell
+			# Right-click still cancels a construction preview.
+			if is_dragging:
+				is_dragging = false
 				demolition_cells.clear()
-				_collect_demolition_cells(cell)
+				return
 
-			elif is_dragging and demolition_mode:
+			if not _is_inside_map(cell):
+				return
+
+			demolition_mode = true
+			is_dragging = true
+			drag_start = cell
+			demolition_last_cell = cell
+			demolition_cells.clear()
+			_collect_demolition_cells(cell)
+
+		if event.is_action_released(InputActions.DEMOLISH):
+			if is_dragging and demolition_mode:
 				_finish_demolition(cell)
 
 func _check_route(force_reset: bool = false) -> void:
@@ -576,27 +576,28 @@ func _layout_header() -> void:
 	if header_box == null or header_background == null:
 		return
 
-	var header_height: float = header_box.position.y + header_box.size.y + 12.0
+	var scale: float = GameSettings.ui_scale
+	var header_height: float = header_box.position.y + header_box.size.y + (12.0 * scale)
 	header_background.offset_bottom = header_height
 
 	if station_panel != null:
-		station_panel.offset_top = header_height + 16.0
+		station_panel.offset_top = header_height + (16.0 * scale)
 
 	# Left column: objectives, then the network map in whatever height is left
 	# above the bottom buttons. Recomputed every frame (cheap, and it follows
 	# the Goals and Map toggles and any window or scale change).
-	var column_top: float = header_height + 16.0
-	var bottom_limit: float = get_viewport_rect().size.y - 64.0
+	var column_top: float = header_height + (16.0 * scale)
+	var bottom_limit: float = get_viewport_rect().size.y - (64.0 * scale)
 
 	if objective_panel != null:
-		var objective_height: float = 104.0 if GameSettings.use_compact_header() else 140.0
+		var objective_height: float = (104.0 if GameSettings.use_compact_header() else 140.0) * scale
 		_set_top_left_rect(objective_panel, column_top, column_top + objective_height)
 
 		if objective_panel.visible:
-			column_top += objective_height + 12.0
+			column_top += objective_height + (12.0 * scale)
 
 	if network_map != null:
-		var map_height: float = clampf(bottom_limit - column_top, 120.0, 200.0)
+		var map_height: float = clampf(bottom_limit - column_top, 120.0 * scale, 200.0 * scale)
 		_set_top_left_rect(network_map, column_top, column_top + map_height)
 
 
@@ -915,7 +916,8 @@ func _save_game() -> void:
 		"sim": {
 			"clock": sim_clock.save_state(),
 			"rng": sim_rng.save_state(),
-			"events": event_log.save_state()
+			"events": event_log.save_state(),
+			"commands": command_queue.save_state()
 		}
 	}
 
@@ -978,20 +980,20 @@ func _is_valid_save(data: Dictionary) -> bool:
 		return false
 	if not EventLog.is_valid_state(sim.get("events")):
 		return false
+	# Command queue is required for v17+, optional for v16.
 	var saved_version: Variant = data.get("version")
-
 	if not _is_valid_number(saved_version):
 		return false
-
 	var version_number: float = float(saved_version)
-
 	if version_number != floor(version_number):
 		return false
+	var version: int = int(version_number)
+	if version >= 17:
+		if not CommandQueue.is_valid_state(sim.get("commands")):
+			return false
 
 	if version_number != float(SAVE_VERSION):
 		return false
-
-	var version: int = int(version_number)
 
 	if not data.get("tracks") is Array:
 		return false
@@ -1225,9 +1227,13 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	freight_train.restore_state(data["freight"])
 	scenario_goals.current_index = int(data["scenario_stage"])
 	sim_clock.restore_state(data["sim"]["clock"])
-	command_queue.clear()
 	sim_rng.restore_state(data["sim"]["rng"])
 	event_log.restore_state(data["sim"]["events"])
+
+	if data["sim"].has("commands") and CommandQueue.is_valid_state(data["sim"]["commands"]):
+		command_queue.restore_state(data["sim"]["commands"])
+	else:
+		command_queue.clear()
 	var loaded_notice: String = "Previous save loaded." if save_path == SAVE_BACKUP_PATH else "Game loaded."
 	if migration["migrated"]:
 		loaded_notice += " Upgraded from save version %d; saving again keeps the new format." % int(migration["from_version"])
@@ -1342,27 +1348,21 @@ func _update_toolbar() -> void:
 func _input(event: InputEvent) -> void:
 	if _modal_open():
 		return
+
+	if event.is_action_pressed(InputActions.CAMERA_PAN):
+		if not _mouse_is_over_interface():
+			is_panning = true
+			is_dragging = false
+			get_viewport().set_input_as_handled()
+
+	if event.is_action_released(InputActions.CAMERA_PAN):
+		is_panning = false
+		get_viewport().set_input_as_handled()
+
 	if event is InputEventMouseButton:
-		# Release the middle button anywhere to stop panning.
-		if event.button_index == MOUSE_BUTTON_MIDDLE:
-			if event.pressed:
-				if not _mouse_is_over_interface():
-					is_panning = true
-					is_dragging = false
-					get_viewport().set_input_as_handled()
-			else:
-				is_panning = false
-				get_viewport().set_input_as_handled()
-
-			return
-
 		# Cancel construction if its drag ends over the interface.
 		if (
-			event.button_index in [
-				MOUSE_BUTTON_LEFT,
-				MOUSE_BUTTON_RIGHT
-			]
-			and not event.pressed
+			(event.is_action_released(InputActions.BUILD) or event.is_action_released(InputActions.DEMOLISH))
 			and is_dragging
 			and _mouse_is_over_interface()
 		):
@@ -1377,13 +1377,13 @@ func _input(event: InputEvent) -> void:
 			return
 
 		if event.pressed and not _mouse_is_over_interface():
-			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			if event.is_action_pressed(InputActions.ZOOM_IN):
 				if not is_dragging:
 					_zoom_camera(ZOOM_STEP)
 
 				get_viewport().set_input_as_handled()
 
-			elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			elif event.is_action_pressed(InputActions.ZOOM_OUT):
 				if not is_dragging:
 					_zoom_camera(1.0 / ZOOM_STEP)
 
@@ -1426,14 +1426,15 @@ func _setup_station_inspector() -> void:
 	station_panel.name = "StationInspector"
 	$Interface.add_child(station_panel)
 
+	var scale: float = GameSettings.ui_scale
 	station_panel.set_anchors_and_offsets_preset(
 		Control.PRESET_TOP_RIGHT
 	)
-	station_panel.offset_left = -304.0
-	station_panel.offset_right = -16.0
-	station_panel.offset_top = 176.0
+	station_panel.offset_left = -304.0 * scale
+	station_panel.offset_right = -16.0 * scale
+	station_panel.offset_top = 176.0 * scale
 	station_panel.anchor_bottom = 1.0
-	station_panel.offset_bottom = -16.0
+	station_panel.offset_bottom = -16.0 * scale
 	station_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var margin := MarginContainer.new()
@@ -2144,13 +2145,14 @@ func _setup_history_controls() -> void:
 	controls.name = "ConstructionHistory"
 	$Interface.add_child(controls)
 
+	var scale: float = GameSettings.ui_scale
 	controls.set_anchors_and_offsets_preset(
 		Control.PRESET_BOTTOM_LEFT
 	)
-	controls.offset_left = 24.0
-	controls.offset_right = 224.0
-	controls.offset_top = -48.0
-	controls.offset_bottom = -12.0
+	controls.offset_left = 24.0 * scale
+	controls.offset_right = 224.0 * scale
+	controls.offset_top = -48.0 * scale
+	controls.offset_bottom = -12.0 * scale
 	controls.add_theme_constant_override("separation", 8)
 
 	undo_button = Button.new()
@@ -2585,6 +2587,8 @@ func _open_settings() -> void:
 # Pushes the current player settings to everything that shows them.
 func _apply_settings() -> void:
 	GameSettings.apply(get_window())
+	InputActions.apply_bindings(GameSettings.key_bindings)
+	InputActions.apply_mouse_bindings(GameSettings.mouse_bindings)
 
 	# Enlarging the interface scales the whole window; the camera cancels that
 	# out so the map keeps its on-screen size.
@@ -2657,14 +2661,15 @@ func _setup_network_map() -> void:
 
 	$Interface.add_child(network_map)
 
+	var scale: float = GameSettings.ui_scale
 	network_map.set_anchors_and_offsets_preset(
 		Control.PRESET_BOTTOM_LEFT
 	)
 
-	network_map.offset_left = 24.0
-	network_map.offset_right = 304.0
-	network_map.offset_top = -264.0
-	network_map.offset_bottom = -64.0
+	network_map.offset_left = 24.0 * scale
+	network_map.offset_right = 304.0 * scale
+	network_map.offset_top = -264.0 * scale
+	network_map.offset_bottom = -64.0 * scale
 
 	network_map.navigation_requested.connect(
 		_on_map_navigation_requested
@@ -2767,14 +2772,15 @@ func _setup_objective_panel() -> void:
 	objective_panel.name = "Objectives"
 	$Interface.add_child(objective_panel)
 
+	var scale: float = GameSettings.ui_scale
 	objective_panel.set_anchors_and_offsets_preset(
 		Control.PRESET_TOP_LEFT
 	)
 
-	objective_panel.offset_left = 24.0
-	objective_panel.offset_right = 344.0
-	objective_panel.offset_top = 176.0
-	objective_panel.offset_bottom = 316.0
+	objective_panel.offset_left = 24.0 * scale
+	objective_panel.offset_right = 344.0 * scale
+	objective_panel.offset_top = 176.0 * scale
+	objective_panel.offset_bottom = 316.0 * scale
 	objective_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var margin := MarginContainer.new()

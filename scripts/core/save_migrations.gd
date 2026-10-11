@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 16
+const CURRENT_VERSION: int = 17
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -69,6 +69,8 @@ static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 			return _v14_to_v15(data)
 		15:
 			return _v15_to_v16(data)
+		16:
+			return _v16_to_v17(data)
 
 	# Unreachable while every version between OLDEST and CURRENT has a step.
 	return data
@@ -103,10 +105,19 @@ static func _v15_to_v16(data: Dictionary) -> Dictionary:
 	return data
 
 
+# v17 adds the command queue to the sim block for determinism.
+static func _v16_to_v17(data: Dictionary) -> Dictionary:
+	if data.has("sim") and data["sim"] is Dictionary:
+		if not data["sim"].has("commands"):
+			data["sim"]["commands"] = {"next_seq": 1, "pending": []}
+	return data
+
+
 static func default_sim_state() -> Dictionary:
 	return {
 		"clock": {"tick": 0},
 		# No random events exist yet, so a fixed seed is fine for old saves.
 		"rng": {"seed": "1"},
-		"events": {"next_id": 1, "events": []}
+		"events": {"next_id": 1, "events": []},
+		"commands": {"next_seq": 1, "pending": []}
 	}

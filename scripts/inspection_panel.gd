@@ -5,6 +5,16 @@ signal planning_changed(enabled: bool)
 signal apply_plan
 signal discard_plan
 signal pick_corridor(which: int)
+signal pick_blueprint(which: int)
+signal save_blueprint
+signal import_blueprints
+signal export_blueprint
+signal place_blueprint
+var blueprint_name: LineEdit
+var blueprint_search: LineEdit
+var blueprint_choice: OptionButton
+var blueprint_status: Label
+var blueprint_names: Array[String] = []
 signal draft_corridor
 var corridor_label: Label
 var corridor_spacing: SpinBox
@@ -85,6 +95,50 @@ func _ready() -> void:
 	stage.focus_mode = Control.FOCUS_NONE
 	stage.pressed.connect(func() -> void: draft_corridor.emit())
 	plan_controls.add_child(stage)
+	var blueprint_title := Label.new()
+	blueprint_title.text = "Track blueprints"
+	plan_controls.add_child(blueprint_title)
+	var corners := HFlowContainer.new()
+	plan_controls.add_child(corners)
+	for which in [1, 2]:
+		var corner := Button.new()
+		corner.text = "Pick corner %d" % which
+		corner.focus_mode = Control.FOCUS_NONE
+		corner.pressed.connect(func() -> void: pick_blueprint.emit(which))
+		corners.add_child(corner)
+	blueprint_name = LineEdit.new()
+	blueprint_name.placeholder_text = "Name for saved layout"
+	blueprint_name.max_length = 40
+	plan_controls.add_child(blueprint_name)
+	var save_design := Button.new()
+	save_design.text = "Save selected rectangle"
+	save_design.focus_mode = Control.FOCUS_NONE
+	save_design.pressed.connect(func() -> void: save_blueprint.emit())
+	plan_controls.add_child(save_design)
+	blueprint_search = LineEdit.new()
+	blueprint_search.placeholder_text = "Search saved layouts"
+	blueprint_search.text_changed.connect(func(_text: String) -> void: changed.emit())
+	plan_controls.add_child(blueprint_search)
+	blueprint_choice = OptionButton.new()
+	blueprint_choice.fit_to_longest_item = false
+	blueprint_choice.focus_mode = Control.FOCUS_NONE
+	plan_controls.add_child(blueprint_choice)
+	var place_design := Button.new()
+	place_design.text = "Place selected blueprint"
+	place_design.focus_mode = Control.FOCUS_NONE
+	place_design.pressed.connect(func() -> void: place_blueprint.emit())
+	plan_controls.add_child(place_design)
+	var sharing := HFlowContainer.new()
+	plan_controls.add_child(sharing)
+	for entry in [["Import JSON", "import_blueprints"], ["Export selected", "export_blueprint"]]:
+		var share := Button.new()
+		share.text = entry[0]
+		share.focus_mode = Control.FOCUS_NONE
+		share.pressed.connect(emit_signal.bind(entry[1]))
+		sharing.add_child(share)
+	blueprint_status = Label.new()
+	blueprint_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	plan_controls.add_child(blueprint_status)
 	selector = OptionButton.new()
 	selector.fit_to_longest_item = false
 	selector.custom_minimum_size.x = 260
@@ -115,3 +169,23 @@ func refresh(trains: Array, text: String) -> void:
 			selected_service = ""
 		selector.select(index)
 	summary.text = text
+
+func refresh_blueprints(designs: Array) -> void:
+	var selected := selected_blueprint()
+	var names: Array[String] = []
+	for design in designs:
+		if blueprint_search.text.strip_edges().is_empty() or blueprint_search.text.strip_edges().to_lower() in str(design.name).to_lower(): names.append(design.name)
+	if names == blueprint_names: return
+	blueprint_names = names
+	blueprint_choice.clear()
+	for name in names: blueprint_choice.add_item(name)
+	if names.is_empty():
+		blueprint_choice.add_item("No matching blueprints")
+		blueprint_choice.disabled = true
+	else:
+		blueprint_choice.disabled = false
+		blueprint_choice.select(maxi(0, names.find(selected)))
+
+func selected_blueprint() -> String:
+	var index := blueprint_choice.selected
+	return blueprint_names[index] if index >= 0 and index < blueprint_names.size() else ""

@@ -32,6 +32,14 @@ var traffic_wait_samples: Dictionary = {}
 var problems_dialog: ConfirmationDialog
 var problems_button: Button
 
+const TrackBlueprints = preload("res://scripts/core/track_blueprints.gd")
+const BLUEPRINT_PATH := "user://track_blueprints.json"
+var blueprint_file_dialog: FileDialog
+var blueprints: Array = []
+var blueprint_library_error := ""
+var blueprint_first := Vector2i(-1, -1)
+var blueprint_last := Vector2i(-1, -1)
+
 const SignalCorridor = preload("res://scripts/core/signal_corridor.gd")
 var corridor_pick := 0
 var corridor_start := Vector2i(-1, -1)
@@ -319,6 +327,7 @@ func _ready() -> void:
 	_setup_settings_dialog()
 	_setup_reservation_overlay()
 	_setup_inspection()
+	_load_blueprints()
 	_setup_problems()
 	_setup_traffic_dialog()
 	_setup_signal_tool()
@@ -388,7 +397,7 @@ func _record_event(type: String, subject: String, data: Dictionary = {}) -> void
 
 # True while a dialog owns the keyboard, so game shortcuts stay quiet.
 func _modal_open() -> bool:
-	return _management_window_is_open() or (settings_dialog != null and settings_dialog.visible)
+	return _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -4171,6 +4180,26 @@ func _setup_inspection() -> void:
 		corridor_pick = which
 		_show_notice("Click track to choose corridor %s." % ("start" if which == 1 else "end")))
 	inspection_panel.draft_corridor.connect(_draft_corridor_signals)
+	inspection_panel.pick_blueprint.connect(func(which: int) -> void:
+		corridor_pick = which + 2
+		_show_notice("Click the map to choose blueprint corner %d." % which))
+	inspection_panel.save_blueprint.connect(_save_blueprint)
+	inspection_panel.import_blueprints.connect(_open_blueprint_file.bind(false))
+	inspection_panel.export_blueprint.connect(_open_blueprint_file.bind(true))
+	blueprint_file_dialog = FileDialog.new()
+	blueprint_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	blueprint_file_dialog.filters = PackedStringArray(["*.json ; Track blueprint libraries"])
+	blueprint_file_dialog.exclusive = true
+	blueprint_file_dialog.file_selected.connect(func(path: String) -> void:
+		if blueprint_file_dialog.file_mode == FileDialog.FILE_MODE_SAVE_FILE: _export_blueprint(path)
+		else: _import_blueprints(path))
+	$Interface.add_child(blueprint_file_dialog)
+	inspection_panel.place_blueprint.connect(func() -> void:
+		if inspection_panel.selected_blueprint().is_empty():
+			_show_notice("Select a saved blueprint first.")
+			return
+		corridor_pick = 5
+		_show_notice("Click the map for the blueprint's top-left corner. Escape cancels."))
 	inspection_button = Button.new()
 	inspection_button.text = "Overlays"
 	inspection_button.toggle_mode = true
@@ -4182,6 +4211,7 @@ func _setup_inspection() -> void:
 	$Interface/HeaderBox/Toolbar.add_child(inspection_button)
 
 func _update_inspection() -> void:
+	inspection_panel.refresh_blueprints(blueprints)
 	var trains := inspection_trains()
 	var changes: Dictionary = construction_plan.changes.duplicate() if planning_mode else {}
 	if is_dragging:
@@ -4386,6 +4416,7 @@ func _set_planning_mode(enabled: bool) -> void:
 		_show_notice("Apply or discard the draft before leaving planning mode.")
 		return
 	planning_mode = enabled
+	corridor_pick = 0
 	is_dragging = false
 	build_plan.clear()
 	if enabled:
@@ -4437,6 +4468,7 @@ func _apply_draft() -> bool:
 	construction_undo.back()["signals_after"] = signals_after
 	_record_event(EventLog.CONSTRUCTION_APPLIED, "player", {"tracks": after.size(), "signals": signals_after.size(), "cost": quote.cost, "refund": quote.refund})
 	construction_plan.clear()
+	corridor_pick = 0
 	_check_route()
 	_show_notice("Applied %d tracks and %d signals; net cost £%d. Undo treats the plan as one action." % [after.size(), signals_after.size(), quote.net])
 	_update_toolbar()
@@ -4445,6 +4477,10 @@ func _apply_draft() -> bool:
 
 func _draw_construction_draft() -> void:
 	if not planning_mode: return
+	if _is_inside_map(blueprint_first) and _is_inside_map(blueprint_last):
+		var origin := Vector2i(mini(blueprint_first.x, blueprint_last.x), mini(blueprint_first.y, blueprint_last.y))
+		var size := Vector2i(absi(blueprint_first.x - blueprint_last.x) + 1, absi(blueprint_first.y - blueprint_last.y) + 1)
+		draw_rect(Rect2(Vector2(origin) * TILE_SIZE, Vector2(size) * TILE_SIZE).grow(-1), Color.WHITE, false, 2.0)
 	for cell in corridor_cells:
 		draw_rect(Rect2(Vector2(cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE).grow(-2), Color.WHITE, false, 1.0)
 	for cell in construction_plan.signal_changes:
@@ -4461,6 +4497,17 @@ func _draw_construction_draft() -> void:
 
 
 func _pick_corridor_cell(cell: Vector2i) -> void:
+	if not planning_mode or not _is_inside_map(cell): return
+	if corridor_pick == 5:
+		if _place_blueprint(cell): corridor_pick = 0
+		return
+	if corridor_pick in [3, 4]:
+		if corridor_pick == 3: blueprint_first = cell
+		else: blueprint_last = cell
+		corridor_pick = 0
+		inspection_panel.blueprint_status.text = "Rectangle %s → %s. Save copies built track and signals; facilities are omitted." % [str(blueprint_first), str(blueprint_last)]
+		queue_redraw()
+		return
 	var working: Dictionary = construction_plan.projected(tracks)
 	if not working.has(cell):
 		_show_notice("Choose existing or drafted track for the corridor endpoint.")
@@ -4484,3 +4531,111 @@ func _draft_corridor_signals() -> bool:
 	_show_notice("Corridor signals drafted; inspect block boundaries before Apply plan.")
 	queue_redraw()
 	return true
+
+func _load_blueprints() -> void:
+	var result: Dictionary = TrackBlueprints.load_library(BLUEPRINT_PATH)
+	blueprints = result.designs
+	blueprint_library_error = result.error
+	inspection_panel.refresh_blueprints(blueprints)
+	inspection_panel.blueprint_status.text = result.error if not result.error.is_empty() else "%d saved layouts. Pick two map corners to capture a built layout." % blueprints.size()
+
+func _save_blueprint() -> bool:
+	if not planning_mode: return false
+	if not blueprint_library_error.is_empty():
+		_show_notice(blueprint_library_error + " Preserve or repair track_blueprints.json before saving designs.")
+		return false
+	if not _is_inside_map(blueprint_first) or not _is_inside_map(blueprint_last):
+		_show_notice("Choose both rectangle corners first.")
+		return false
+	var name: String = inspection_panel.blueprint_name.text.strip_edges()
+	for design in blueprints:
+		if design.name == name:
+			_show_notice("That blueprint name already exists. Choose a different name.")
+			return false
+	var data: Dictionary = TrackBlueprints.capture(tracks, track_signals, blueprint_first, blueprint_last, name, _plan_protected)
+	if data.is_empty():
+		_show_notice("Enter a name and select built track outside platforms or facility grounds.")
+		return false
+	var proposed := blueprints.duplicate()
+	proposed.append(data)
+	if not TrackBlueprints.save_library(BLUEPRINT_PATH, proposed):
+		_show_notice("Could not save the blueprint library (maximum 50 designs).")
+		return false
+	blueprints = proposed
+	inspection_panel.blueprint_search.clear()
+	inspection_panel.refresh_blueprints(blueprints)
+	inspection_panel.blueprint_choice.select(inspection_panel.blueprint_names.find(name))
+	inspection_panel.blueprint_status.text = "Saved %s: %d×%d tiles, %d tracks and %d signals." % [name, data.width, data.height, data.tiles.size(), data.signals.size()]
+	_show_notice("Blueprint saved locally; its prior library is kept as a backup.")
+	return true
+
+func _place_blueprint(anchor: Vector2i) -> bool:
+	if not planning_mode: return false
+	var name: String = inspection_panel.selected_blueprint()
+	var data: Dictionary = {}
+	for design in blueprints:
+		if design.name == name: data = design
+	if data.is_empty():
+		_show_notice("Select a saved blueprint first.")
+		return false
+	var proposal: Dictionary = TrackBlueprints.place(data, anchor, construction_plan.projected(tracks), construction_plan.projected_signals(track_signals), Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected)
+	if not proposal.error.is_empty():
+		_show_notice(proposal.error)
+		return false
+	construction_plan.stage(proposal.tracks, tracks)
+	construction_plan.stage_signals(proposal.signals, track_signals, tracks)
+	_show_notice("Blueprint drafted. Review price, reservations and service impact before Apply plan.")
+	queue_redraw()
+	return true
+
+func _open_blueprint_file(exporting: bool) -> void:
+	if exporting and inspection_panel.selected_blueprint().is_empty():
+		_show_notice("Select a saved blueprint to export.")
+		return
+	corridor_pick = 0
+	blueprint_file_dialog.title = "Export selected blueprint" if exporting else "Import blueprint library"
+	blueprint_file_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE if exporting else FileDialog.FILE_MODE_OPEN_FILE
+	if exporting: blueprint_file_dialog.current_file = "track-design.json"
+	blueprint_file_dialog.popup_centered_clamped(Vector2i(700, 500), 0.95)
+
+func _import_blueprints(path: String) -> bool:
+	if not blueprint_library_error.is_empty():
+		_show_notice("Repair the local blueprint library before importing.")
+		return false
+	var loaded: Dictionary = TrackBlueprints.load_library(path)
+	if not FileAccess.file_exists(path) or not loaded.error.is_empty() or loaded.designs.is_empty():
+		_show_notice("No valid designs to import. " + str(loaded.error))
+		return false
+	var proposed := blueprints.duplicate()
+	var names: Dictionary = {}
+	for design in blueprints: names[design.name] = true
+	for design in loaded.designs:
+		if names.has(design.name):
+			_show_notice("Import refused: blueprint '%s' already exists. No designs were changed." % design.name)
+			return false
+		names[design.name] = true
+		proposed.append(design)
+	if not TrackBlueprints.save_library(BLUEPRINT_PATH, proposed):
+		_show_notice("Import could not be saved (maximum 50 designs).")
+		return false
+	blueprints = proposed
+	inspection_panel.blueprint_search.clear()
+	inspection_panel.refresh_blueprints(blueprints)
+	inspection_panel.blueprint_status.text = "Imported %d designs; %d total saved layouts." % [loaded.designs.size(), blueprints.size()]
+	_show_notice(inspection_panel.blueprint_status.text)
+	return true
+
+func _export_blueprint(path: String) -> bool:
+	if ProjectSettings.globalize_path(path) in [ProjectSettings.globalize_path(BLUEPRINT_PATH), ProjectSettings.globalize_path(BLUEPRINT_PATH + ".backup")]:
+		_show_notice("Choose an export filename outside the active library and its backup.")
+		return false
+	var name: String = inspection_panel.selected_blueprint()
+	for design in blueprints:
+		if design.name != name: continue
+		if TrackBlueprints.save_library(path, [design]):
+			_show_notice("Exported '%s' as a versioned JSON design." % name)
+			return true
+		_show_notice("Could not write the exported blueprint.")
+		return false
+	_show_notice("Select a saved blueprint to export.")
+	return false

@@ -24,9 +24,18 @@ func configure() -> void:
 	ok_button_text = "Apply"
 	exclusive = true
 
+	# Everything scrolls, so the Apply and Cancel buttons stay reachable at
+	# any interface scale or window size.
+	var outer := ScrollContainer.new()
+	outer.custom_minimum_size = Vector2(0, 120)
+	outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outer.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(outer)
+
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
-	add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer.add_child(box)
 
 	box.add_child(_heading("Display"))
 
@@ -46,21 +55,16 @@ func configure() -> void:
 
 	box.add_child(_heading("Keys — click one, then press the new key"))
 
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.y = 140
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	box.add_child(scroll)
-
 	key_grid = GridContainer.new()
 	key_grid.columns = 2
 	key_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	key_grid.add_theme_constant_override("h_separation", 16)
-	scroll.add_child(key_grid)
+	box.add_child(key_grid)
 
 	for action in Actions.ORDER:
 		var action_label := Label.new()
 		action_label.text = Actions.label(action)
-		action_label.custom_minimum_size.x = 220
+		action_label.custom_minimum_size.x = 200
 		key_grid.add_child(action_label)
 
 		var button := Button.new()
@@ -78,7 +82,7 @@ func configure() -> void:
 
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.custom_minimum_size = Vector2(500, 44)
+	status.custom_minimum_size = Vector2(0, 44)
 	box.add_child(status)
 
 	confirmed.connect(_apply)

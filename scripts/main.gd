@@ -278,6 +278,7 @@ func _process(delta: float) -> void:
 	_update_history_controls()
 	_update_network_map()
 	_update_objective_panel()
+	_layout_header()
 	queue_redraw()
 	
 func _simulation_step(step_seconds: float) -> void:
@@ -558,9 +559,33 @@ func _layout_header() -> void:
 	if station_panel != null:
 		station_panel.offset_top = header_height + 16.0
 
+	# Left column: objectives, then the network map in whatever height is left
+	# above the bottom buttons. Recomputed every frame (cheap, and it follows
+	# the Goals and Map toggles and any window or scale change).
+	var column_top: float = header_height + 16.0
+	var bottom_limit: float = get_viewport_rect().size.y - 64.0
+
 	if objective_panel != null:
-		objective_panel.offset_top = header_height + 16.0
-		objective_panel.offset_bottom = header_height + 156.0
+		_set_top_left_rect(objective_panel, column_top, column_top + 140.0)
+
+		if objective_panel.visible:
+			column_top += 152.0
+
+	if network_map != null:
+		var map_height: float = clampf(bottom_limit - column_top, 120.0, 200.0)
+		_set_top_left_rect(network_map, column_top, column_top + map_height)
+
+
+func _set_top_left_rect(control: Control, top: float, bottom: float) -> void:
+	if control.anchor_top != 0.0 or control.anchor_bottom != 0.0:
+		control.anchor_top = 0.0
+		control.anchor_bottom = 0.0
+
+	if not is_equal_approx(control.offset_top, top):
+		control.offset_top = top
+
+	if not is_equal_approx(control.offset_bottom, bottom):
+		control.offset_bottom = bottom
 
 
 func _draw() -> void:

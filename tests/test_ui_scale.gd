@@ -44,6 +44,17 @@ func _run() -> void:
 	game._reset_camera()
 	check(is_equal_approx(game.camera.zoom.x, 0.5), "reset gives the compensated zoom at 200%")
 
+	# The Apply button must stay reachable at the largest scale.
+	game.settings_dialog.open_dialog()
+	await process_frame
+	await process_frame
+	var dialog: ConfirmationDialog = game.settings_dialog
+	var logical: Vector2 = game.get_viewport_rect().size
+	check(float(dialog.size.y) <= logical.y + 1.0, "settings dialog fits the view height at 200%% (dialog %d, view %d)" % [dialog.size.y, logical.y])
+	var ok_rect: Rect2 = dialog.get_ok_button().get_global_rect()
+	check(Rect2(Vector2.ZERO, Vector2(dialog.size)).encloses(ok_rect), "Apply button lies inside the settings dialog at 200%")
+	dialog.hide()
+
 	Settings.ui_scale = 1.0
 	game._apply_settings()
 	check(is_equal_approx(game.camera.zoom.x, 1.0), "back to 100% restores the camera zoom")

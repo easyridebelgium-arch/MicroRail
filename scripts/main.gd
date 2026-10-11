@@ -86,6 +86,7 @@ const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
 const SimClock = preload("res://scripts/core/sim_clock.gd")
+const Reservations = preload("res://scripts/core/track_reservations.gd")
 const CommandQueue = preload("res://scripts/core/command_queue.gd")
 const SimRng = preload("res://scripts/core/sim_rng.gd")
 const EventLog = preload("res://scripts/core/event_log.gd")
@@ -102,9 +103,12 @@ const ScenarioGoals = preload("res://scripts/scenario_goals.gd")
 
 # A false value means horizontal; true means vertical.
 var tracks: Dictionary = {}
-# Switch positions for drawing: {cell: 0 (through) or 1 (branch)}. Trains follow
-# their planned routes; each switch is set to match the routes that use it.
+# Switch positions: {cell: 0 (through) or 1 (branch)}. Reservation owners
+# lock the switch and set it for their actual movement.
 var switch_states: Dictionary = {}
+var reservations = Reservations.new()
+var reservation_overlay: bool = false
+var reservation_waits: Dictionary = {}
 var freight_route_cells: Array[Vector2i] = []
 var draw_track_mode: bool = false
 var build_stroke: Array[Vector2i] = []
@@ -259,6 +263,8 @@ func _ready() -> void:
 	_setup_fleet_editor()
 	_apply_fleet_specs()
 	_setup_settings_dialog()
+	_setup_reservation_overlay()
+	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
 	_apply_settings()
@@ -294,6 +300,7 @@ func _process(delta: float) -> void:
 func _simulation_step(step_seconds: float) -> void:
 	_generate_passengers(step_seconds)
 	_produce_logs(step_seconds)
+	_rebuild_reservations(true)
 	forest_stock -= freight_train.advance(step_seconds, forest_stock)
 
 	if _passenger_service_is_active():
@@ -407,6 +414,7 @@ func _check_route(force_reset: bool = false) -> void:
 	_refresh_switch_states(new_route)
 	passenger_route_error = built["error"]
 	if not force_reset and new_route == route_cells:
+		_rebuild_reservations()
 		return
 	_return_onboard_passengers()
 	_record_event(EventLog.ROUTE_CHANGED, "passenger", {"connected": not new_route.is_empty(), "tiles": new_route.size()})
@@ -420,6 +428,7 @@ func _check_route(force_reset: bool = false) -> void:
 	wait_remaining = 0.0
 	train_needs_boarding = true
 	_update_train_transform()
+	_rebuild_reservations()
 
 
 func _move_train(delta: float) -> void:
@@ -434,7 +443,7 @@ func _move_train(delta: float) -> void:
 		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
 	var next_stop: int = _next_passenger_stop()
 	var target_distance: float = stop_distances[next_stop]
-	route_distance = move_toward(route_distance, target_distance, _get_train_speed() * delta)
+	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta))
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
 		var unloaded: int = passengers_on_train
@@ -647,6 +656,8 @@ func _draw() -> void:
 	elif _is_inside_map(hovered_cell):
 		var color: Color = Palette.get_color(Palette.Role.HOVER_OK if _can_build_at(hovered_cell) else Palette.Role.HOVER_BAD)
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
+	if reservation_overlay:
+		_draw_reservations()
 	_draw_train()
 
 
@@ -846,6 +857,10 @@ func _execute_command(command: Dictionary) -> void:
 
 
 func _use_switch_tool(cell: Vector2i) -> void:
+	_rebuild_reservations()
+	if reservations.owners.has(cell):
+		_show_notice("Track reserved by train #%d; wait until it clears." % int(reservations.owners[cell]))
+		return
 	if not _can_demolish(cell):
 		_show_notice("Click a straight piece of track to place a switch.")
 		return
@@ -862,6 +877,7 @@ func _use_switch_tool(cell: Vector2i) -> void:
 # Swaps one tile between a straight and its switch variants. The stem and
 # through ports never change, so existing routes stay valid.
 func _execute_set_tile(data: Dictionary) -> void:
+	_rebuild_reservations()
 	var cell := Vector2i(int(data["x"]), int(data["y"]))
 	var new_tile: Variant = data["tile"]
 
@@ -911,6 +927,11 @@ func _execute_build(data: Dictionary) -> void:
 	for entry in data["cells"]:
 		changes[Vector2i(int(entry[0]), int(entry[1]))] = entry[2]
 
+	_rebuild_reservations()
+	for cell in changes:
+		if reservations.owners.has(cell):
+			_show_notice("Track is reserved by a train; wait until it clears.")
+			return
 	var new_count: int = int(data["new_count"])
 	var cost: int = new_count * TRACK_BUILD_COST
 
@@ -1363,6 +1384,9 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	_update_train_transform()
 	freight_train.set_route(loaded_freight_cells, float(TILE_SIZE))
 	freight_train.restore_state(data["freight"])
+	reservation_waits.clear()
+	freight_train.reservation_wait = ""
+	_rebuild_reservations()
 	scenario_goals.current_index = int(data["scenario_stage"])
 	sim_clock.restore_state(data["sim"]["clock"])
 	sim_rng.restore_state(data["sim"]["rng"])
@@ -1465,6 +1489,7 @@ func _toggle_switch_tool() -> void:
 
 func _toggle_pause() -> void:
 	paused = not paused
+	_rebuild_reservations()
 	if not paused:
 		_clear_construction_history()
 	_update_toolbar()
@@ -2061,32 +2086,16 @@ func _setup_freight_train() -> void:
 	freight_train.delivered.connect(_on_logs_delivered)
 	freight_train.operating_expense.connect(_on_freight_operating_expense)
 
+	freight_train.movement_guard = _freight_reserved_movement
 	add_child(freight_train)
 	_refresh_freight_route(route_cells)
 
 
 func _find_freight_route(
 	track_data: Dictionary,
-	passenger_cells: Array[Vector2i]
+	_passenger_cells: Array[Vector2i]
 ) -> Array[Vector2i]:
-	var candidate: Array[Vector2i] = RailRouter.find_route(
-		track_data,
-		FOREST_SITE,
-		CARGO_TERMINAL
-	)
-
-	var empty_route: Array[Vector2i] = []
-
-	# Keep services separate until we introduce signals.
-	for cell in candidate:
-		if passenger_cells.has(cell):
-			return empty_route
-
-		if cell in [STATION_A, STATION_B, STATION_C]:
-			return empty_route
-
-	return candidate
-
+	return RailRouter.find_route(track_data, FOREST_SITE, CARGO_TERMINAL)
 
 func _refresh_freight_route(passenger_cells: Array[Vector2i]) -> void:
 	if freight_train == null:
@@ -2101,17 +2110,12 @@ func _refresh_freight_route(passenger_cells: Array[Vector2i]) -> void:
 	freight_train.set_route(cells, float(TILE_SIZE))
 
 
-# Sets every switch to match the routes that use it; switches no route uses
-# keep their position.
-func _refresh_switch_states(passenger_cells: Array[Vector2i]) -> void:
-	var settings: Dictionary = RailRouter.switch_settings(tracks, freight_route_cells)
-	settings.merge(RailRouter.switch_settings(tracks, passenger_cells), true)
+# Drop removed switches; reservation owners set the positions of active ones.
+func _refresh_switch_states(_passenger_cells: Array[Vector2i]) -> void:
 	var updated: Dictionary = {}
-
 	for cell in tracks:
 		if TrackGeometry.is_switch(tracks[cell]):
-			updated[cell] = int(settings.get(cell, switch_states.get(cell, 0)))
-
+			updated[cell] = int(switch_states.get(cell, 0))
 	switch_states = updated
 
 
@@ -2304,6 +2308,12 @@ func _apply_construction_history(
 	else:
 		target = change["after"]
 
+	_rebuild_reservations()
+	for cell in target:
+		if reservations.owners.has(cell):
+			_show_notice("Cannot undo or redo reserved track; wait until the train clears.")
+			return false
+
 	for cell in target:
 		if target[cell] == null:
 			tracks.erase(cell)
@@ -2383,6 +2393,8 @@ func _passenger_service_status() -> String:
 	var home: String = ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["name"]
 	if not passenger_service_enabled:
 		return title + (": withdrawing to " if _passenger_service_is_active() else ": stopped at ") + home
+	if reservation_waits.has("passenger"):
+		return title + ": " + reservation_waits["passenger"]
 	if wait_remaining > 0.0:
 		return "%s: departing %s in %.1f seconds" % [title, ServiceRoutes.STATIONS[services["passenger"]["stops"][passenger_stop_index]]["name"], wait_remaining]
 	return title + ": travelling to " + ServiceRoutes.STATIONS[services["passenger"]["stops"][_next_passenger_stop()]]["name"]
@@ -2443,6 +2455,9 @@ func _can_demolish(cell: Vector2i) -> bool:
 	if not _is_inside_map(cell):
 		return false
 
+	if reservations.owners.has(cell):
+		return false
+
 	if not tracks.has(cell) or _is_station_space(cell):
 		return false
 
@@ -2495,6 +2510,7 @@ func _finish_demolition(target: Vector2i) -> void:
 
 
 func _execute_demolish(data: Dictionary) -> void:
+	_rebuild_reservations()
 	var before: Dictionary = {}
 	var after: Dictionary = {}
 
@@ -3288,3 +3304,68 @@ func fleet_train_status(id: int) -> String:
 	if train["service"] == "passenger":
 		return _passenger_service_status()
 	return services["freight"]["name"] + ": " + freight_train.status_text()
+
+
+func _reservation_path(path: Curve2D, home: Vector2) -> Curve2D:
+	if path.point_count >= 2:
+		return path
+	var parked := Curve2D.new()
+	parked.add_point(home)
+	parked.add_point(home + Vector2(0.001, 0))
+	return parked
+
+func _rebuild_reservations(allow_movement: bool = false) -> void:
+	if freight_train == null:
+		return
+	var passenger := Fleet.assigned(fleet, "passenger")
+	var freight := Fleet.assigned(fleet, "freight")
+	var trains: Array = [
+		{"id": int(passenger["id"]), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_connected else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0},
+		{"id": int(freight["id"]), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.service_is_active() and freight_train.dwell <= 0.0 and (not freight_train.to_terminal or freight_train.distance_along_route > 0.001 or freight_train.cargo + forest_stock >= freight_train.get_minimum_load())}
+	]
+	reservations.rebuild(trains, tracks, float(TILE_SIZE))
+	switch_states.merge(reservations.switches, true)
+
+func _freight_reserved_movement(path: Curve2D, current: float, proposed: float) -> float:
+	return _reserved_movement("freight", path, current, proposed)
+
+func _reserved_movement(service: String, path: Curve2D, current: float, proposed: float) -> float:
+	var id := int(Fleet.assigned(fleet, service)["id"])
+	var allowed: float = reservations.limit(id, path, current, proposed, float(TILE_SIZE))
+	if absf(allowed - proposed) > 0.001:
+		var conflict: Dictionary = reservations.waits.get(id, {})
+		var cell: Vector2i = conflict.get("cell", Vector2i(-1, -1))
+		var owner := int(conflict.get("owner", -1))
+		var other := Fleet.find(fleet, owner)
+		var name: String = str(other.get("name", "another train"))
+		var place := "switch" if TrackGeometry.is_switch(tracks.get(cell)) else "track"
+		var reason := "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]
+		if reservation_waits.get(service, "") != reason:
+			_record_event(EventLog.TRAIN_WAITING, str(id), {"reason": reason, "blocked_by": owner, "x": cell.x, "y": cell.y})
+		reservation_waits[service] = reason
+	else:
+		reservation_waits.erase(service)
+	freight_train.reservation_wait = str(reservation_waits.get("freight", ""))
+	return allowed
+
+func _setup_reservation_overlay() -> void:
+	var button := Button.new()
+	button.text = "Reservations"
+	button.toggle_mode = true
+	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = "Hatched tiles are owned by the displayed train ID. Occupied and reserved track cannot be changed."
+	button.toggled.connect(func(enabled: bool) -> void:
+		reservation_overlay = enabled
+		queue_redraw())
+	$Interface/HeaderBox/Toolbar.add_child(button)
+
+func _draw_reservations() -> void:
+	for cell in reservations.owners:
+		var origin := Vector2(cell) * TILE_SIZE
+		var rect := Rect2(origin, Vector2.ONE * TILE_SIZE)
+		draw_rect(rect, Color(1, 1, 1, 0.65), false, 1.0)
+		for offset in range(0, TILE_SIZE, 8):
+			draw_line(origin + Vector2(offset, 0), origin + Vector2(TILE_SIZE, TILE_SIZE - offset), Color(1, 1, 1, 0.45))
+			if offset > 0:
+				draw_line(origin + Vector2(0, offset), origin + Vector2(TILE_SIZE - offset, TILE_SIZE), Color(1, 1, 1, 0.45))
+		draw_string(ThemeDB.fallback_font, origin + Vector2(2, 13), "#%d" % int(reservations.owners[cell]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)

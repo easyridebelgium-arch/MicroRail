@@ -25,10 +25,10 @@ still planned. See [Fleet management](FLEET.md) for the implemented controls.
 ## Phase 0 — Determinism, saves and accessibility first
 
 The merged foundation and fleet integration passes headless checks in Godot 4.6.3,
-including fixed-step movement, save migration and RNG continuation. Phase 0 remains
-partially complete: UI-only scaling to 200%, layout reflow, comprehensive remapping
-and command-at-tick determinism still need work. Presence of a class alone is not
-evidence that every gameplay path uses it. See [foundation status](phase-0-foundations.md).
+including fixed-step movement, save migration and RNG continuation. The Phase 0
+accessibility and command-queue work is integrated: UI scale to 200%, keyboard and
+mouse remapping, compact layouts and saved pending construction commands. Full
+input replay and controller support remain later work. See [foundation status](phase-0-foundations.md).
 
 | Foundation | Scope and completion evidence |
 | --- | --- |
@@ -52,7 +52,7 @@ must not claim to predict traffic conflicts without the reservation layer.
 | Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices and stored spares are implemented. Multiple trains on a shared track depend on reservations and signals. |
 | Train consists and rolling stock (Phase 2, after safe train-length handling) | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Extend the fleet model with vehicle composition, cargo compatibility and total train length. Account for platform and block lengths before running long consists. Introduce stock types as their passenger classes or cargo types become available. |
 | Junctions and switches | Build branching networks and share infrastructure between services. | Extend track connections and route selection beyond two-port pieces. |
-| Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Support safe waiting, junction conflicts and recovery from blocked routes. |
+| Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Basic tile reservations, switch/selected-port locking, safe waiting events and a hatched ownership overlay are implemented. Shared passenger/freight routing is enabled. Signals and deadlock recovery are next; reservations do not select alternate passing-loop paths. |
 | Priority and pathfinding rules | Offer simple dispatch priorities, initially express > local passenger > freight, so players can influence junction behaviour without configuring complex signalling. | Priorities choose between safe movements; they never override reservations. Allow player overrides, explain why a train is waiting, and prevent low-priority services from waiting indefinitely. Respect waypoint directives when choosing paths. |
 | Waypoints and waypoint directives | Place lightweight markers or directional waypoints to force a train through a particular track without constructing a station. Allow routing directives associated with signals. | Extend ordered routes with pass-through instructions and direction constraints. Keep routing directives distinct from a signal's safety role: a directive must never override an occupied or reserved block. |
 | Signal control modes | Automatic signals/reservations by default, with optional one-way, route, platform and manual dispatch controls. | All modes use the same reservation rules and explain why movements are blocked. |
@@ -198,5 +198,6 @@ Autosave and logs can land as soon as the save/event foundations are reliable; t
 need not wait for controller support. Visual polish and sound can proceed alongside
 the phases, with gameplay effects explicitly optional. Build the reservation layer
 once and reuse it for preview, dispatch, work zones, recovery and eventual shunting.
-The next priority is foundation integration and verification, not adding more
-simultaneously running trains before the network can safely control them.
+Junctions and basic reservations are integrated. Next: deadlock detection and safe
+recovery, then signals/dispatch controls. Add more simultaneously running trains
+after these operating rules are proven. See [reservation behaviour and checks](RESERVATIONS.md).

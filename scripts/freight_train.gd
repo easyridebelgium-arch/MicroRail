@@ -32,6 +32,8 @@ var running_cost_per_second: int = OPERATING_COST_PER_SECOND
 var loading_rule: int = LoadingRule.ANY
 var home_position: Vector2 = Vector2.ZERO
 var cargo: int = 0
+var movement_guard: Callable
+var reservation_wait: String = ""
 
 var route_cells: Array[Vector2i] = []
 var route_path: Curve2D = Curve2D.new()
@@ -84,11 +86,15 @@ func advance(delta: float, available_logs: int) -> int:
 
 	var target: float = route_length if to_terminal else 0.0
 
+	var previous_distance := distance_along_route
 	distance_along_route = move_toward(
 		distance_along_route,
 		target,
 		get_speed() * delta
 	)
+
+	if movement_guard.is_valid():
+		distance_along_route = movement_guard.call(route_path, previous_distance, distance_along_route)
 
 	if absf(distance_along_route - target) < 0.001:
 		distance_along_route = target
@@ -103,7 +109,7 @@ func advance(delta: float, available_logs: int) -> int:
 
 		to_terminal = not to_terminal
 		dwell = STATION_WAIT
-	elif at_forest or at_terminal:
+	elif (at_forest or at_terminal) and absf(distance_along_route - previous_distance) > 0.001:
 		departed.emit("forest" if at_forest else "terminal", cargo)
 
 	_update_transform()
@@ -149,13 +155,15 @@ func _draw() -> void:
 
 func status_text() -> String:
 	if route_cells.is_empty():
-		return "Needs a separate connected freight route"
+		return "Needs a connected freight route"
 	if not service_enabled:
 		if service_is_active():
 			return "Withdrawing after return to forest"
 
 		return "Freight service stopped at forest"
 
+	if not reservation_wait.is_empty():
+		return reservation_wait
 	if dwell > 0.0:
 		return "Stopped at loading track"
 

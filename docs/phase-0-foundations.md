@@ -71,14 +71,15 @@ copy them over the current scripts.
 
 ## Known limits (deliberate, for later)
 
-- **Only build and demolish use the command queue so far.** While the game
-  runs they wait for the start of the next simulation step; while paused they
-  run at once. Undo/Redo, purchases, upgrades, route and fleet changes still act
-  directly from their handlers, and the queue is not saved: saving runs any
-  waiting command first, and loading clears it. A `commands` block in the save
-  (version 17) is only needed once commands can wait longer than one step.
-  `tests/test_command_queue.gd` passes (27 checks, 11 Oct 2026);
-  `tests/test_command_wiring.gd` has not been run yet.
+- **Build and demolish use the command queue.** While the game runs they wait
+  for the start of the next simulation step; while paused they run at once.
+  Upgrades, purchases, Undo/Redo, route and fleet changes already require the
+  game to be paused, so they act directly and never wait. The queue is not
+  saved: saving runs any waiting command first and loading clears it. A
+  `commands` block in the save (version 17) is only needed if commands ever wait
+  longer than one step. Tests: `test_command_queue.gd` (27 checks),
+  `test_command_wiring.gd`, `test_mouse_tracks.gd` and
+  `test_merge_integration.gd` pass (11 Oct 2026).
 - **Paused edits are not logged.** They run immediately and are not recorded
   anywhere a replay could read, so deterministic replay is still incomplete.
 

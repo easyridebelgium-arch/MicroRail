@@ -85,6 +85,7 @@ const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
 const SimClock = preload("res://scripts/core/sim_clock.gd")
+const CommandQueue = preload("res://scripts/core/command_queue.gd")
 const SimRng = preload("res://scripts/core/sim_rng.gd")
 const EventLog = preload("res://scripts/core/event_log.gd")
 const SaveMigrations = preload("res://scripts/core/save_migrations.gd")
@@ -185,6 +186,7 @@ var scenario_goals: ScenarioGoals = ScenarioGoals.new()
 
 # Phase 0 foundations: fixed-step clock, seeded RNG and the event stream.
 var sim_clock: SimClock = SimClock.new()
+var command_queue: CommandQueue = CommandQueue.new()
 var sim_rng: SimRng = SimRng.new()
 var event_log: EventLog = EventLog.new()
 var settings_dialog: SettingsDialog
@@ -263,6 +265,7 @@ func _process(delta: float) -> void:
 	if not paused:
 		for _step in sim_clock.advance(delta):
 			sim_clock.begin_tick()
+			_run_due_commands()
 			_simulation_step(SimClock.TICK_SECONDS)
 
 	_update_instructions()
@@ -708,6 +711,52 @@ func _finish_track_drag(end_cell: Vector2i) -> void:
 	if cost > 0 and money < cost:
 		_show_notice("Insufficient funds: need £%d, available £%d." % [cost, money])
 		return
+	var cells: Array = []
+	for cell in changes:
+		cells.append([cell.x, cell.y, bool(changes[cell])])
+	_submit_command("build", {"cells": cells, "new_count": int(build_plan["new_count"])})
+
+
+# Paused edits run at once (and are stamped with the current tick). While the
+# simulation runs, edits wait for the start of the next simulation step.
+func _submit_command(type: String, data: Dictionary) -> void:
+	if paused:
+		_execute_command({"seq": 0, "tick": sim_clock.tick, "type": type, "data": data})
+		return
+
+	if command_queue.enqueue(sim_clock.tick + 1, type, data).is_empty():
+		_show_notice("Too many pending commands; try again in a moment.")
+
+
+func _run_due_commands() -> void:
+	for command in command_queue.drain(sim_clock.tick):
+		_execute_command(command)
+
+
+func _execute_command(command: Dictionary) -> void:
+	var data: Dictionary = command["data"]
+
+	match str(command["type"]):
+		"build":
+			_execute_build(data)
+		"demolish":
+			_execute_demolish(data)
+
+
+# Rules are checked again here because time may have passed since the click.
+func _execute_build(data: Dictionary) -> void:
+	var changes: Dictionary = {}
+
+	for entry in data["cells"]:
+		changes[Vector2i(int(entry[0]), int(entry[1]))] = bool(entry[2])
+
+	var new_count: int = int(data["new_count"])
+	var cost: int = new_count * TRACK_BUILD_COST
+
+	if cost > 0 and money < cost:
+		_show_notice("Insufficient funds: need £%d, available £%d." % [cost, money])
+		return
+
 	var before: Dictionary = {}
 	for cell in changes:
 		before[cell] = tracks.get(cell)
@@ -715,9 +764,9 @@ func _finish_track_drag(end_cell: Vector2i) -> void:
 	money -= cost
 	total_construction_cost += cost
 	_record_construction_change(before, changes, -cost, cost)
-	_record_event(EventLog.TRACK_BUILT, "player", {"tiles": changes.size(), "new_tiles": int(build_plan["new_count"]), "cost": cost})
+	_record_event(EventLog.TRACK_BUILT, "player", {"tiles": changes.size(), "new_tiles": new_count, "cost": cost})
 	_check_route()
-	_show_notice("Built %d new tiles for £%d; connections adjusted automatically." % [build_plan["new_count"], cost])
+	_show_notice("Built %d new tiles for £%d; connections adjusted automatically." % [new_count, cost])
 	queue_redraw()
 
 
@@ -766,6 +815,9 @@ func _save_game() -> void:
 		_show_notice("Finish or cancel track placement before saving.")
 		return
 
+	# Commands still waiting for the next step would otherwise be lost.
+	for command in command_queue.drain(sim_clock.tick + 1):
+		_execute_command(command)
 	_sync_fleet_upgrades()
 	var saved_tracks: Array = []
 
@@ -1103,6 +1155,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	freight_train.restore_state(data["freight"])
 	scenario_goals.current_index = int(data["scenario_stage"])
 	sim_clock.restore_state(data["sim"]["clock"])
+	command_queue.clear()
 	sim_rng.restore_state(data["sim"]["rng"])
 	event_log.restore_state(data["sim"]["events"])
 	var loaded_notice: String = "Previous save loaded." if save_path == SAVE_BACKUP_PATH else "Game loaded."
@@ -2174,15 +2227,31 @@ func _finish_demolition(target: Vector2i) -> void:
 	_collect_demolition_cells(target)
 	is_dragging = false
 
-	var before: Dictionary = {}
-	var after: Dictionary = {}
+	var cells: Array = []
 
 	for cell in demolition_cells:
 		if _can_demolish(cell):
-			before[cell] = tracks[cell]
-			after[cell] = null
+			cells.append([cell.x, cell.y])
 
 	demolition_cells.clear()
+
+	if cells.is_empty():
+		queue_redraw()
+		return
+
+	_submit_command("demolish", {"cells": cells})
+
+
+func _execute_demolish(data: Dictionary) -> void:
+	var before: Dictionary = {}
+	var after: Dictionary = {}
+
+	for entry in data["cells"]:
+		var cell := Vector2i(int(entry[0]), int(entry[1]))
+
+		if _can_demolish(cell):
+			before[cell] = tracks[cell]
+			after[cell] = null
 
 	if before.is_empty():
 		queue_redraw()

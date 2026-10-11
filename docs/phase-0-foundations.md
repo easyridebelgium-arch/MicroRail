@@ -16,7 +16,9 @@ visual interaction and the remaining accessibility work still need verification.
 | `scripts/core/palette.gd` | Colours by role: Default, Colour-blind safe, High contrast |
 | `scripts/core/input_actions.gd` | All keyboard commands as InputMap actions, with remapping |
 | `scripts/settings_dialog.gd` | Settings window: scale, palette, reduced motion, keys |
+| `scripts/core/command_queue.gd` | Player commands scheduled for a simulation tick (not yet used by `main.gd`) |
 | `tests/phase0_selftest.gd` | Headless checks for the modules above |
+| `tests/test_command_queue.gd` | Headless checks for the command queue |
 
 The running code is under `scripts/`. The `patched/` folder and
 `phase0-changes.diff` are historical copies, not installation instructions for the
@@ -68,6 +70,13 @@ copy them over the current scripts.
    for all three modes, and pair it with a shape or label.
 
 ## Known limits (deliberate, for later)
+
+- **The command queue is not wired in yet.** `command_queue.gd` orders and
+  saves tick-stamped commands, but build, demolish, purchase and route changes
+  still act directly from input handlers. Moving them onto the queue (then adding
+  a `commands` block to the save, version 17) is the remaining step for
+  command-at-tick determinism. Neither file has been run in Godot; run
+  `godot --headless --path . --script res://tests/test_command_queue.gd`.
 
 - **Interface scale scales the whole view** (map and interface together), and
   stops at 150%. At 200% the header text and toolbar do not fit; they need

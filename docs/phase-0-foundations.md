@@ -9,7 +9,7 @@ Test with the checklist below before building on this.
 
 | File | Purpose |
 |---|---|
-| `scripts/core/sim_clock.gd` | Fixed 60 Hz simulation steps, tick counter, speed multiplier |
+| `scripts/core/sim_clock.gd` | Fixed 60 Hz simulation steps, tick counter, 1×/2×/5×/10× multiplier with bounded stall catch-up |
 | `scripts/core/sim_rng.gd` | The one random number generator for simulation code, saved in saves |
 | `scripts/core/event_log.gd` | Bounded event stream (tick, subject, type, data) |
 | `scripts/core/save_migrations.gd` | Upgrades old saves one version at a time |
@@ -30,7 +30,9 @@ copy them over the current scripts.
 
 - **Simulation steps are fixed at 1/60 s** instead of using each frame's
   `delta`. Integration tests compare timers and moving trains at 30, 60 and
-  120 FPS. Long stalls deliberately drop excess catch-up time; this is not yet
+  120 FPS. The toolbar now offers [gameplay speeds](GAMEPLAY_SPEED.md) of 1×,
+  2×, 5× and 10×, with remappable number-row shortcuts. Every system still advances
+  in 1/60-second ticks. Long stalls deliberately drop excess catch-up time; this is not yet
   a full deterministic command/replay system. Rendering, camera, notices and UI
   still use real frame time.
 - **Saves are version 19**, defined only by `SaveMigrations.CURRENT_VERSION`.
@@ -45,7 +47,8 @@ copy them over the current scripts.
 - **Keys go through the InputMap.** Defaults match the old keys (Space, M, G,
   I, Home, Esc, WASD/arrows, Shift). Letter shortcuts follow the letter
   printed on the key; camera movement follows the physical key position (WASD
-  stays under the left hand on AZERTY and other layouts).
+  stays under the left hand on AZERTY and other layouts). Simulation speed keys
+  use the physical number-row positions 1–4, so AZERTY does not require Shift.
 - **Mouse buttons go through the InputMap.** Build (left), demolish (right),
   pan (middle), zoom in (wheel up) and zoom out (wheel down) are now remappable
   in the settings dialog alongside keyboard commands.

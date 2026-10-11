@@ -5,6 +5,12 @@ extends RefCounted
 ## the left hand on any keyboard layout.
 
 const TOGGLE_PAUSE: StringName = &"toggle_pause"
+const SPEED_NORMAL: StringName = &"speed_normal"
+const SPEED_DOUBLE: StringName = &"speed_double"
+const SPEED_FAST: StringName = &"speed_fast"
+const SPEED_MAX: StringName = &"speed_max"
+const SPEED_ACTIONS: Array[StringName] = [SPEED_NORMAL, SPEED_DOUBLE, SPEED_FAST, SPEED_MAX]
+
 const TOGGLE_MAP: StringName = &"toggle_map"
 const TOGGLE_GOALS: StringName = &"toggle_goals"
 const TOGGLE_INSPECT: StringName = &"toggle_inspect"
@@ -26,6 +32,10 @@ const ZOOM_OUT: StringName = &"zoom_out"
 ## Keyboard actions shown on the settings screen.
 const ORDER: Array[StringName] = [
 	TOGGLE_PAUSE,
+	SPEED_NORMAL,
+	SPEED_DOUBLE,
+	SPEED_FAST,
+	SPEED_MAX,
 	TOGGLE_MAP,
 	TOGGLE_GOALS,
 	TOGGLE_INSPECT,
@@ -55,6 +65,10 @@ const MAX_MOUSE_BUTTON: int = 9
 static func label(action: StringName) -> String:
 	match action:
 		TOGGLE_PAUSE: return "Pause / resume"
+		SPEED_NORMAL: return "Simulation speed 1×"
+		SPEED_DOUBLE: return "Simulation speed 2×"
+		SPEED_FAST: return "Simulation speed 5×"
+		SPEED_MAX: return "Simulation speed 10×"
 		TOGGLE_MAP: return "Show / hide network map"
 		TOGGLE_GOALS: return "Show / hide objectives"
 		TOGGLE_INSPECT: return "Inspect mode"
@@ -76,7 +90,8 @@ static func label(action: StringName) -> String:
 
 
 static func uses_physical_keys(action: StringName) -> bool:
-	return action in [
+	# Number-row positions also work unshifted on AZERTY layouts.
+	return action in SPEED_ACTIONS or action in [
 		CAMERA_UP,
 		CAMERA_DOWN,
 		CAMERA_LEFT,
@@ -92,6 +107,10 @@ static func uses_mouse(action: StringName) -> bool:
 static func default_keys(action: StringName) -> PackedInt32Array:
 	match action:
 		TOGGLE_PAUSE: return PackedInt32Array([KEY_SPACE])
+		SPEED_NORMAL: return PackedInt32Array([KEY_1])
+		SPEED_DOUBLE: return PackedInt32Array([KEY_2])
+		SPEED_FAST: return PackedInt32Array([KEY_3])
+		SPEED_MAX: return PackedInt32Array([KEY_4])
 		TOGGLE_MAP: return PackedInt32Array([KEY_M])
 		TOGGLE_GOALS: return PackedInt32Array([KEY_G])
 		TOGGLE_INSPECT: return PackedInt32Array([KEY_I])

@@ -85,6 +85,7 @@ const LOGS_PER_BATCH: int = 5
 const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
+const GAME_SPEEDS: Array[float] = [1.0, 2.0, 5.0, 10.0]
 const SimClock = preload("res://scripts/core/sim_clock.gd")
 const BlockSignals = preload("res://scripts/core/block_signals.gd")
 const RuntimeRoutes = preload("res://scripts/core/runtime_routes.gd")
@@ -119,6 +120,7 @@ var passenger_held: bool = false
 var track_signals: Dictionary = {}
 var block_signals = BlockSignals.new()
 var signal_tool_mode: bool = false
+var speed_selector: OptionButton
 var signal_button: Button
 var reservation_trains: Dictionary = {}
 var traffic_dialog: ConfirmationDialog
@@ -282,6 +284,7 @@ func _ready() -> void:
 	_setup_reservation_overlay()
 	_setup_traffic_dialog()
 	_setup_signal_tool()
+	_setup_speed_control()
 	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
@@ -342,6 +345,14 @@ func _modal_open() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	if _modal_open():
 		return
+
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	if not (focused is LineEdit or focused is TextEdit):
+		for index in range(InputActions.SPEED_ACTIONS.size()):
+			if event.is_action_pressed(InputActions.SPEED_ACTIONS[index]):
+				_set_game_speed(index)
+				get_viewport().set_input_as_handled()
+				return
 
 	if event.is_action_pressed(InputActions.TOGGLE_MAP):
 		_toggle_network_map()
@@ -2917,6 +2928,13 @@ func _refresh_shortcut_tooltips() -> void:
 	inspect_button.tooltip_text = "Inspect stations and industries — %s" % InputActions.key_label(InputActions.TOGGLE_INSPECT)
 	map_button.tooltip_text = "Show or hide the network map — %s" % InputActions.key_label(InputActions.TOGGLE_MAP)
 	goals_button.tooltip_text = "Show or hide scenario objectives — %s" % InputActions.key_label(InputActions.TOGGLE_GOALS)
+	if speed_selector != null:
+		var shortcuts: PackedStringArray = []
+		for index in range(GAME_SPEEDS.size()):
+			shortcuts.append("%s: %d×" % [InputActions.key_label(InputActions.SPEED_ACTIONS[index]), int(GAME_SPEEDS[index])])
+		speed_selector.tooltip_text = "Simulation speed — " + ", ".join(shortcuts) + ". Selecting a speed keeps pause unchanged."
+		for index in range(GAME_SPEEDS.size()):
+			speed_selector.set_item_tooltip(index, InputActions.key_label(InputActions.SPEED_ACTIONS[index]))
 
 
 func _setup_network_map() -> void:
@@ -3661,3 +3679,22 @@ func set_dispatch_hold(id: int, hold: bool) -> String:
 	_rebuild_reservations()
 	_record_event(EventLog.DISPATCH_CHANGED, str(id), {"hold": hold})
 	return "Train held at its current position." if hold else "Train released. Resume to run under reservations and signals."
+
+
+func _setup_speed_control() -> void:
+	speed_selector = OptionButton.new()
+	speed_selector.name = "SimulationSpeed"
+	speed_selector.focus_mode = Control.FOCUS_NONE
+	for speed in GAME_SPEEDS:
+		speed_selector.add_item("%d×" % int(speed))
+	speed_selector.select(0)
+	speed_selector.item_selected.connect(_set_game_speed)
+	var toolbar: Node = $Interface/HeaderBox/Toolbar
+	toolbar.add_child(speed_selector)
+	toolbar.move_child(speed_selector, pause_button.get_index() + 1)
+
+func _set_game_speed(index: int) -> void:
+	if index < 0 or index >= GAME_SPEEDS.size() or _modal_open(): return
+	sim_clock.speed = GAME_SPEEDS[index]
+	speed_selector.select(index)
+	_show_notice("Simulation speed %d×%s." % [int(sim_clock.speed), " — still paused" if paused else ""])

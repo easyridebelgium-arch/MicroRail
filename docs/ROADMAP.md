@@ -12,6 +12,8 @@ each system, with Godot and GDScript as the main development tools.
 - Construction costs, drag demolition and paused construction Undo/Redo.
 - Passenger and log-freight services, production and delivery income.
 - Separate speed and capacity upgrades.
+- Simulation speed selector: 1× (default), 2×, 5× and 10×, with remappable
+  number-row shortcuts and independent pause.
 - Named services and ordered passenger stops across Stations A, B and C.
 - A fleet roster with permanent train IDs, four purchasable models, individual
   names, stored spares, replacement assignment, sales and per-train upgrades.
@@ -34,6 +36,7 @@ input replay and controller support remain later work. See [foundation status](p
 | Foundation | Scope and completion evidence |
 | --- | --- |
 | Fixed-timestep simulation | Separate simulation ticks from rendering and wall-clock time. Queue gameplay commands at defined ticks and use stable update ordering. Check that the same initial state and command sequence produce matching simulation results at different rendering frame rates. |
+| Gameplay speed controls (implemented) | Phase 0 quality of life, before adding more operations: default 1×, then 2×/5×/10× using a dropdown showing the current speed and remappable number-row keys 1–4. Accelerate all simulation systems through the fixed clock; leave camera/UI timing and pause independent. The frame budget supports 10× at 30/60/120 FPS, with bounded catch-up after stalls. See [gameplay speed](GAMEPLAY_SPEED.md). |
 | One seeded simulation RNG | Route simulation randomness through one owned RNG; save its seed and current state so loading continues the sequence. Keep visual randomness separate. Seeds alone do not guarantee determinism: update order, input timing and algorithms must also be controlled. |
 | Versioned saves | Maintain one schema version source and validate the whole save before applying it. Use explicit migrations for supported formats; reject unsupported or ambiguous development formats clearly. Branches must not assign the same version to incompatible schemas. Keep failed loads atomic and preserve backups. |
 | Bounded event stream | Record simulation tick, stable subject/train ID, event type and compact payload for logs, alerts and journals. Bound retention and preserve ordering. An event log is not sufficient to reconstruct full world state or moving trains. |

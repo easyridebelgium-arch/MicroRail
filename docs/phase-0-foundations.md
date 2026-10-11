@@ -1,8 +1,9 @@
 # Phase 0 - Foundations
 
 Status: integrated with the merged fleet and route code and checked headlessly in
-Godot 4.6.3. Foundation module and merge integration tests pass. Windows/Godot 4.7
-visual interaction and the remaining accessibility work still need verification.
+Godot 4.6.3. Foundation module and merge integration tests pass. Phase 0 accessibility
+work is now complete (UI scale to 200%, mouse button remapping, command queue persistence).
+Test with the checklist below before building on this.
 
 ## What was added
 
@@ -88,12 +89,6 @@ copy them over the current scripts.
 - **Paused edits are not logged.** They run immediately and are not recorded
   anywhere a replay could read, so deterministic replay is still incomplete.
 
-- **Interface scale scales the whole view** (map and interface together), and
-  stops at 150%. At 200% the header text and toolbar do not fit; they need
-  reflowing (remaining Phase 0 work). A scale for the interface only needs the hard-coded
-  offsets in `main.gd` replaced by containers.
-- **Mouse input is still hard-coded** (left build, right demolish, middle pan,
-  wheel zoom). Move these to actions before adding controller support.
 - **Reduced motion has nothing to reduce yet.** The setting is stored and
   readable (`GameSettings.reduced_motion`); gate screen shake, particles and
   flashing on it as they are added.
@@ -121,10 +116,11 @@ It should print `N checks, 0 failed`. Then play and check:
 3. Pause (Space), map (M), goals (G), inspect (I), Home, Esc and WASD all work.
 4. Save, quit, load: trains, money and objectives are restored.
 5. Load a **version 14 save** (keep a copy first): it loads with an
-   "Upgraded from save version 14" notice, then saves as v16.
-6. Settings: pick 125%/150% scale; switch to Colour-blind safe and check the
+   "Upgraded from save version 14" notice, then saves as v17.
+6. Settings: pick 125%/150%/175%/200% scale; switch to Colour-blind safe and check the
    build preview, invalid cells, both trains and the map; remap a key, press
-   Apply, restart, confirm it persisted; "Restore default keys" works.
+   Apply, restart, confirm it persisted; "Restore default keys" works;
+   remap mouse buttons and confirm they work.
 7. Turn on `event_log.echo_to_output` and confirm events appear when trains
    arrive and depart, tracks are built, and logs are delivered.
 8. Let the game run for a while with a slow frame rate (drag the window) and

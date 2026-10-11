@@ -39,7 +39,7 @@ may require [physical reversal](DEADLOCKS.md). Connected branches can make a blo
 larger than expected: add boundaries on each approach/exit. There is one assigned
 running train per service. Use [waypoint directives](WAYPOINTS.md) to choose pass-through tracks.
 
-Saves v20 persist signal locations/modes and dispatcher state. Runtime ownership is
+Saves v21 persist signal locations/modes and dispatcher state. Runtime ownership is
 reconstructed before movement. Shape/text indicators work alongside palette choices.
 
 ## Verification

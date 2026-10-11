@@ -37,8 +37,10 @@ affected path to continue; a different path does not redirect a train mid-trip.
 Occupied/reserved track remains protected from demolition. Stop-order changes
 require an empty train physically at the new first stop and a connected new route.
 
-Saves are **v20** and retain runtime paths, unfinished reversals, loads and holds.
-V18 saves receive runtime defaults; v19 saves receive empty waypoint directives. Reservation ownership, signal block
+Saves are **v21** and retain runtime paths, unfinished reversals, loads and holds.
+V18 saves receive runtime defaults; v19 saves receive empty waypoint directives;
+v20 services default to Shuttle. Loop recovery returns to the departure stop of
+the current leg, including the closing last-to-first leg. Reservation ownership, signal block
 authority and deadlock timers are rebuilt after load. A persistent cycle is
 rediscovered after three seconds of actual waiting.
 

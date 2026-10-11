@@ -27,7 +27,7 @@ static func valid_cells(value: Variant) -> bool:
 		if delta == Vector2i.ZERO or maxi(absi(delta.x), absi(delta.y)) != 1: return false
 	return true
 
-static func passenger_path(cells: Array[Vector2i], stops: Array, tile_size: float, waypoints: Dictionary = {}) -> Dictionary:
+static func passenger_path(cells: Array[Vector2i], stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle") -> Dictionary:
 	var path := Curve2D.new()
 	path.bake_interval = 1.0
 	var distances: Array[float] = [0.0]
@@ -35,7 +35,9 @@ static func passenger_path(cells: Array[Vector2i], stops: Array, tile_size: floa
 	if cells[0] != Services.STATIONS[stops[0]]["cell"]: return {}
 	var start := 0
 	var leg_index := 0
-	for stop in stops.slice(1):
+	var destinations: Array = stops.slice(1)
+	if mode == "loop": destinations.append(stops[0])
+	for stop in destinations:
 		var end := -1
 		for i in range(start + 1, cells.size()):
 			if cells[i] == Services.STATIONS[stop]["cell"]:
@@ -83,7 +85,7 @@ static func valid_state(value: Variant, services: Dictionary) -> bool:
 	for field in ["passenger_cells", "freight_cells"]:
 		if not valid_cells(value.get(field)): return false
 	var passenger := decode(value["passenger_cells"])
-	if not passenger.is_empty() and passenger_path(passenger, services["passenger"]["stops"], 32, services["passenger"].get("waypoints", {})).is_empty(): return false
+	if not passenger.is_empty() and passenger_path(passenger, services["passenger"]["stops"], 32, services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle")).is_empty(): return false
 	var freight := decode(value["freight_cells"])
 	if not freight.is_empty():
 		if freight.size() < 2 or freight[0] != Vector2i(8, 24) or freight[-1] != Vector2i(28, 24): return false

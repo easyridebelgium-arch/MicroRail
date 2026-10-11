@@ -12,8 +12,9 @@ There is no loading, unloading, station dwell or reversal at a waypoint.
 2. Select **Waypoint** in the toolbar and click an existing track cell outside a
    station/industry platform. **Routes** opens and pauses the simulation, with
    the selected X/Y coordinates filled in.
-3. Choose **Passenger service** or **Freight service**. Select an outward leg,
-   such as **A → B**, **B → C**, or **FOREST → TERMINAL**.
+3. Choose **Passenger service** or **Freight service**. Select a leg,
+   such as **A → B**, **B → C**, or **FOREST → TERMINAL**. Passenger Loop mode also exposes
+   the closing leg (for example **B → A** for stops A, C, B).
 4. Click **Add waypoint**. Repeat through X/Y coordinates for additional cells,
    using **Up/Down** to set their required order and **Remove** to delete a draft
    directive. You can also open Routes directly and enter coordinates manually.
@@ -31,16 +32,18 @@ legs that no longer exist; closing without Apply preserves the live configuratio
 
 ## Behavior and limits
 
-Up to 16 distinct waypoint cells are allowed per outward leg. Passenger stations
+Up to 16 distinct waypoint cells are allowed per leg. Passenger stations
 and industry platforms cannot be waypoints. The shortest port-valid route that
 satisfies the ordered directives is chosen. The search carries the entry port
 through the whole leg, so a waypoint on a switch cannot allow a forbidden
 branch-to-branch move or a turn between crossing lines. The destination is reached
 only after all directives have been satisfied.
 
-Shuttles return along the selected geometry in reverse. One-way waypoint arrows,
-different outbound/return itineraries, automatic passing-loop selection and timed
-priority dispatch remain future work. A chosen passing loop helps only when the
+Shuttles return along the selected geometry in reverse. Passenger Loop routes
+follow the ordered stops and a separate last-to-first leg with its own directives;
+A, C, B in Loop mode visits A → C → B → A without stopping at C again.
+One-way waypoint arrows, independent shuttle return itineraries, automatic
+passing-loop selection and timed priority dispatch remain future work. A chosen passing loop helps only when the
 services' actual paths avoid the contested section and its signals have appropriate
 boundaries. A waypoint never overrides another train's occupied/reserved track.
 
@@ -48,8 +51,9 @@ Broken-track checks use the current route occurrence, heading and next destinati
 A gap behind a train permits delivery; after turning, it waits if the return path
 crosses that gap. Route edits never replace geometry under a moving train.
 
-Saves **v20** persist per-leg directives and retain train route snapshots/positions.
-V19 saves receive empty directives. Validation checks that retained paths satisfy
+Saves **v21** persist per-leg directives and retain train route snapshots/positions.
+V19 saves receive empty directives; v20 saves retain their directives and default
+to Shuttle mode. Validation checks that retained paths satisfy
 their saved waypoint order; coordinates are normalized to integers on load.
 
 ```sh

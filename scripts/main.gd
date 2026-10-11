@@ -453,7 +453,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_finish_demolition(cell)
 
 func _check_route(force_reset: bool = false) -> void:
-	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}))
+	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"))
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
 	for cell in track_signals.keys():
@@ -490,7 +490,7 @@ func _move_train(delta: float) -> void:
 		train_needs_boarding = false
 		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
 	var next_stop: int = _next_passenger_stop()
-	var target_distance: float = stop_distances[next_stop]
+	var target_distance: float = _passenger_target_distance()
 	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta))
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
@@ -509,7 +509,12 @@ func _move_train(delta: float) -> void:
 		_unload_passengers()
 		passenger_stop_index = next_stop
 		_record_event(EventLog.TRAIN_ARRIVED, "passenger", {"stop": services["passenger"]["stops"][next_stop], "passengers": unloaded})
-		if passenger_stop_index == stop_distances.size() - 1:
+		if _passenger_is_loop():
+			# The closing leg ends at the same physical station as distance zero.
+			# Wrap only after arrival; never rebuild or relocate a moving train.
+			if passenger_stop_index == 0: route_distance = 0.0
+			travelling_to_b = true
+		elif passenger_stop_index == stop_distances.size() - 1:
 			travelling_to_b = false
 		elif passenger_stop_index == 0:
 			travelling_to_b = true
@@ -1413,7 +1418,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		loaded_tracks[cell] = entry[2]
 	var runtime: Dictionary = data["runtime"]
 	var saved_passenger := RuntimeRoutes.decode(runtime["passenger_cells"])
-	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {})) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}))
+	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle")) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"))
 	var loaded_cells: Array[Vector2i] = []
 	loaded_cells.assign(built["cells"])
 	var loaded_path: Curve2D = built["path"]
@@ -1430,7 +1435,11 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		if returning and int(runtime["passenger_return_stop"]) != stop_index:
 			_show_notice("Invalid recovery origin.")
 			return
-		var next_stop: int = stop_index + ((-1 if state["travelling_to_b"] else 1) if returning else (1 if state["travelling_to_b"] else -1))
+		var original_forward: bool = not state["travelling_to_b"] if returning else state["travelling_to_b"]
+		if data["services"]["passenger"].get("mode", "shuttle") == "loop" and not original_forward:
+			_show_notice("Saved loop train direction is invalid.")
+			return
+		var next_stop: int = stop_index + (1 if original_forward else -1)
 		if next_stop < 0 or next_stop >= distances.size():
 			_show_notice("Saved train stop direction is invalid.")
 			return
@@ -3233,7 +3242,16 @@ func _station_key(cell: Vector2i) -> String:
 
 func _next_passenger_stop() -> int:
 	if passenger_returning: return passenger_return_stop
+	if _passenger_is_loop(): return (passenger_stop_index + 1) % services["passenger"]["stops"].size()
 	return passenger_stop_index + (1 if travelling_to_b else -1)
+
+func _passenger_is_loop() -> bool:
+	return services["passenger"].get("mode", "shuttle") == "loop"
+
+func _passenger_target_distance() -> float:
+	if _passenger_is_loop() and not passenger_returning:
+		return stop_distances[passenger_stop_index + 1]
+	return stop_distances[_next_passenger_stop()]
 
 func _return_onboard_passengers() -> void:
 	if passengers_on_train > 0:
@@ -3248,7 +3266,7 @@ func _setup_routes_editor() -> void:
 	routes_button = Button.new()
 	routes_button.text = "Routes"
 	routes_button.focus_mode = Control.FOCUS_NONE
-	routes_button.tooltip_text = "Name services; edit ordered stops and pass-through waypoints"
+	routes_button.tooltip_text = "Name services; edit route mode, ordered stops and pass-through waypoints"
 	routes_button.pressed.connect(_open_routes_editor)
 	$Interface/HeaderBox/Toolbar.add_child(routes_button)
 
@@ -3268,7 +3286,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	if not paused:
 		return "Pause before changing routes."
 	configuration = ServiceRoutes.from_save(configuration)
-	var changed: bool = configuration["passenger"]["stops"] != services["passenger"]["stops"] or configuration["passenger"].get("waypoints", {}) != services["passenger"].get("waypoints", {})
+	var changed: bool = configuration["passenger"].get("mode", "shuttle") != services["passenger"].get("mode", "shuttle") or configuration["passenger"]["stops"] != services["passenger"]["stops"] or configuration["passenger"].get("waypoints", {}) != services["passenger"].get("waypoints", {})
 	var freight_changed: bool = configuration["freight"].get("waypoints", {}) != services["freight"].get("waypoints", {})
 	if freight_changed:
 		if freight_train.distance_along_route > 0.001 or freight_train.recovery_returning:
@@ -3278,8 +3296,8 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	if changed:
 		var new_home: Vector2 = _cell_center(ServiceRoutes.STATIONS[configuration["passenger"]["stops"][0]]["cell"])
 		if passengers_on_train > 0 or passenger_returning or train_position.distance_to(new_home) > 0.1:
-			return "Finish the trip or reverse back first. Stops and waypoints can only change with an empty train at the first stop."
-		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE), configuration["passenger"].get("waypoints", {}))["cells"].is_empty():
+			return "Finish the trip or reverse back first. Route mode, stops and waypoints can only change with an empty train at the first stop."
+		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE), configuration["passenger"].get("waypoints", {}), configuration["passenger"].get("mode", "shuttle"))["cells"].is_empty():
 			return "Complete the new route before changing the stop order."
 		# Reparameterise a path only when its origin is this exact physical spot.
 		route_cells.clear()
@@ -3723,7 +3741,7 @@ func _set_game_speed(index: int) -> void:
 func _refresh_directional_routes(notify: bool = true) -> void:
 	var passenger_was_clear := route_connected
 	var next_stop := _next_passenger_stop()
-	route_connected = next_stop >= 0 and next_stop < stop_distances.size() and passenger_travel.is_clear(route_cells, route_path, route_distance, stop_distances[next_stop], tracks, float(TILE_SIZE))
+	route_connected = next_stop >= 0 and next_stop < stop_distances.size() and passenger_travel.is_clear(route_cells, route_path, route_distance, _passenger_target_distance(), tracks, float(TILE_SIZE))
 	passenger_route_error = "" if route_connected else "Route incomplete ahead — stopped here. Repair the path to the next destination."
 	if freight_train == null: return
 	var freight_was_clear: bool = freight_train.route_valid

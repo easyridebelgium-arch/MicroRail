@@ -30,7 +30,7 @@ shortest port-valid path through any assigned waypoints; passenger tiles and pla
 
 ## Saves and limits
 
-The current schema is **v20** (retained paths, recovery, signals and waypoints). Reservations are transient and are reconstructed from
+The current schema is **v21** (retained paths, recovery, signals, waypoints and route modes). Reservations are transient and are reconstructed from
 restored fleet IDs, paths, positions and direction before any train moves.
 
 Opposing trains on a single track can wait indefinitely without player action.

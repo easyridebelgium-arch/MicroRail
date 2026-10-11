@@ -4,6 +4,8 @@ const Services = preload("res://scripts/service_routes.gd")
 var game: Node
 var draft: Dictionary
 var service_choice: OptionButton
+var route_mode: OptionButton
+var heading: Label
 var name_field: LineEdit
 var stop_list: ItemList
 var station_choice: OptionButton
@@ -44,8 +46,13 @@ func configure(owner_game: Node) -> void:
 	name_field.max_length = 40
 	name_field.placeholder_text = "Route name"
 	box.add_child(name_field)
-	var heading := Label.new()
-	heading.text = "Ordered stops — train returns through the list in reverse"
+	route_mode = OptionButton.new()
+	route_mode.add_item("Shuttle — return through stops in reverse")
+	route_mode.add_item("Loop — last stop returns directly to first")
+	box.add_child(route_mode)
+	route_mode.item_selected.connect(_select_mode)
+	heading = Label.new()
+	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(heading)
 	stop_list = ItemList.new()
 	stop_list.custom_minimum_size.y = 140
@@ -132,8 +139,10 @@ func _select_service(index: int) -> void:
 func _show_service() -> void:
 	name_field.text = draft[_key()]["name"]
 	editing_controls.visible = _key() == "passenger"
+	route_mode.visible = _key() == "passenger"
+	route_mode.select(1 if draft[_key()].get("mode", "shuttle") == "loop" else 0)
 	_refresh_stops()
-	status.text = "Stop/waypoint edits require an empty train at the first station. Choose each outward leg and add pass-through track cells in order. Return trips use the same track in reverse; names can change mid-trip." if _key() == "passenger" else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
+	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if _key() == "passenger" else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
 
 func _refresh_stops(selected: int = -1) -> void:
 	stop_list.clear()
@@ -144,7 +153,21 @@ func _refresh_stops(selected: int = -1) -> void:
 		stop_list.add_item("%d. %s" % [index + 1, stop_name])
 	if selected >= 0 and selected < stops.size():
 		stop_list.select(selected)
+	var itinerary := stops.duplicate()
+	if draft[_key()].get("mode", "shuttle") == "loop": itinerary.append(stops[0])
+	else:
+		var back := stops.slice(0, stops.size() - 1)
+		back.reverse()
+		itinerary.append_array(back)
+	var names: PackedStringArray = []
+	for stop in itinerary: names.append(str(stop).to_upper())
+	heading.text = "Stop sequence: " + " → ".join(names)
 	_refresh_legs()
+
+func _select_mode(index: int) -> void:
+	draft["passenger"]["mode"] = "loop" if index == 1 else "shuttle"
+	_refresh_stops()
+	status.text = "Mode changed in draft. Apply at the first station with an empty train. Switching to Shuttle removes closing-leg waypoints."
 
 func _add_stop() -> void:
 	var key: String = station_choice.get_selected_metadata()
@@ -190,10 +213,10 @@ func _refresh_legs() -> void:
 	var old: String = str(waypoint_leg.get_selected_metadata()) if waypoint_leg.item_count > 0 else ""
 	waypoint_leg.clear()
 	var valid_keys: Array[String] = []
-	for index in range(stops.size() - 1):
+	for index in range(Services.leg_count(stops, draft[_key()].get("mode", "shuttle"))):
 		var key := Services.leg_key(stops, index)
 		valid_keys.append(key)
-		waypoint_leg.add_item("%s → %s" % [str(stops[index]).to_upper(), str(stops[index + 1]).to_upper()])
+		waypoint_leg.add_item("%s → %s" % [str(stops[index]).to_upper(), str(stops[(index + 1) % stops.size()]).to_upper()])
 		waypoint_leg.set_item_metadata(index, key)
 		if key == old: waypoint_leg.select(index)
 	var directives: Dictionary = draft[_key()].get("waypoints", {}).duplicate(true)

@@ -10,8 +10,8 @@ const STATIONS: Dictionary = {
 
 static func defaults() -> Dictionary:
 	return {
-		"passenger": {"name": "Passenger Shuttle", "stops": ["a", "b"], "waypoints": {}},
-		"freight": {"name": "Timber Service", "stops": ["forest", "terminal"], "waypoints": {}},
+		"passenger": {"name": "Passenger Shuttle", "stops": ["a", "b"], "waypoints": {}, "mode": "shuttle"},
+		"freight": {"name": "Timber Service", "stops": ["forest", "terminal"], "waypoints": {}, "mode": "shuttle"},
 	}
 
 static func is_valid(value: Variant) -> bool:
@@ -23,6 +23,8 @@ static func is_valid(value: Variant) -> bool:
 		var service: Dictionary = value[key]
 		if not service.get("name") is String or not service.get("stops") is Array:
 			return false
+		var mode: Variant = service.get("mode", "shuttle")
+		if not mode is String or mode not in ["shuttle", "loop"] or (key == "freight" and mode != "shuttle"): return false
 		var title: String = service["name"]
 		if title != title.strip_edges() or title.is_empty() or title.length() > 40 or "\n" in title or "\r" in title:
 			return false
@@ -37,14 +39,14 @@ static func is_valid(value: Variant) -> bool:
 	if value["freight"]["stops"] != ["forest", "terminal"]: return false
 	return valid_waypoints(value["passenger"]) and valid_waypoints(value["freight"])
 
-static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}) -> Dictionary:
+static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle") -> Dictionary:
 	var cells: Array[Vector2i] = []
 	var path := Curve2D.new()
 	path.bake_interval = 1.0
 	var distances: Array[float] = [0.0]
-	for index in range(stops.size() - 1):
+	for index in range(leg_count(stops, mode)):
 		var from_stop: Dictionary = STATIONS[stops[index]]
-		var to_stop: Dictionary = STATIONS[stops[index + 1]]
+		var to_stop: Dictionary = STATIONS[stops[(index + 1) % stops.size()]]
 		var leg: Array[Vector2i] = WaypointRouter.find_route(tracks, from_stop["cell"], to_stop["cell"], waypoints.get(leg_key(stops, index), []))
 		if leg.is_empty():
 			return {"cells": [], "path": Curve2D.new(), "distances": [], "error": "Missing track or waypoint path: %s → %s" % [from_stop["name"], to_stop["name"]]}
@@ -62,13 +64,16 @@ static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints:
 
 
 static func leg_key(stops: Array, index: int) -> String:
-	return "%s>%s" % [stops[index], stops[index + 1]]
+	return "%s>%s" % [stops[index], stops[(index + 1) % stops.size()]]
+
+static func leg_count(stops: Array, mode: String) -> int:
+	return stops.size() if mode == "loop" else stops.size() - 1
 
 static func valid_waypoints(service: Dictionary) -> bool:
 	var directives: Variant = service.get("waypoints", {})
 	if not directives is Dictionary: return false
 	var legs: Array[String] = []
-	for index in range(service["stops"].size() - 1): legs.append(leg_key(service["stops"], index))
+	for index in range(leg_count(service["stops"], service.get("mode", "shuttle"))): legs.append(leg_key(service["stops"], index))
 	for key in directives:
 		if not key is String or not legs.has(key) or not directives[key] is Array or directives[key].size() > 16: return false
 		var seen: Dictionary = {}
@@ -99,4 +104,5 @@ static func from_save(value: Dictionary) -> Dictionary:
 			for point in directives[leg]: normalized.append([int(point[0]), int(point[1])])
 			directives[leg] = normalized
 		result[service]["waypoints"] = directives
+		result[service]["mode"] = result[service].get("mode", "shuttle")
 	return result

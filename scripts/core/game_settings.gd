@@ -8,9 +8,9 @@ extends RefCounted
 
 const SETTINGS_PATH: String = "user://settings.cfg"
 
-## Offered scales. The whole view is scaled (world and interface together);
-## 200% needs the header and toolbar layouts to reflow first (planned for Phase 1).
-const UI_SCALES: Array[float] = [1.0, 1.25, 1.5]
+## Offered scales. The window scales everything; main.gd cancels that for the
+## map camera, so only the interface grows.
+const UI_SCALES: Array[float] = [1.0, 1.25, 1.5, 2.0]
 
 enum PaletteMode {
 	DEFAULT,

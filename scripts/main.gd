@@ -186,6 +186,8 @@ var scenario_goals: ScenarioGoals = ScenarioGoals.new()
 
 # Phase 0 foundations: fixed-step clock, seeded RNG and the event stream.
 var sim_clock: SimClock = SimClock.new()
+# The interface scale the camera zoom currently compensates for.
+var applied_ui_scale: float = 1.0
 var command_queue: CommandQueue = CommandQueue.new()
 var sim_rng: SimRng = SimRng.new()
 var event_log: EventLog = EventLog.new()
@@ -199,21 +201,23 @@ var objective_progress: ProgressBar
 var objective_details: Label
 var goals_button: Button
 
-@onready var instructions: Label = $Interface/Instructions
-@onready var straight_button: Button = $Interface/Toolbar/StraightButton
-@onready var curve_button: Button = $Interface/Toolbar/CurveButton
-@onready var rotate_button: Button = $Interface/Toolbar/RotateButton
-@onready var pause_button: Button = $Interface/Toolbar/PauseButton
-@onready var save_button: Button = $Interface/Toolbar/SaveButton
-@onready var load_button: Button = $Interface/Toolbar/LoadButton
-@onready var folder_button: Button = $Interface/Toolbar/FolderButton
+@onready var instructions: Label = $Interface/HeaderBox/Instructions
+@onready var straight_button: Button = $Interface/HeaderBox/Toolbar/StraightButton
+@onready var curve_button: Button = $Interface/HeaderBox/Toolbar/CurveButton
+@onready var rotate_button: Button = $Interface/HeaderBox/Toolbar/RotateButton
+@onready var pause_button: Button = $Interface/HeaderBox/Toolbar/PauseButton
+@onready var save_button: Button = $Interface/HeaderBox/Toolbar/SaveButton
+@onready var load_button: Button = $Interface/HeaderBox/Toolbar/LoadButton
+@onready var folder_button: Button = $Interface/HeaderBox/Toolbar/FolderButton
 @onready var camera: Camera2D = $Camera2D
 @onready var header_background: ColorRect = $Interface/HeaderBackground
-@onready var backup_button: Button = $Interface/Toolbar/BackupButton
-@onready var inspect_button: Button = $Interface/Toolbar/InspectButton
+@onready var header_box: VBoxContainer = $Interface/HeaderBox
+@onready var backup_button: Button = $Interface/HeaderBox/Toolbar/BackupButton
+@onready var inspect_button: Button = $Interface/HeaderBox/Toolbar/InspectButton
 
 func _ready() -> void:
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
+	header_box.resized.connect(_layout_header)
 
 	# Player settings first, so keys, scale and colours are right from frame one.
 	GameSettings.load_settings()
@@ -540,6 +544,23 @@ func _update_instructions() -> void:
 
 func _on_viewport_size_changed() -> void:
 	queue_redraw()
+	_layout_header()
+
+
+# The header grows when the toolbar wraps onto more rows; panels below follow it.
+func _layout_header() -> void:
+	if header_box == null or header_background == null:
+		return
+
+	var header_height: float = header_box.position.y + header_box.size.y + 12.0
+	header_background.offset_bottom = header_height
+
+	if station_panel != null:
+		station_panel.offset_top = header_height + 16.0
+
+	if objective_panel != null:
+		objective_panel.offset_top = header_height + 16.0
+		objective_panel.offset_bottom = header_height + 156.0
 
 
 func _draw() -> void:
@@ -1324,19 +1345,21 @@ func _input(event: InputEvent) -> void:
 		camera.force_update_scroll()
 		get_viewport().set_input_as_handled()
 func _reset_camera() -> void:
-	camera.zoom = Vector2.ONE
-	camera.position = get_viewport_rect().size / 2.0
+	camera.zoom = Vector2.ONE / applied_ui_scale
+	camera.position = get_viewport_rect().size / camera.zoom / 2.0
 	camera.force_update_scroll()
 
 
 func _zoom_camera(factor: float) -> void:
 	var mouse_before: Vector2 = get_global_mouse_position()
 
+	# The player's zoom excludes the interface scale, so the map keeps its
+	# size on screen when only the interface is enlarged.
 	var new_zoom: float = clampf(
-		camera.zoom.x * factor,
+		camera.zoom.x * applied_ui_scale * factor,
 		MIN_ZOOM,
 		MAX_ZOOM
-	)
+	) / applied_ui_scale
 
 	camera.zoom = Vector2(new_zoom, new_zoom)
 	camera.force_update_scroll()
@@ -2499,7 +2522,7 @@ func _setup_settings_dialog() -> void:
 	settings_button.focus_mode = Control.FOCUS_NONE
 	settings_button.tooltip_text = "Interface scale, colours and keys"
 	settings_button.pressed.connect(_open_settings)
-	$Interface/Toolbar.add_child(settings_button)
+	$Interface/HeaderBox/Toolbar.add_child(settings_button)
 
 
 func _open_settings() -> void:
@@ -2513,6 +2536,14 @@ func _open_settings() -> void:
 # Pushes the current player settings to everything that shows them.
 func _apply_settings() -> void:
 	GameSettings.apply(get_window())
+
+	# Enlarging the interface scales the whole window; the camera cancels that
+	# out so the map keeps its on-screen size.
+	var player_zoom: float = camera.zoom.x * applied_ui_scale
+	applied_ui_scale = GameSettings.ui_scale
+	camera.zoom = Vector2.ONE * player_zoom / applied_ui_scale
+	camera.force_update_scroll()
+	_layout_header()
 	network_map.facilities = _facility_markers()
 	freight_train.queue_redraw()
 	_refresh_shortcut_tooltips()
@@ -2844,7 +2875,7 @@ func _setup_routes_editor() -> void:
 	routes_button.focus_mode = Control.FOCUS_NONE
 	routes_button.tooltip_text = "Name services and edit ordered stops"
 	routes_button.pressed.connect(_open_routes_editor)
-	$Interface/Toolbar.add_child(routes_button)
+	$Interface/HeaderBox/Toolbar.add_child(routes_button)
 
 func _open_routes_editor() -> void:
 	paused = true
@@ -2884,7 +2915,7 @@ func _setup_fleet_editor() -> void:
 	fleet_button.focus_mode = Control.FOCUS_NONE
 	fleet_button.tooltip_text = "Buy, name and assign individual trains"
 	fleet_button.pressed.connect(_open_fleet_editor)
-	$Interface/Toolbar.add_child(fleet_button)
+	$Interface/HeaderBox/Toolbar.add_child(fleet_button)
 
 func _open_fleet_editor() -> void:
 	paused = true

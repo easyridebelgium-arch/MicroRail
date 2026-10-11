@@ -5,7 +5,6 @@ const TILE_SIZE: int = 32
 const GRID_COLOR: Color = Color(0.18, 0.23, 0.25)
 const SLEEPER_COLOR: Color = Color(0.43, 0.29, 0.17)
 const RAIL_COLOR: Color = Color(0.78, 0.82, 0.85)
-const PREVIEW_COLOR: Color = Color(0.35, 0.9, 0.55, 0.8)
 
 const TRAIN_CAPACITY: int = 20
 const PASSENGER_INTERVAL: float = 5.0
@@ -86,6 +85,15 @@ const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
 const SAVE_VERSION: int = 15
+const SimClock = preload("res://scripts/core/sim_clock.gd")
+const SimRng = preload("res://scripts/core/sim_rng.gd")
+const EventLog = preload("res://scripts/core/event_log.gd")
+const SaveMigrations = preload("res://scripts/core/save_migrations.gd")
+const GameSettings = preload("res://scripts/core/game_settings.gd")
+const InputActions = preload("res://scripts/core/input_actions.gd")
+const Palette = preload("res://scripts/core/palette.gd")
+const SettingsDialog = preload("res://scripts/settings_dialog.gd")
+const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const TOOLBAR_ICON_SHEET = preload("res://assets/ui/icons/toolbar.svg")
 const NetworkMap = preload("res://scripts/network_map.gd")
@@ -117,6 +125,7 @@ var fleet: Dictionary = Fleet.defaults()
 var fleet_editor: FleetEditor
 var fleet_button: Button
 var total_vehicle_cost: int = 0
+
 var route_editor: RouteEditor
 var routes_button: Button
 var passenger_route_error: String = "No connected passenger route"
@@ -175,6 +184,13 @@ var network_map: NetworkMap
 var map_button: Button
 var scenario_goals: ScenarioGoals = ScenarioGoals.new()
 
+# Phase 0 foundations: fixed-step clock, seeded RNG and the event stream.
+var sim_clock: SimClock = SimClock.new()
+var sim_rng: SimRng = SimRng.new()
+var event_log: EventLog = EventLog.new()
+var settings_dialog: SettingsDialog
+var settings_button: Button
+
 var objective_panel: PanelContainer
 var objective_heading: Label
 var objective_description: Label
@@ -198,6 +214,15 @@ var goals_button: Button
 func _ready() -> void:
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
 
+	# Player settings first, so keys, scale and colours are right from frame one.
+	GameSettings.load_settings()
+	InputActions.register_defaults()
+	InputActions.apply_bindings(GameSettings.key_bindings)
+	GameSettings.apply(get_window())
+
+	# A new game gets a fresh seed; loading a save restores the saved one.
+	sim_rng.randomize_seed()
+
 	# Each station includes a horizontal platform track.
 	tracks[STATION_A] = false
 	tracks[STATION_B] = false
@@ -211,7 +236,6 @@ func _ready() -> void:
 	_setup_toolbar()
 	_reset_camera()
 	_setup_station_inspector()
-	_setup_camera_keys()
 	_setup_freight_train()
 	_setup_history_controls()
 	_setup_network_map()
@@ -219,8 +243,10 @@ func _ready() -> void:
 	_setup_routes_editor()
 	_setup_fleet_editor()
 	_apply_fleet_specs()
+	_setup_settings_dialog()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
+	_apply_settings()
 
 func _process(delta: float) -> void:
 	_move_camera_with_keyboard(delta)
@@ -234,6 +260,7 @@ func _process(delta: float) -> void:
 	if notice_remaining > 0.0:
 		notice_remaining = maxf(0.0, notice_remaining - delta)
 
+	# The simulation advances in fixed steps, whatever the frame rate.
 	if not paused:
 		_generate_passengers(delta)
 		_produce_logs(delta)
@@ -243,6 +270,9 @@ func _process(delta: float) -> void:
 			_move_train(delta)
 			_charge_operating_cost(delta)
 		_check_scenario_objectives()
+		for _step in sim_clock.advance(delta):
+			sim_clock.begin_tick()
+			_simulation_step(SimClock.TICK_SECONDS)
 
 	_update_instructions()
 	_update_toolbar()
@@ -252,6 +282,30 @@ func _process(delta: float) -> void:
 	_update_objective_panel()
 	queue_redraw()
 	
+func _simulation_step(step_seconds: float) -> void:
+	_generate_passengers(step_seconds)
+	_produce_logs(step_seconds)
+	forest_stock -= freight_train.advance(step_seconds, forest_stock)
+
+	if _passenger_service_is_active():
+		_move_train(step_seconds)
+		_charge_operating_cost(step_seconds)
+
+	_check_scenario_objectives()
+
+
+func _record_event(type: String, subject: String, data: Dictionary = {}) -> void:
+	event_log.record(sim_clock.tick, type, subject, data)
+
+
+# True while a dialog owns the keyboard, so game shortcuts stay quiet.
+func _modal_open() -> bool:
+	if route_editor != null and route_editor.visible:
+		return true
+
+	return settings_dialog != null and settings_dialog.visible
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if _management_window_is_open():
 		return
@@ -266,22 +320,36 @@ func _unhandled_input(event: InputEvent) -> void:
 				demolition_cells.clear()
 				_reset_camera()
 				return
+	if _modal_open():
+		return
 
-			if event.keycode == KEY_ESCAPE:
-				is_dragging = false
-				demolition_cells.clear()
-				return
+	if event.is_action_pressed(InputActions.TOGGLE_MAP):
+		_toggle_network_map()
+		return
 
-			if event.keycode == KEY_I:
-				_toggle_inspect_mode()
-				return
+	if event.is_action_pressed(InputActions.RESET_CAMERA):
+		is_dragging = false
+		is_panning = false
+		demolition_cells.clear()
+		_reset_camera()
+		return
 
+	if event.is_action_pressed(InputActions.CANCEL):
+		is_dragging = false
+		demolition_cells.clear()
+		return
 
-			if event.keycode == KEY_SPACE:
-				_toggle_pause()
-			if event.keycode == KEY_G:
-				_toggle_objective_panel()
-				return
+	if event.is_action_pressed(InputActions.TOGGLE_INSPECT):
+		_toggle_inspect_mode()
+		return
+
+	if event.is_action_pressed(InputActions.TOGGLE_PAUSE):
+		_toggle_pause()
+		return
+
+	if event.is_action_pressed(InputActions.TOGGLE_GOALS):
+		_toggle_objective_panel()
+		return
 
 	if event is InputEventMouseButton:
 		var cell: Vector2i = _mouse_to_cell()
@@ -344,6 +412,7 @@ func _check_route(force_reset: bool = false) -> void:
 	if not force_reset and new_route == route_cells:
 		return
 	_return_onboard_passengers()
+	_record_event(EventLog.ROUTE_CHANGED, "passenger", {"connected": not new_route.is_empty(), "tiles": new_route.size()})
 	route_cells = new_route
 	route_path = built["path"]
 	stop_distances.assign(built["distances"])
@@ -365,13 +434,16 @@ func _move_train(delta: float) -> void:
 	if train_needs_boarding:
 		_board_passengers()
 		train_needs_boarding = false
+		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
 	var next_stop: int = _next_passenger_stop()
 	var target_distance: float = stop_distances[next_stop]
 	route_distance = move_toward(route_distance, target_distance, _get_train_speed() * delta)
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
+		var unloaded: int = passengers_on_train
 		_unload_passengers()
 		passenger_stop_index = next_stop
+		_record_event(EventLog.TRAIN_ARRIVED, "passenger", {"stop": services["passenger"]["stops"][next_stop], "passengers": unloaded})
 		if passenger_stop_index == stop_distances.size() - 1:
 			travelling_to_b = false
 		elif passenger_stop_index == 0:
@@ -455,6 +527,10 @@ func _update_instructions() -> void:
 		"Left-drag: automatic track | Right-drag: remove"
 		+ " | Right-click: cancel | Use toolbar to choose Connect or Draw"
 		+ " | Space: pause | Esc: cancel"
+		+ " | %s: pause | %s: cancel" % [
+			InputActions.key_label(InputActions.TOGGLE_PAUSE),
+			InputActions.key_label(InputActions.CANCEL)
+		]
 		+ "\n%s | Cell: %d,%d | Build: £%d%s | %s"
 		% [
 			direction,
@@ -510,6 +586,7 @@ func _draw() -> void:
 			_draw_invalid_build_cell(cell)
 	elif _is_inside_map(hovered_cell):
 		var color := Color(0.35, 0.9, 0.55, 0.45) if _can_build_at(hovered_cell) else Color(1.0, 0.2, 0.15, 0.6)
+		var color: Color = Palette.get_color(Palette.Role.HOVER_OK if _can_build_at(hovered_cell) else Palette.Role.HOVER_BAD)
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
 	_draw_train()
 
@@ -561,6 +638,11 @@ func _draw_track(cell: Vector2i, track_type: Variant, preview: bool) -> void:
 	if preview:
 		sleeper_color.a = 0.5
 		draw_rect(Rect2(Vector2.ZERO, Vector2.ONE * TILE_SIZE), Color(0.35, 0.9, 0.55, 0.12))
+	var rail_color: Color = Palette.get_color(Palette.Role.PREVIEW) if preview else RAIL_COLOR
+	var sleeper_color: Color = SLEEPER_COLOR
+	if preview:
+		sleeper_color.a = 0.5
+		draw_rect(Rect2(Vector2.ZERO, Vector2.ONE * TILE_SIZE), Palette.get_color(Palette.Role.PREVIEW_FILL))
 	var sleepers: PackedVector2Array = geometry["sleepers"]
 	for index in range(0, sleepers.size(), 2):
 		draw_line(sleepers[index], sleepers[index + 1], sleeper_color, 4.0)
@@ -626,7 +708,7 @@ func _draw_train() -> void:
 		Vector2(26, 14)
 	)
 
-	draw_rect(body, Color(0.85, 0.22, 0.18))
+	draw_rect(body, Palette.get_color(Palette.Role.TRAIN_PASSENGER))
 	draw_rect(body, Color(0.15, 0.08, 0.08), false, 1.0)
 
 	# The front of the train always points along its heading.
@@ -665,6 +747,7 @@ func _finish_track_drag(end_cell: Vector2i) -> void:
 	money -= cost
 	total_construction_cost += cost
 	_record_construction_change(before, changes, -cost, cost)
+	_record_event(EventLog.TRACK_BUILT, "player", {"tiles": changes.size(), "new_tiles": int(build_plan["new_count"]), "cost": cost})
 	_check_route()
 	_show_notice("Built %d new tiles for £%d; connections adjusted automatically." % [build_plan["new_count"], cost])
 	queue_redraw()
@@ -739,6 +822,11 @@ func _save_game() -> void:
 		"scenario_stage": scenario_goals.current_index,
 		"services": services.duplicate(true),
 		"fleet": fleet.duplicate(true)
+		"sim": {
+			"clock": sim_clock.save_state(),
+			"rng": sim_rng.save_state(),
+			"events": event_log.save_state()
+		}
 	}
 
 	# Prepare the new save before touching the existing one.
@@ -790,6 +878,16 @@ func _is_valid_number(value: Variant) -> bool:
 
 func _is_valid_save(data: Dictionary) -> bool:
 	if not ServiceRoutes.is_valid(data.get("services")) or not Fleet.is_valid(data.get("fleet")):
+	if not ServiceRoutes.is_valid(data.get("services")):
+		return false
+	var sim: Variant = data.get("sim")
+	if not sim is Dictionary:
+		return false
+	if not SimClock.is_valid_state(sim.get("clock")):
+		return false
+	if not SimRng.is_valid_state(sim.get("rng")):
+		return false
+	if not EventLog.is_valid_state(sim.get("events")):
 		return false
 	var saved_version: Variant = data.get("version")
 
@@ -974,7 +1072,11 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	var data: Dictionary = parser.data
 	if not _is_valid_number(data.get("version")) or float(data["version"]) != float(SAVE_VERSION):
 		_show_notice("This save is from another development version. Start a new game.")
+	var migration: Dictionary = SaveMigrations.migrate(parser.data)
+	if not migration["ok"]:
+		_show_notice(migration["error"])
 		return
+	var data: Dictionary = migration["data"]
 	if not _is_valid_save(data):
 		_show_notice("The save file is damaged or incompatible.")
 		return
@@ -1013,6 +1115,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	var loaded_freight_cells: Array[Vector2i] = _find_freight_route(loaded_tracks, loaded_cells)
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
 	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"])):
+	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length()):
 		_show_notice("Saved freight train state is invalid.")
 		return
 	# Commit only after validating every service and train.
@@ -1037,6 +1140,13 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	freight_train.restore_state(data["freight"])
 	scenario_goals.current_index = int(data["scenario_stage"])
 	_show_notice("Previous save loaded." if save_path == SAVE_BACKUP_PATH else "Game loaded.")
+	sim_clock.restore_state(data["sim"]["clock"])
+	sim_rng.restore_state(data["sim"]["rng"])
+	event_log.restore_state(data["sim"]["events"])
+	var loaded_notice: String = "Previous save loaded." if save_path == SAVE_BACKUP_PATH else "Game loaded."
+	if migration["migrated"]:
+		loaded_notice += " Upgraded from save version %d; saving again keeps the new format." % int(migration["from_version"])
+	_show_notice(loaded_notice)
 	_update_instructions()
 	_clear_construction_history()
 	_update_history_controls()
@@ -1136,17 +1246,17 @@ func _update_toolbar() -> void:
 	if toolbar_icon_textures.size() == 10:
 		pause_button.icon = toolbar_icon_textures[5 if paused else 4]
 
-	pause_button.tooltip_text = (
-		"Resume simulation — Space"
-		if paused
-		else "Pause simulation — Space"
-	)
+	pause_button.tooltip_text = "%s — %s" % [
+		"Resume simulation" if paused else "Pause simulation",
+		InputActions.key_label(InputActions.TOGGLE_PAUSE)
+	]
 
 	save_button.disabled = is_dragging
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
 	if _management_window_is_open():
+	if _modal_open():
 		return
 	if event is InputEventMouseButton:
 		# Release the middle button anywhere to stop panning.
@@ -1454,6 +1564,10 @@ func _draw_invalid_build_cell(cell: Vector2i) -> void:
 	draw_rect(Rect2(origin, Vector2.ONE * TILE_SIZE), Color(1.0, 0.15, 0.1, 0.3))
 	draw_line(origin + Vector2(6, 6), origin + Vector2(TILE_SIZE - 6, TILE_SIZE - 6), Color(1.0, 0.3, 0.25), 2.0)
 	draw_line(origin + Vector2(TILE_SIZE - 6, 6), origin + Vector2(6, TILE_SIZE - 6), Color(1.0, 0.3, 0.25), 2.0)
+	var mark_color: Color = Palette.get_color(Palette.Role.BAD_MARK)
+	draw_rect(Rect2(origin, Vector2.ONE * TILE_SIZE), Palette.get_color(Palette.Role.BAD_FILL))
+	draw_line(origin + Vector2(6, 6), origin + Vector2(TILE_SIZE - 6, TILE_SIZE - 6), mark_color, 2.0)
+	draw_line(origin + Vector2(TILE_SIZE - 6, 6), origin + Vector2(6, TILE_SIZE - 6), mark_color, 2.0)
 
 
 func _remove_station_space_tracks(track_data: Dictionary) -> int:
@@ -1512,6 +1626,7 @@ func _upgrade_capacity() -> void:
 	capacity_upgrade_level += 1
 	total_vehicle_cost += price
 	_sync_fleet_upgrades()
+	_record_event(EventLog.UPGRADE_BOUGHT, "passenger", {"kind": "capacity", "level": capacity_upgrade_level, "price": price})
 
 	_show_notice(
 		"Capacity upgraded to %d passengers." % _get_train_capacity()
@@ -1542,7 +1657,7 @@ func _upgrade_speed() -> void:
 	speed_upgrade_level += 1
 	total_vehicle_cost += price
 	_sync_fleet_upgrades()
-
+	_record_event(EventLog.UPGRADE_BOUGHT, "passenger", {"kind": "speed", "level": speed_upgrade_level, "price": price})
 	_show_notice(
 		"Speed upgraded to %.0f pixels/second." % _get_train_speed()
 	)
@@ -1593,6 +1708,7 @@ func _update_freight_inspector() -> void:
 	if rule_index >= 0:
 		freight_rule_option.select(rule_index)
 	var train_status: String = services["freight"]["name"] + " / " + Fleet.assigned(fleet, "freight")["name"] + " — " + freight_train.status_text()
+	var train_status: String = services["freight"]["name"] + " — " + freight_train.status_text()
 
 	if paused:
 		train_status = "Paused — " + train_status
@@ -1662,33 +1778,9 @@ func _update_freight_inspector() -> void:
 		FreightTrain.MAX_SPEED_LEVEL
 	]
 		
-func _setup_camera_keys() -> void:
-	_add_camera_key(&"camera_up", KEY_W)
-	_add_camera_key(&"camera_up", KEY_UP)
-
-	_add_camera_key(&"camera_down", KEY_S)
-	_add_camera_key(&"camera_down", KEY_DOWN)
-
-	_add_camera_key(&"camera_left", KEY_A)
-	_add_camera_key(&"camera_left", KEY_LEFT)
-
-	_add_camera_key(&"camera_right", KEY_D)
-	_add_camera_key(&"camera_right", KEY_RIGHT)
-
-
-func _add_camera_key(action: StringName, physical_key: Key) -> void:
-	if not InputMap.has_action(action):
-		InputMap.add_action(action)
-
-	var key_event := InputEventKey.new()
-	key_event.physical_keycode = physical_key
-
-	if not InputMap.action_has_event(action, key_event):
-		InputMap.action_add_event(action, key_event)
-
-
 func _move_camera_with_keyboard(delta: float) -> void:
 	if _management_window_is_open():
+	if _modal_open():
 		return
 	# Avoid shifting an unfinished construction preview.
 	if is_dragging or is_panning:
@@ -1711,7 +1803,7 @@ func _move_camera_with_keyboard(delta: float) -> void:
 
 	var speed: float = KEYBOARD_PAN_SPEED
 
-	if Input.is_key_pressed(KEY_SHIFT):
+	if Input.is_action_pressed(InputActions.CAMERA_FAST):
 		speed *= 2.0
 
 	camera.position += direction * speed * delta / camera.zoom.x
@@ -1769,6 +1861,7 @@ func _on_logs_delivered(amount: int) -> void:
 	logs_delivered += amount
 	freight_income += payment
 	money += payment
+	_record_event(EventLog.CARGO_DELIVERED, "freight", {"logs": amount, "payment": payment})
 func _on_freight_operating_expense(amount: int) -> void:
 	money -= amount
 	freight_operating_cost += amount
@@ -1797,6 +1890,7 @@ func _upgrade_freight_capacity() -> void:
 	freight_train.capacity_level += 1
 	total_vehicle_cost += price
 	_sync_fleet_upgrades()
+	_record_event(EventLog.UPGRADE_BOUGHT, "freight", {"kind": "capacity", "level": freight_train.capacity_level, "price": price})
 
 	_show_notice(
 		"Freight capacity increased to %d logs."
@@ -1825,6 +1919,7 @@ func _upgrade_freight_speed() -> void:
 	freight_train.speed_level += 1
 	total_vehicle_cost += price
 	_sync_fleet_upgrades()
+	_record_event(EventLog.UPGRADE_BOUGHT, "freight", {"kind": "speed", "level": freight_train.speed_level, "price": price})
 
 	_show_notice(
 		"Freight speed increased to %.0f pixels/second."
@@ -2042,6 +2137,7 @@ func _selected_service_is_freight() -> bool:
 func _toggle_selected_service() -> void:
 	if _selected_service_is_freight():
 		freight_train.service_enabled = not freight_train.service_enabled
+		_record_event(EventLog.SERVICE_TOGGLED, "freight", {"enabled": freight_train.service_enabled})
 
 		if freight_train.service_enabled:
 			_show_notice("Freight service enabled.")
@@ -2049,6 +2145,7 @@ func _toggle_selected_service() -> void:
 			_show_notice("Freight service will stop at the forest.")
 	else:
 		passenger_service_enabled = not passenger_service_enabled
+		_record_event(EventLog.SERVICE_TOGGLED, "passenger", {"enabled": passenger_service_enabled})
 
 		if passenger_service_enabled:
 			_show_notice("Passenger service enabled.")
@@ -2148,6 +2245,7 @@ func _finish_demolition(target: Vector2i) -> void:
 		0
 	)
 
+	_record_event(EventLog.TRACK_DEMOLISHED, "player", {"tiles": before.size(), "refund": refund})
 	_check_route()
 
 	_show_notice(
@@ -2365,6 +2463,63 @@ func _setup_toolbar_icons() -> void:
 	backup_button.tooltip_text = "Load previous save"
 
 	_update_toolbar()
+func _setup_settings_dialog() -> void:
+	settings_dialog = SettingsDialog.new()
+	settings_dialog.configure()
+	settings_dialog.settings_applied.connect(_apply_settings)
+	$Interface.add_child(settings_dialog)
+
+	settings_button = Button.new()
+	settings_button.text = "Settings"
+	settings_button.focus_mode = Control.FOCUS_NONE
+	settings_button.tooltip_text = "Interface scale, colours and keys"
+	settings_button.pressed.connect(_open_settings)
+	$Interface/Toolbar.add_child(settings_button)
+
+
+func _open_settings() -> void:
+	is_dragging = false
+	is_panning = false
+	demolition_cells.clear()
+	build_plan.clear()
+	settings_dialog.open_dialog()
+
+
+# Pushes the current player settings to everything that shows them.
+func _apply_settings() -> void:
+	GameSettings.apply(get_window())
+	network_map.facilities = _facility_markers()
+	freight_train.queue_redraw()
+	_refresh_shortcut_tooltips()
+	queue_redraw()
+
+
+func _facility_markers() -> Array[Dictionary]:
+	var markers: Array[Dictionary] = []
+
+	for station in [STATION_A, STATION_B, STATION_C]:
+		markers.append({
+			"cell": station,
+			"color": Palette.get_color(Palette.Role.FACILITY_STATION)
+		})
+
+	markers.append({
+		"cell": FOREST_SITE,
+		"color": Palette.get_color(Palette.Role.FACILITY_FOREST)
+	})
+	markers.append({
+		"cell": CARGO_TERMINAL,
+		"color": Palette.get_color(Palette.Role.FACILITY_TERMINAL)
+	})
+	return markers
+
+
+func _refresh_shortcut_tooltips() -> void:
+	inspect_button.tooltip_text = "Inspect stations and industries — %s" % InputActions.key_label(InputActions.TOGGLE_INSPECT)
+	map_button.tooltip_text = "Show or hide the network map — %s" % InputActions.key_label(InputActions.TOGGLE_MAP)
+	goals_button.tooltip_text = "Show or hide scenario objectives — %s" % InputActions.key_label(InputActions.TOGGLE_GOALS)
+
+
 func _setup_network_map() -> void:
 	network_map = NetworkMap.new()
 	network_map.name = "NetworkMap"
@@ -2488,6 +2643,7 @@ func _check_scenario_objectives() -> void:
 		return
 
 	money += reward
+	_record_event(EventLog.OBJECTIVE_COMPLETED, "player", {"count": completed, "reward": reward, "stage": scenario_goals.current_index})
 
 	if scenario_goals.is_complete():
 		_show_notice(

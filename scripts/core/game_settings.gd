@@ -1,0 +1,77 @@
+extends RefCounted
+## Player settings that belong to the player, not to a save file:
+## UI scale, colour palette, reduced motion and key bindings.
+## Stored in user://settings.cfg and shared by every game.
+##
+## All members are static, so any script can read them without an autoload:
+##     if GameSettings.reduced_motion: ...
+
+const SETTINGS_PATH: String = "user://settings.cfg"
+
+## Offered scales. The whole view is scaled (world and interface together);
+## 200% needs the header and toolbar layouts to reflow first (planned for Phase 1).
+const UI_SCALES: Array[float] = [1.0, 1.25, 1.5]
+
+enum PaletteMode {
+	DEFAULT,
+	COLOUR_BLIND,
+	HIGH_CONTRAST
+}
+
+const PALETTE_NAMES: Array[String] = [
+	"Default",
+	"Colour-blind safe",
+	"High contrast"
+]
+
+static var ui_scale: float = 1.0
+static var palette_mode: int = PaletteMode.DEFAULT
+static var reduced_motion: bool = false
+
+## {action name: [key codes]} as saved. Empty means "use the defaults".
+static var key_bindings: Dictionary = {}
+
+
+static func load_settings() -> void:
+	var config := ConfigFile.new()
+
+	if config.load(SETTINGS_PATH) != OK:
+		return
+
+	ui_scale = nearest_scale(float(config.get_value("display", "ui_scale", 1.0)))
+	palette_mode = clampi(
+		int(config.get_value("display", "palette", PaletteMode.DEFAULT)),
+		0,
+		PaletteMode.size() - 1
+	)
+	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
+
+	var saved_bindings: Variant = config.get_value("input", "bindings", {})
+	key_bindings = saved_bindings if saved_bindings is Dictionary else {}
+
+
+## Returns true when the file was written.
+static func save_settings() -> bool:
+	var config := ConfigFile.new()
+
+	config.set_value("display", "ui_scale", ui_scale)
+	config.set_value("display", "palette", palette_mode)
+	config.set_value("display", "reduced_motion", reduced_motion)
+	config.set_value("input", "bindings", key_bindings)
+
+	return config.save(SETTINGS_PATH) == OK
+
+
+## Applies the settings that act on the window itself.
+static func apply(window: Window) -> void:
+	window.content_scale_factor = ui_scale
+
+
+static func nearest_scale(value: float) -> float:
+	var best: float = UI_SCALES[0]
+
+	for candidate in UI_SCALES:
+		if absf(candidate - value) < absf(best - value):
+			best = candidate
+
+	return best

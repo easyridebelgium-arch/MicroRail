@@ -1,5 +1,7 @@
 extends Control
 
+const Palette = preload("res://scripts/core/palette.gd")
+
 signal navigation_requested(world_position: Vector2)
 
 var map_cells: Vector2i = Vector2i(80, 50)
@@ -129,8 +131,8 @@ func _draw() -> void:
 
 	# Trains: passenger first, freight second.
 	var colors: Array[Color] = [
-		Color("#FF655A"),
-		Color("#56A4FF")
+		Palette.get_color(Palette.Role.MAP_PASSENGER),
+		Palette.get_color(Palette.Role.MAP_FREIGHT)
 	]
 
 	for index in range(train_positions.size()):

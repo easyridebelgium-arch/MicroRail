@@ -14,6 +14,12 @@ var sell_button: Button
 var service_button: Button
 var rename_button: Button
 var status: Label
+var assignment_choice: OptionButton
+var start_station: OptionButton
+var start_button: Button
+var store_button: Button
+var capacity_button: Button
+var speed_button: Button
 var selected_id: int = 1
 
 func configure(owner_game: Node) -> void:
@@ -22,14 +28,21 @@ func configure(owner_game: Node) -> void:
 	ok_button_text = "Close"
 	size = Vector2i(670, 610)
 	exclusive = true
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size.y = 100
+	add_child(scroll)
 	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 10)
-	add_child(box)
+	scroll.add_child(box)
 	balance = Label.new()
+	balance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(balance)
 	var purchase := HBoxContainer.new()
 	box.add_child(purchase)
 	model_choice = OptionButton.new()
+	model_choice.clip_text = true
 	model_choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for model in Fleet.MODELS:
 		model_choice.add_item("%s — £%d" % [Fleet.MODELS[model]["name"], Fleet.MODELS[model]["price"]])
@@ -38,6 +51,7 @@ func configure(owner_game: Node) -> void:
 	model_choice.item_selected.connect(_model_changed)
 	buy_button = _button(purchase, "Buy", _buy)
 	model_details = Label.new()
+	model_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(model_details)
 	train_list = ItemList.new()
 	train_list.custom_minimum_size.y = 145
@@ -45,7 +59,7 @@ func configure(owner_game: Node) -> void:
 	train_list.item_selected.connect(_select_train)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	details.custom_minimum_size = Vector2(620, 65)
+	details.custom_minimum_size = Vector2(0, 65)
 	box.add_child(details)
 	var rename_row := HBoxContainer.new()
 	box.add_child(rename_row)
@@ -54,17 +68,35 @@ func configure(owner_game: Node) -> void:
 	name_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rename_row.add_child(name_field)
 	rename_button = _button(rename_row, "Rename", _rename)
-	var actions := HBoxContainer.new()
+	var actions := HFlowContainer.new()
 	box.add_child(actions)
+	assignment_choice = OptionButton.new()
+	assignment_choice.clip_text = true
+	assignment_choice.custom_minimum_size.x = 180
+	actions.add_child(assignment_choice)
 	assign_button = _button(actions, "Assign", _assign)
 	service_button = _button(actions, "Withdraw service", _toggle_service)
 	sell_button = _button(actions, "Sell", _sell)
+	var start_row := HFlowContainer.new()
+	box.add_child(start_row)
+	start_station = OptionButton.new()
+	for key in game.ServiceRoutes.STATIONS:
+		start_station.add_item("Start at " + game.ServiceRoutes.STATIONS[key].name)
+		start_station.set_item_metadata(start_station.item_count - 1, key)
+	start_row.add_child(start_station)
+	start_button = _button(start_row, "Start new passenger service", _start_service)
+	store_button = _button(start_row, "Store & remove route", _store_service)
+	var upgrades := HFlowContainer.new()
+	box.add_child(upgrades)
+	capacity_button = _button(upgrades, "Upgrade capacity", _upgrade.bind("capacity"))
+	speed_button = _button(upgrades, "Upgrade speed", _upgrade.bind("speed"))
 	status = Label.new()
-	status.custom_minimum_size = Vector2(620, 70)
+	status.custom_minimum_size = Vector2(0, 70)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(status)
 	var hint := Label.new()
-	hint.text = "One train per service. Spares stay off-map without running costs.\nChanges apply immediately; use Save after closing. The game stays paused."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.text = "One train per route; multiple passenger routes can run together. Start a stored passenger train on a clear platform, then edit it in Routes. Withdraw an extra service to its first station before storing/removing it. Use Save to keep changes."
 	box.add_child(hint)
 
 func _button(parent: Node, title_text: String, callback: Callable) -> Button:
@@ -77,7 +109,7 @@ func _button(parent: Node, title_text: String, callback: Callable) -> Button:
 func open_editor() -> void:
 	status.text = "Choose a model to buy or select an owned train to manage it."
 	refresh()
-	popup_centered()
+	popup_centered_clamped(Vector2i(700, 620), 0.95)
 
 func refresh() -> void:
 	game._sync_fleet_upgrades()
@@ -106,14 +138,31 @@ func _select_train(index: int) -> void:
 	var service: String = train["service"]
 	name_field.text = train["name"]
 	details.text = "%s | %d %s | %.0f px/s | £%d/s\nUpgrades: capacity %d/3, speed %d/3\n%s" % [model["name"], Fleet.capacity(train), "seats" if model["kind"] == "passenger" else "logs", Fleet.speed(train), model["running_cost"], train["capacity_level"], train["speed_level"], game.fleet_train_status(selected_id)]
-	assign_button.text = "Assign to %s" % model["kind"]
+	var previous: String = str(assignment_choice.get_selected_metadata()) if assignment_choice.item_count > 0 else ""
+	assignment_choice.clear()
+	for key in game.service_keys():
+		if game.ServiceRoutes.kind(key) != model.kind: continue
+		assignment_choice.add_item(game.services[key].name)
+		assignment_choice.set_item_metadata(assignment_choice.item_count - 1, key)
+		if key == previous: assignment_choice.select(assignment_choice.item_count - 1)
+	assign_button.text = "Replace route's train"
+	start_button.disabled = service != "" or model.kind != "passenger"
+	start_station.disabled = start_button.disabled
+	store_button.disabled = not game.passenger_services.has(service)
+	for kind in ["capacity", "speed"]:
+		var button: Button = capacity_button if kind == "capacity" else speed_button
+		var base: int = (250 if model.kind == "passenger" else 300) if kind == "capacity" else (200 if model.kind == "passenger" else 250)
+		var level := int(train[kind + "_level"])
+		var price := base * (level + 1)
+		button.text = "%s: maximum" % kind.capitalize() if level >= 3 else "Upgrade %s (£%d)" % [kind, price]
+		button.disabled = level >= 3 or game.money < price
 	assign_button.disabled = service != ""
 	sell_button.text = "Sell (£%d)" % Fleet.sale_price(train)
 	sell_button.disabled = service != ""
 	sell_button.tooltip_text = "Only stored trains can be sold. Refund: half the model and upgrade purchase costs."
 	service_button.disabled = service == ""
 	if service != "":
-		var enabled: bool = game.passenger_service_enabled if service == "passenger" else game.freight_train.service_enabled
+		var enabled: bool = game.service_enabled(service)
 		service_button.text = "Withdraw service" if enabled else "Enable service"
 	else:
 		service_button.text = "Withdraw service"
@@ -130,8 +179,7 @@ func _rename() -> void:
 	refresh()
 
 func _assign() -> void:
-	var train: Dictionary = Fleet.find(game.fleet, selected_id)
-	status.text = game.assign_fleet_train(selected_id, Fleet.MODELS[train["model"]]["kind"])
+	status.text = game.assign_fleet_train(selected_id, assignment_choice.get_selected_metadata())
 	refresh()
 
 func _sell() -> void:
@@ -140,4 +188,16 @@ func _sell() -> void:
 
 func _toggle_service() -> void:
 	status.text = game.toggle_fleet_service(selected_id)
+	refresh()
+
+func _start_service() -> void:
+	status.text = game.start_passenger_service(selected_id, start_station.get_selected_metadata())
+	refresh()
+
+func _store_service() -> void:
+	status.text = game.remove_passenger_service(selected_id)
+	refresh()
+
+func _upgrade(kind: String) -> void:
+	status.text = game.upgrade_fleet_train(selected_id, kind)
 	refresh()

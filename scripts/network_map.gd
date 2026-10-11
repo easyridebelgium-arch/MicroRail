@@ -9,6 +9,7 @@ var world_tile_size: float = 32.0
 
 var track_data: Dictionary = {}
 var facilities: Array[Dictionary] = []
+var train_kinds: Array[String] = []
 var train_positions: Array[Vector2] = []
 
 var camera_world_rect: Rect2 = Rect2()
@@ -144,7 +145,7 @@ func _draw() -> void:
 		draw_circle(
 			_world_to_map(world_position),
 			2.5,
-			colors[index % colors.size()]
+			colors[1 if index < train_kinds.size() and train_kinds[index] == "freight" else 0]
 		)
 
 

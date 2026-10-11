@@ -30,7 +30,7 @@ shortest port-valid path through any assigned waypoints; passenger tiles and pla
 
 ## Saves and limits
 
-The current schema is **v21** (retained paths, recovery, signals, waypoints and route modes). Reservations are transient and are reconstructed from
+The current schema is **v22** (retained paths, recovery, signals, waypoints and route modes). Reservations are transient and are reconstructed from
 restored fleet IDs, paths, positions and direction before any train moves.
 
 Opposing trains on a single track can wait indefinitely without player action.
@@ -66,3 +66,7 @@ Manual play check:
 4. Pause with a train at a switch; attempt to change or remove it. It stays locked.
 5. Save and reload during movement or waiting. Ownership returns before movement.
 6. Repeat using colour-blind and high-contrast palettes at 200% interface scale.
+
+Additional passenger services participate in the same stable-ID reservation table.
+Red signals cap lookahead requests so a waiting arrival cannot lock a switch
+needed by a departing train. See [multiple-service layouts](MULTIPLE_SERVICES.md).

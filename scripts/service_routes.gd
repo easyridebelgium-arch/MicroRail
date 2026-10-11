@@ -8,6 +8,18 @@ const STATIONS: Dictionary = {
 	"c": {"name": "Station C", "cell": Vector2i(36, 8)},
 }
 
+const MAX_PASSENGER_SERVICES := 8
+
+static func is_passenger_key(key: Variant) -> bool:
+	if not key is String: return false
+	if key == "passenger": return true
+	if not key.begins_with("passenger_"): return false
+	var suffix: String = key.trim_prefix("passenger_")
+	return suffix.is_valid_int() and int(suffix) >= 1 and int(suffix) < 1000000000 and str(int(suffix)) == suffix
+
+static func kind(key: String) -> String:
+	return "passenger" if is_passenger_key(key) else key
+
 static func defaults() -> Dictionary:
 	return {
 		"passenger": {"name": "Passenger Shuttle", "stops": ["a", "b"], "waypoints": {}, "mode": "shuttle"},
@@ -15,29 +27,27 @@ static func defaults() -> Dictionary:
 	}
 
 static func is_valid(value: Variant) -> bool:
-	if not value is Dictionary:
-		return false
-	for key in ["passenger", "freight"]:
-		if not value.get(key) is Dictionary:
-			return false
+	if not value is Dictionary or not value.has("passenger") or not value.has("freight") or value.size() > MAX_PASSENGER_SERVICES + 1: return false
+	for key in value:
+		if key != "freight" and not is_passenger_key(key): return false
+		if not value[key] is Dictionary: return false
 		var service: Dictionary = value[key]
-		if not service.get("name") is String or not service.get("stops") is Array:
-			return false
+		if not service.get("name") is String or not service.get("stops") is Array: return false
 		var mode: Variant = service.get("mode", "shuttle")
 		if not mode is String or mode not in ["shuttle", "loop"] or (key == "freight" and mode != "shuttle"): return false
 		var title: String = service["name"]
-		if title != title.strip_edges() or title.is_empty() or title.length() > 40 or "\n" in title or "\r" in title:
-			return false
-	var stops: Array = value["passenger"]["stops"]
-	if stops.size() < 2 or stops.size() > STATIONS.size():
-		return false
-	var seen: Dictionary = {}
-	for stop in stops:
-		if not stop is String or not STATIONS.has(stop) or seen.has(stop):
-			return false
-		seen[stop] = true
-	if value["freight"]["stops"] != ["forest", "terminal"]: return false
-	return valid_waypoints(value["passenger"]) and valid_waypoints(value["freight"])
+		if title != title.strip_edges() or title.is_empty() or title.length() > 40 or "\n" in title or "\r" in title: return false
+		if key == "freight":
+			if service.stops != ["forest", "terminal"]: return false
+		else:
+			var stops: Array = service.stops
+			if stops.size() < 2 or stops.size() > STATIONS.size(): return false
+			var seen: Dictionary = {}
+			for stop in stops:
+				if not stop is String or not STATIONS.has(stop) or seen.has(stop): return false
+				seen[stop] = true
+		if not valid_waypoints(service): return false
+	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle") -> Dictionary:
 	var cells: Array[Vector2i] = []
@@ -97,7 +107,7 @@ static func waypoints_in_order(cells: Array[Vector2i], points: Array) -> bool:
 
 static func from_save(value: Dictionary) -> Dictionary:
 	var result := value.duplicate(true)
-	for service in ["passenger", "freight"]:
+	for service in result:
 		var directives: Dictionary = result[service].get("waypoints", {})
 		for leg in directives:
 			var normalized: Array = []

@@ -40,6 +40,9 @@ func configure(owner_game: Node) -> void:
 	service_choice = OptionButton.new()
 	service_choice.add_item("Passenger service")
 	service_choice.add_item("Freight service")
+	service_choice.set_item_metadata(0, "passenger")
+	service_choice.set_item_metadata(1, "freight")
+	service_choice.clip_text = true
 	box.add_child(service_choice)
 	service_choice.item_selected.connect(_select_service)
 	name_field = LineEdit.new()
@@ -116,6 +119,11 @@ func _button(title_text: String, callback: Callable) -> Button:
 
 func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 	draft = game.services.duplicate(true)
+	service_choice.clear()
+	for key in game.service_keys():
+		var train: Dictionary = game.Fleet.assigned(game.fleet, key)
+		service_choice.add_item("%s — #%d" % [game.services[key].name, int(train.id)])
+		service_choice.set_item_metadata(service_choice.item_count - 1, key)
 	service_choice.select(0)
 	selected_service_key = "passenger"
 	_show_service()
@@ -133,16 +141,16 @@ func _capture_name(key: String) -> void:
 
 func _select_service(index: int) -> void:
 	_capture_name(_key())
-	selected_service_key = "passenger" if index == 0 else "freight"
+	selected_service_key = service_choice.get_item_metadata(index)
 	_show_service()
 
 func _show_service() -> void:
 	name_field.text = draft[_key()]["name"]
-	editing_controls.visible = _key() == "passenger"
-	route_mode.visible = _key() == "passenger"
+	editing_controls.visible = Services.is_passenger_key(_key())
+	route_mode.visible = Services.is_passenger_key(_key())
 	route_mode.select(1 if draft[_key()].get("mode", "shuttle") == "loop" else 0)
 	_refresh_stops()
-	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if _key() == "passenger" else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
+	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if Services.is_passenger_key(_key()) else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
 
 func _refresh_stops(selected: int = -1) -> void:
 	stop_list.clear()
@@ -165,13 +173,13 @@ func _refresh_stops(selected: int = -1) -> void:
 	_refresh_legs()
 
 func _select_mode(index: int) -> void:
-	draft["passenger"]["mode"] = "loop" if index == 1 else "shuttle"
+	draft[_key()]["mode"] = "loop" if index == 1 else "shuttle"
 	_refresh_stops()
 	status.text = "Mode changed in draft. Apply at the first station with an empty train. Switching to Shuttle removes closing-leg waypoints."
 
 func _add_stop() -> void:
 	var key: String = station_choice.get_selected_metadata()
-	var stops: Array = draft["passenger"]["stops"]
+	var stops: Array = draft[_key()]["stops"]
 	if stops.has(key):
 		status.text = "That station is already on this route. Select it and use Up or Down."
 		return
@@ -182,7 +190,7 @@ func _remove_stop() -> void:
 	var selected: PackedInt32Array = stop_list.get_selected_items()
 	if selected.is_empty():
 		return
-	var stops: Array = draft["passenger"]["stops"]
+	var stops: Array = draft[_key()]["stops"]
 	if stops.size() <= 2:
 		status.text = "Keep at least two stops. Add another station before removing one."
 		return
@@ -193,7 +201,7 @@ func _move_stop(direction: int) -> void:
 	var selected: PackedInt32Array = stop_list.get_selected_items()
 	if selected.is_empty():
 		return
-	var stops: Array = draft["passenger"]["stops"]
+	var stops: Array = draft[_key()]["stops"]
 	var index: int = selected[0]
 	var target: int = index + direction
 	if target < 0 or target >= stops.size():

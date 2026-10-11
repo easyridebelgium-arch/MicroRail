@@ -48,7 +48,7 @@ func configure(owner_game: Node) -> void:
 
 func open_dialog() -> void:
 	train_choice.clear()
-	for service in ["passenger", "freight"]:
+	for service in game.service_keys():
 		var train: Dictionary = game.Fleet.assigned(game.fleet, service)
 		train_choice.add_item("#%d %s" % [int(train["id"]), train["name"]])
 		train_choice.set_item_metadata(train_choice.item_count - 1, int(train["id"]))

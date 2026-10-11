@@ -24,7 +24,7 @@ func footprint(path: Curve2D, distance: float, tile_size: float) -> Array[Vector
 		for x in range(low.x, high.x + 1): cells.append(Vector2i(x, y))
 	return cells
 
-func rebuild(trains: Array, tracks: Dictionary, tile_size: float) -> void:
+func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: Dictionary = {}) -> void:
 	owners.clear()
 	occupied_owners.clear()
 	switches.clear()
@@ -51,6 +51,9 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float) -> void:
 		var length: float = train.path.get_baked_length()
 		var direction := 1.0 if train.forward else -1.0
 		var end: float = clampf(train.distance + direction * tile_size * LOOKAHEAD_TILES, 0, length) if train.moving else train.distance
+		# A red signal limits future requests, not the protection of the body.
+		if request_ends.has(train.id):
+			end = clampf(float(request_ends[train.id]), minf(train.distance, end), maxf(train.distance, end))
 		var spans := _route_spans(train.path, train.cells, tile_size)
 		var distance: float = train.distance
 		while true:

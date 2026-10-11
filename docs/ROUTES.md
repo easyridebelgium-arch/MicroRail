@@ -2,7 +2,7 @@
 
 Use GitHub Desktop to select `codex/fix-main-merge`, Fetch origin, then
 Pull origin. Close Godot before pulling and reopen the existing project afterward.
-The merged update uses save version 21. Version 14 and both version 15 development
+The merged update uses save version 22. Version 14 and both version 15 development
 formats migrate on loading; earlier formats are not supported. See [Fleet management](FLEET.md) for purchasing and assigning trains.
 
 ## Try a three-stop passenger service
@@ -32,8 +32,9 @@ load as Shuttle with their positions and directives preserved.
 
 ## Editing behaviour
 
-- Each service has one assigned train. Use Fleet to buy spares and assign replacements;
-  multiple simultaneous trains on the same service remain a later step.
+- Each service has one assigned train. Fleet can [start additional passenger
+  services](MULTIPLE_SERVICES.md) on clear platforms, or replace a returned train.
+  Multiple simultaneous trains on one service remain a later step.
 - Passenger routes use two or three unique stations. Choose Shuttle or Loop per passenger route. The preview shows the full stop sequence.
 - Renaming a route does not interrupt its train.
 - Route mode, stops and passenger waypoints can change only with an empty train physically

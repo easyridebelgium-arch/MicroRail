@@ -51,7 +51,7 @@ Broken-track checks use the current route occurrence, heading and next destinati
 A gap behind a train permits delivery; after turning, it waits if the return path
 crosses that gap. Route edits never replace geometry under a moving train.
 
-Saves **v21** persist per-leg directives and retain train route snapshots/positions.
+Saves **v22** persist per-leg directives and retain train route snapshots/positions.
 V19 saves receive empty directives; v20 saves retain their directives and default
 to Shuttle mode. Validation checks that retained paths satisfy
 their saved waypoint order; coordinates are normalized to integers on load.

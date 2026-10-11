@@ -18,13 +18,17 @@ each system, with Godot and GDScript as the main development tools.
   number-row shortcuts and independent pause.
 - Named services and ordered passenger stops across Stations A, B and C, with
   Shuttle (reverse stop order) or Loop (last-to-first) modes and a sequence preview.
+- Up to eight independently active passenger services, each with its own train,
+  stops, mode and directives; shared reservations/signals, Fleet controls and saved
+  runtimes. Red signals limit future reservations to keep departure switches clear.
 - A fleet roster with permanent train IDs, four purchasable models, individual
   names, stored spares, replacement assignment, sales and per-train upgrades.
 - Station inspection, camera scrolling, minimap, introductory objectives and saves.
 
-These are prototype foundations. The fleet currently assigns one train to each of
-the two services; spares remain off-map. Individual passenger destinations, multiple
-simultaneous trains per service and additional dispatch policies are still planned.
+These are prototype foundations. The fleet assigns one train to each active
+service; additional passenger services can run together and spares stay off-map.
+Individual passenger destinations, multiple trains per service, multiple platforms
+and additional dispatch policies remain planned. See [multiple active services](MULTIPLE_SERVICES.md).
 Junctions, reservations and basic block signals provide shared-track safety.
 See [Fleet management](FLEET.md) for the implemented controls.
 
@@ -46,7 +50,7 @@ input replay and controller support remain later work. See [foundation status](p
 | Accessibility defaults | UI-only scale from 100–200%, high-DPI layouts, colourblind-safe and high-contrast palettes, shapes/icons alongside colour, reduced motion/flashing and key remapping. Preserve AZERTY/QWERTY support and mouse-only construction. Test dialogs and toolbars at the largest supported scale. |
 | Input and interface separation | Use named input actions, keep typing and menu navigation from controlling the map, and design focus/navigation paths early. Full controller/Steam Deck support and radial menus wait until the core menus stabilise. |
 
-## Phase 1 — Network integrity, then planning and readable feedback
+## Phase 1 — Network integrity, services, then planning and readable feedback
 
 Implementation order within this phase: junction topology → reservations and safe
 waiting → signals and deadlock/recovery handling → waypoints and safe route edits
@@ -58,7 +62,7 @@ must not claim to predict traffic conflicts without the reservation layer.
 
 | Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
 | --- | --- | --- |
-| Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices, stored spares and Shuttle/Loop routes are implemented. Next: multiple independent active passenger services (e.g. A–B and A–C), each with its own ID, route, mode and directives. Reuse the proven reservations/signals; verify shared switches, no overlaps, withdrawal and save/load before multiple trains per service. |
+| Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices, stored spares and Shuttle/Loop routes are implemented. Implemented: up to eight independent active passenger services (e.g. A–B and A–C), each with its own assigned train, route, mode, directives and saved runtime. Shared switches, no overlaps, physical recovery, withdrawal/storage and save/load are checked. Multiple trains per service and multiple platforms remain later work. |
 | Train consists and rolling stock (Phase 2, after safe train-length handling) | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Extend the fleet model with vehicle composition, cargo compatibility and total train length. Account for platform and block lengths before running long consists. Introduce stock types as their passenger classes or cargo types become available. |
 | Junctions and switches | Build branching networks and share infrastructure between services. | Implemented: port-aware routing, locked switches, crossings and a switch tool. Further construction conveniences remain planned. |
 | Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Basic tile reservations, switch/selected-port locking, safe waiting events and a hatched ownership overlay are implemented. Shared passenger/freight routing is enabled. Basic deadlock detection, physical reversal, bidirectional automatic block signals and manual holds are implemented; reservations do not select alternate passing-loop paths. |
@@ -195,9 +199,9 @@ instead of adding a separate campaign simulation.
    events, remapping, UI scale, colourblind/high-contrast modes and reduced motion.
 2. Junctions, reservations, signals, physical deadlock recovery, directional
    broken-track checks, waypoint routing and Shuttle/Loop modes (implemented).
-   Next, add multiple independent active passenger services and verify shared switches,
-   passing-loop directives, safe withdrawal and saves. Multiple trains per service
-   and priorities build on that foundation.
+   Independent active passenger services, signal-limited reservation lookahead,
+   passing-loop directives, safe withdrawal/storage and saves are now implemented.
+   Multiple trains per service and priorities build on that foundation.
 3. Reservation-aware planning, overlays, batch edits, search and alerts. Begin with
    measured congestion indicators; predictive bottleneck advice waits for demand data.
 4. Consists/templates, vehicle comparison, safe service edits and replacement rules.
@@ -215,9 +219,9 @@ Junctions, reservations, sustained deadlock detection, physical reversal, automa
 block signals, manual dispatch and ordered waypoints are integrated. Missing track
 ahead on the current leg stops trains in place; a gap behind does not interrupt
 delivery. After turning, the new leg is checked again. Shuttle/Loop route modes
-and closing-leg waypoints are integrated. Next: multiple
-independent active passenger services, so A–B and A–C trains can run together on
-shared tracks with selected passing-loop paths. Then route/reservation inspection
-overlays, affected-service construction feedback and richer planning previews.
+and closing-leg waypoints are integrated. Multiple independent passenger services
+now run together on shared tracks with selected passing-loop paths and signal
+boundaries. Next: route/reservation inspection overlays, affected-service
+construction feedback and richer planning previews.
 Predictive traffic advice waits for timetable/demand data; multiple trains per
 service follow the independent-service model. See [reservation behaviour and checks](RESERVATIONS.md).

@@ -1,5 +1,7 @@
 extends RefCounted
 
+const Services = preload("res://scripts/service_routes.gd")
+
 const MODELS: Dictionary = {
 	"passenger_standard": {"name": "Passenger Shuttle", "kind": "passenger", "price": 400, "capacity": 20, "speed": 80.0, "running_cost": 1},
 	"passenger_fast": {"name": "Fast Passenger", "kind": "passenger", "price": 650, "capacity": 12, "speed": 120.0, "running_cost": 2},
@@ -63,10 +65,10 @@ static func is_valid(value: Variant) -> bool:
 		if not _whole(train.get("capacity_level"), 0, 3) or not _whole(train.get("speed_level"), 0, 3):
 			return false
 		var service: Variant = train.get("service")
-		if not service is String or not service in ["", "passenger", "freight"]:
+		if not service is String or not (service == "" or service == "freight" or Services.is_passenger_key(service)):
 			return false
 		if service != "":
-			if MODELS[train["model"]]["kind"] != service or assignments.has(service):
+			if MODELS[train["model"]]["kind"] != Services.kind(service) or assignments.has(service):
 				return false
 			assignments[service] = true
 	return assignments.has("passenger") and assignments.has("freight")

@@ -27,13 +27,14 @@ static func valid_cells(value: Variant) -> bool:
 		if delta == Vector2i.ZERO or maxi(absi(delta.x), absi(delta.y)) != 1: return false
 	return true
 
-static func passenger_path(cells: Array[Vector2i], stops: Array, tile_size: float) -> Dictionary:
+static func passenger_path(cells: Array[Vector2i], stops: Array, tile_size: float, waypoints: Dictionary = {}) -> Dictionary:
 	var path := Curve2D.new()
 	path.bake_interval = 1.0
 	var distances: Array[float] = [0.0]
 	if cells.is_empty(): return {"cells": cells, "path": path, "distances": [], "error": "Route incomplete"}
 	if cells[0] != Services.STATIONS[stops[0]]["cell"]: return {}
 	var start := 0
+	var leg_index := 0
 	for stop in stops.slice(1):
 		var end := -1
 		for i in range(start + 1, cells.size()):
@@ -44,6 +45,8 @@ static func passenger_path(cells: Array[Vector2i], stops: Array, tile_size: floa
 		var leg: Array[Vector2i] = cells.slice(start, end + 1)
 		for i in range(1, leg.size() - 1):
 			if Geometry.from_ports(leg[i - 1] - leg[i], leg[i + 1] - leg[i]) == null: return {}
+		if not Services.waypoints_in_order(leg, waypoints.get(Services.leg_key(stops, leg_index), [])): return {}
+		leg_index += 1
 		var segment := Router.make_path(leg, tile_size)
 		for i in range(segment.point_count):
 			var point := segment.get_point_position(i)
@@ -80,10 +83,11 @@ static func valid_state(value: Variant, services: Dictionary) -> bool:
 	for field in ["passenger_cells", "freight_cells"]:
 		if not valid_cells(value.get(field)): return false
 	var passenger := decode(value["passenger_cells"])
-	if not passenger.is_empty() and passenger_path(passenger, services["passenger"]["stops"], 32).is_empty(): return false
+	if not passenger.is_empty() and passenger_path(passenger, services["passenger"]["stops"], 32, services["passenger"].get("waypoints", {})).is_empty(): return false
 	var freight := decode(value["freight_cells"])
 	if not freight.is_empty():
 		if freight.size() < 2 or freight[0] != Vector2i(8, 24) or freight[-1] != Vector2i(28, 24): return false
+		if not Services.waypoints_in_order(freight, services["freight"].get("waypoints", {}).get("forest>terminal", [])): return false
 		for i in range(1, freight.size() - 1):
 			if Geometry.from_ports(freight[i - 1] - freight[i], freight[i + 1] - freight[i]) == null: return false
 	return true

@@ -167,7 +167,7 @@ func _draw() -> void:
 
 
 func status_text() -> String:
-	if not route_valid and not route_cells.is_empty(): return "Route incomplete — stopped here. Repair the existing path to continue."
+	if not route_valid and not route_cells.is_empty(): return "Route incomplete ahead — stopped here. Repair the path to the next destination."
 	if held: return "Held by dispatcher at current position"
 	if not reservation_wait.is_empty(): return reservation_wait
 	if recovery_returning: return "Reversing to " + ("terminal" if to_terminal else "forest")

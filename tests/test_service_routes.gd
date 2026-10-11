@@ -184,10 +184,12 @@ func _run() -> void:
 # Movement tests use the same fixed-step reservation refresh as the game.
 func _advance_passenger(game: Node, seconds: float) -> void:
 	for step in range(roundi(seconds * 60)):
+		game._refresh_directional_routes()
 		game._rebuild_reservations(true)
 		game._move_train(1.0 / 60.0)
 
 func _advance_freight(game: Node, seconds: float) -> void:
 	for step in range(roundi(seconds * 60)):
+		game._refresh_directional_routes()
 		game._rebuild_reservations(true)
 		game.forest_stock -= game.freight_train.advance(1.0 / 60.0, game.forest_stock)

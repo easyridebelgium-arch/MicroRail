@@ -12,6 +12,8 @@ each system, with Godot and GDScript as the main development tools.
 - Construction costs, drag demolition and paused construction Undo/Redo.
 - Passenger and log-freight services, production and delivery income.
 - Separate speed and capacity upgrades.
+- Ordered pass-through waypoints per passenger leg and freight service, with
+  port-aware pathfinding, map selection and a scrollable editor.
 - Simulation speed selector: 1× (default), 2×, 5× and 10×, with remappable
   number-row shortcuts and independent pause.
 - Named services and ordered passenger stops across Stations A, B and C.
@@ -46,7 +48,8 @@ input replay and controller support remain later work. See [foundation status](p
 ## Phase 1 — Network integrity, then planning and readable feedback
 
 Implementation order within this phase: junction topology → reservations and safe
-waiting → signals and deadlock/recovery handling → reservation-aware planning,
+waiting → signals and deadlock/recovery handling → waypoints and safe route edits
+→ reservation-aware planning,
 conflict previews and bulk edits. A cost-only ghost preview can arrive earlier, but
 must not claim to predict traffic conflicts without the reservation layer.
 
@@ -55,10 +58,10 @@ must not claim to predict traffic conflicts without the reservation layer.
 | --- | --- | --- |
 | Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices and stored spares are implemented. Multiple trains on a shared track depend on reservations and signals. |
 | Train consists and rolling stock (Phase 2, after safe train-length handling) | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Extend the fleet model with vehicle composition, cargo compatibility and total train length. Account for platform and block lengths before running long consists. Introduce stock types as their passenger classes or cargo types become available. |
-| Junctions and switches | Build branching networks and share infrastructure between services. | Extend track connections and route selection beyond two-port pieces. |
+| Junctions and switches | Build branching networks and share infrastructure between services. | Implemented: port-aware routing, locked switches, crossings and a switch tool. Further construction conveniences remain planned. |
 | Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Basic tile reservations, switch/selected-port locking, safe waiting events and a hatched ownership overlay are implemented. Shared passenger/freight routing is enabled. Basic deadlock detection, physical reversal, bidirectional automatic block signals and manual holds are implemented; reservations do not select alternate passing-loop paths. |
 | Priority and pathfinding rules | Offer simple dispatch priorities, initially express > local passenger > freight, so players can influence junction behaviour without configuring complex signalling. | Priorities choose between safe movements; they never override reservations. Allow player overrides, explain why a train is waiting, and prevent low-priority services from waiting indefinitely. Respect waypoint directives when choosing paths. |
-| Waypoints and waypoint directives | Place lightweight markers or directional waypoints to force a train through a particular track without constructing a station. Allow routing directives associated with signals. | Extend ordered routes with pass-through instructions and direction constraints. Keep routing directives distinct from a signal's safety role: a directive must never override an occupied or reserved block. |
+| Waypoints and waypoint directives | Place lightweight markers or directional waypoints to force a train through a particular track without constructing a station. Allow routing directives associated with signals. | Implemented: up to 16 ordered pass-through track cells per outward leg, map selection, editing and persisted directives for passenger and freight routes. Trains return along that path in reverse. Entry ports are preserved through waypoint routing; stops, reservations and signals remain authoritative. One-way/directional waypoint rules and different return itineraries are deferred until route-direction controls are designed. See [waypoints](WAYPOINTS.md). |
 | Signal control modes | Automatic signals/reservations by default, with optional one-way, route, platform and manual dispatch controls. | Bidirectional automatic blocks, manual stop signals and Traffic Hold/Resume are implemented; one-way, route and platform modes remain planned. All modes use reservations and explain blocked movements. See [signals and dispatch](SIGNALS.md). |
 | Deadlock detection and emergency recovery | Detect circular waits, identify involved trains/blocks and offer safe hold, turn-back, reroute or recovery actions. | Continuous actual wait cycles are detected after three simulation seconds. Traffic reverses the selected train in place, retaining its path and load until it physically returns to its departure stop, then holds it. Manual Hold/Resume is also available. Automatic turn-back, alternate routing and full reversal-location rules remain later work. See [deadlock recovery](DEADLOCKS.md). Full shunting and yard operations arrive later. |
 | Construction planning and conflict preview | Draft ghost tracks, stations, bridges, signals and blueprints before committing; show cost and affected services. | Reservation conflicts require the reservation layer. Add grade, ownership, signal overlap and travel-time warnings as those systems arrive. Preview and commit must use the same validation rules. |
@@ -188,7 +191,9 @@ instead of adding a separate campaign simulation.
 
 1. Integrate and verify Phase 0: fixed ticks, owned RNG, coherent versioned saves,
    events, remapping, UI scale, colourblind/high-contrast modes and reduced motion.
-2. Junctions, reservations, signals, deadlock handling and safe recovery.
+2. Junctions, reservations, signals, physical deadlock recovery, directional
+   broken-track checks, then waypoint routing. Prove these before priorities or
+   multiple simultaneously running trains on one service.
 3. Reservation-aware planning, overlays, batch edits, search and alerts. Begin with
    measured congestion indicators; predictive bottleneck advice waits for demand data.
 4. Consists/templates, vehicle comparison, safe service edits and replacement rules.
@@ -203,7 +208,9 @@ need not wait for controller support. Visual polish and sound can proceed alongs
 the phases, with gameplay effects explicitly optional. Build the reservation layer
 once and reuse it for preview, dispatch, work zones, recovery and eventual shunting.
 Junctions, reservations, sustained deadlock detection, physical reversal, automatic
-block signals and manual dispatch are integrated. Missing track stops trains in
-place; repairing their retained route resumes them. Next: waypoints and route
-directives so players can choose passing loops without adding a station. Add more
-simultaneously running trains after these operating rules are proven. See [reservation behaviour and checks](RESERVATIONS.md).
+block signals, manual dispatch and ordered waypoints are integrated. Missing track
+ahead on the current leg stops trains in place; a gap behind does not interrupt
+delivery. After turning, the new leg is checked again. Next: route/reservation
+inspection overlays and affected-service construction feedback, then richer
+planning previews. Predictive traffic advice waits for timetable/demand data. Add
+multiple simultaneously running trains after these operating rules are proven. See [reservation behaviour and checks](RESERVATIONS.md).

@@ -1,6 +1,6 @@
 # Junctions and switches (Phase 1, step 1)
 
-Status: integrated with building, drawing, trains and v19 saves. Geometry, switch
+Status: integrated with building, drawing, trains and v20 saves. Geometry, switch
 tool and save tests pass headlessly in Godot 4.6.3.
 See [reservations](RESERVATIONS.md) for shared-track operation and switch locks.
 
@@ -43,7 +43,7 @@ cannot change line.
   The switch tile, stem and used exit are locked together. Unreserved switches
   retain their last position. Trains follow planned cell lists and may move only
   over granted tiles; the player cannot modify a reserved switch.
-- **Switch state was added in v18 (current saves are v19):** a `switches` block of `[x, y, state]`, validated as a
+- **Switch state was added in v18 (current saves are v20):** a `switches` block of `[x, y, state]`, validated as a
   whole list (switch tiles only, state 0 or 1, no duplicates) before loading;
   version 17 saves upgrade with an empty list; tiles with three or four ports are
   accepted when loading.
@@ -58,7 +58,7 @@ integrated. Reserved track cannot be changed.
 ## Next steps
 
 [Deadlock detection and physical reversal](DEADLOCKS.md) and
-[signals and dispatch controls](SIGNALS.md) are integrated. Waypoints and route
-directives build on this shared reservation layer next.
+[signals and dispatch controls](SIGNALS.md) are integrated. [Ordered waypoints](WAYPOINTS.md) use that layer to select passing-loop paths.
+Route inspection and affected-service planning feedback come next.
 Manual dispatch and switch-position controls must respect those locks. Crossing
 placement and branching directly from Connect/Draw remain later building tools.

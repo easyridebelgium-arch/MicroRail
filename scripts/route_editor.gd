@@ -13,6 +13,11 @@ var add_button: Button
 var remove_button: Button
 var up_button: Button
 var down_button: Button
+var waypoint_leg: OptionButton
+var waypoint_list: ItemList
+var waypoint_x: SpinBox
+var waypoint_y: SpinBox
+var waypoint_add: Button
 var selected_service_key: String = "passenger"
 
 func configure(owner_game: Node) -> void:
@@ -22,9 +27,14 @@ func configure(owner_game: Node) -> void:
 	ok_button_text = "Apply"
 	dialog_hide_on_ok = false
 	exclusive = true
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size.y = 100
+	add_child(scroll)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
+	scroll.add_child(box)
 	service_choice = OptionButton.new()
 	service_choice.add_item("Passenger service")
 	service_choice.add_item("Freight service")
@@ -51,9 +61,42 @@ func configure(owner_game: Node) -> void:
 	remove_button = _button("Remove", _remove_stop)
 	up_button = _button("Up", _move_stop.bind(-1))
 	down_button = _button("Down", _move_stop.bind(1))
+	var waypoint_heading := Label.new()
+	waypoint_heading.text = "Pass-through waypoints — no loading or station wait"
+	box.add_child(waypoint_heading)
+	waypoint_leg = OptionButton.new()
+	box.add_child(waypoint_leg)
+	waypoint_leg.item_selected.connect(func(_index: int) -> void: _refresh_waypoints())
+	waypoint_list = ItemList.new()
+	waypoint_list.custom_minimum_size.y = 90
+	box.add_child(waypoint_list)
+	var point_controls := HFlowContainer.new()
+	box.add_child(point_controls)
+	for axis in ["X", "Y"]:
+		var label := Label.new()
+		label.text = axis
+		point_controls.add_child(label)
+		var spin := SpinBox.new()
+		spin.max_value = 79 if axis == "X" else 49
+		spin.step = 1
+		spin.custom_minimum_size.x = 84
+		point_controls.add_child(spin)
+		if axis == "X": waypoint_x = spin
+		else: waypoint_y = spin
+	for text in ["Add waypoint", "Remove", "Up", "Down"]:
+		var button := Button.new()
+		button.text = text
+		match text:
+			"Add waypoint":
+				waypoint_add = button
+				button.pressed.connect(_add_waypoint)
+			"Remove": button.pressed.connect(_remove_waypoint)
+			"Up": button.pressed.connect(_move_waypoint.bind(-1))
+			"Down": button.pressed.connect(_move_waypoint.bind(1))
+		point_controls.add_child(button)
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.custom_minimum_size = Vector2(530, 88)
+	status.custom_minimum_size.y = 60
 	box.add_child(status)
 	confirmed.connect(_apply)
 
@@ -64,12 +107,16 @@ func _button(title_text: String, callback: Callable) -> Button:
 	editing_controls.add_child(button)
 	return button
 
-func open_editor() -> void:
+func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 	draft = game.services.duplicate(true)
 	service_choice.select(0)
 	selected_service_key = "passenger"
 	_show_service()
-	popup_centered()
+	if cell.x >= 0:
+		waypoint_x.value = cell.x
+		waypoint_y.value = cell.y
+		status.text = "Cell %d,%d selected. Choose the service and leg, click Add waypoint, then Apply." % [cell.x, cell.y]
+	popup_centered_clamped(Vector2i(680, 620), 0.95)
 
 func _key() -> String:
 	return selected_service_key
@@ -86,7 +133,7 @@ func _show_service() -> void:
 	name_field.text = draft[_key()]["name"]
 	editing_controls.visible = _key() == "passenger"
 	_refresh_stops()
-	status.text = "Choose at least two different passenger stations. Applying a new stop order returns the train to the first stop and its passengers to their departure station. The game stays paused." if _key() == "passenger" else "Forest: load logs → Terminal: unload logs → return to Forest. Freight stops have fixed roles; you can rename this service."
+	status.text = "Stop/waypoint edits require an empty train at the first station. Choose each outward leg and add pass-through track cells in order. Return trips use the same track in reverse; names can change mid-trip." if _key() == "passenger" else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
 
 func _refresh_stops(selected: int = -1) -> void:
 	stop_list.clear()
@@ -97,6 +144,7 @@ func _refresh_stops(selected: int = -1) -> void:
 		stop_list.add_item("%d. %s" % [index + 1, stop_name])
 	if selected >= 0 and selected < stops.size():
 		stop_list.select(selected)
+	_refresh_legs()
 
 func _add_stop() -> void:
 	var key: String = station_choice.get_selected_metadata()
@@ -135,3 +183,69 @@ func _move_stop(direction: int) -> void:
 func _apply() -> void:
 	_capture_name(_key())
 	status.text = game.apply_service_routes(draft)
+
+
+func _refresh_legs() -> void:
+	var stops: Array = draft[_key()]["stops"]
+	var old: String = str(waypoint_leg.get_selected_metadata()) if waypoint_leg.item_count > 0 else ""
+	waypoint_leg.clear()
+	var valid_keys: Array[String] = []
+	for index in range(stops.size() - 1):
+		var key := Services.leg_key(stops, index)
+		valid_keys.append(key)
+		waypoint_leg.add_item("%s → %s" % [str(stops[index]).to_upper(), str(stops[index + 1]).to_upper()])
+		waypoint_leg.set_item_metadata(index, key)
+		if key == old: waypoint_leg.select(index)
+	var directives: Dictionary = draft[_key()].get("waypoints", {}).duplicate(true)
+	for key in directives.keys():
+		if not valid_keys.has(key): directives.erase(key)
+	draft[_key()]["waypoints"] = directives
+	_refresh_waypoints()
+
+func _points() -> Array:
+	var key: String = waypoint_leg.get_selected_metadata()
+	var directives: Dictionary = draft[_key()]["waypoints"]
+	return directives.get(key, [])
+
+func _refresh_waypoints(selected: int = -1) -> void:
+	waypoint_list.clear()
+	if waypoint_leg.item_count == 0: return
+	var points := _points()
+	for index in range(points.size()):
+		waypoint_list.add_item("%d. Track %d,%d" % [index + 1, int(points[index][0]), int(points[index][1])])
+	if selected >= 0 and selected < points.size(): waypoint_list.select(selected)
+
+func _add_waypoint() -> void:
+	var point: Array = [int(waypoint_x.value), int(waypoint_y.value)]
+	var cell := Vector2i(point[0], point[1])
+	if not game.can_place_waypoint(cell):
+		status.text = "Choose existing track outside station/industry platforms."
+		return
+	var points := _points()
+	if points.size() >= 16 or points.has(point):
+		status.text = "Use up to 16 different waypoint cells per leg."
+		return
+	points.append(point)
+	draft[_key()]["waypoints"][str(waypoint_leg.get_selected_metadata())] = points
+	_refresh_waypoints(points.size() - 1)
+	status.text = "Waypoint added to draft. Apply validates the complete path; closing discards edits."
+
+func _remove_waypoint() -> void:
+	var selected := waypoint_list.get_selected_items()
+	if selected.is_empty(): return
+	var points := _points()
+	points.remove_at(selected[0])
+	if points.is_empty(): draft[_key()]["waypoints"].erase(str(waypoint_leg.get_selected_metadata()))
+	_refresh_waypoints(mini(selected[0], points.size() - 1))
+
+func _move_waypoint(direction: int) -> void:
+	var selected := waypoint_list.get_selected_items()
+	if selected.is_empty(): return
+	var points := _points()
+	var index: int = selected[0]
+	var target := index + direction
+	if target < 0 or target >= points.size(): return
+	var point: Array = points[index]
+	points[index] = points[target]
+	points[target] = point
+	_refresh_waypoints(target)

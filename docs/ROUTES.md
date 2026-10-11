@@ -1,8 +1,8 @@
 # Named routes and ordered stops
 
-Use GitHub Desktop to select `codex/mouse-track-building`, Fetch origin, then
+Use GitHub Desktop to select `codex/fix-main-merge`, Fetch origin, then
 Pull origin. Close Godot before pulling and reopen the existing project afterward.
-The merged update uses save version 16. Version 14 and both version 15 development
+The merged update uses save version 20. Version 14 and both version 15 development
 formats migrate on loading; earlier formats are not supported. See [Fleet management](FLEET.md) for purchasing and assigning trains.
 
 ## Try a three-stop passenger service
@@ -29,14 +29,21 @@ Station C appears in the minimap and supports the existing station inspector.
   multiple simultaneous trains on the same service remain a later step.
 - Passenger routes use two or three unique stations. Lists run as shuttles, not loops.
 - Renaming a route does not interrupt its train.
-- Applying a different stop order returns onboard passengers to their departure
-  station and places the train at the new first stop. No fares are awarded for this.
-- All legs must be connected before the passenger service runs. A missing leg is
-  identified in the status message. Repairing the track restores the service.
+- Stops and passenger waypoints can change only with an empty train physically
+  at the first stop of the proposed route. The complete new path must be valid.
+  Edits never teleport trains or unload passengers mid-track. Freight waypoint
+  edits require its train at the forest.
+- Initial planning requires a complete route. Once underway, only the retained
+  track between the train and its next destination is checked. A gap behind does
+  not interrupt delivery; after turning it blocks the return leg and warns.
+  A gap ahead stops the train in place until repaired.
+- [Waypoints](WAYPOINTS.md) choose pass-through cells on each outward leg without
+  adding station stops. Return travel uses the same path in reverse.
 - Withdrawal completes the round trip and parks at the configured first stop.
 - Closing without Apply discards draft edits; Apply updates the game, and the Save
   button writes it to disk. The game remains paused when the Routes window closes.
-- Freight can be renamed, but Forest → Terminal keeps its fixed load/unload roles.
+- Freight can be renamed and given waypoints, but Forest → Terminal retains its
+  fixed load/unload roles.
 - Passengers currently travel to the next listed stop. Individual destinations and
   transfers are not included yet.
 

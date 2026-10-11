@@ -29,16 +29,17 @@ Each fixed tick seeds block ownership from actual train bodies (including held a
 dwelling trains), then grants upcoming blocks in ascending permanent train ID order.
 Authority is rebuilt every tick, so vacated blocks are released. Tile/switch
 reservations remain the final safety check, including when new signals divide a
-block containing multiple trains. Missing track freezes trains on retained routes.
+block containing multiple trains. Missing track ahead on the current leg freezes trains; a gap behind permits
+delivery before the return-leg check.
 
 Both signal modes apply in both directions. This version has no one-way signals,
 priority classes, route/platform signals, automatic passing-loop selection or
 fairness policy. Signals alone cannot resolve a poor single-track layout; a cycle
 may require [physical reversal](DEADLOCKS.md). Connected branches can make a block
 larger than expected: add boundaries on each approach/exit. There is one assigned
-running train per service. Waypoints/route directives are next.
+running train per service. Use [waypoint directives](WAYPOINTS.md) to choose pass-through tracks.
 
-Saves v19 persist signal locations/modes and dispatcher state. Runtime ownership is
+Saves v20 persist signal locations/modes and dispatcher state. Runtime ownership is
 reconstructed before movement. Shape/text indicators work alongside palette choices.
 
 ## Verification

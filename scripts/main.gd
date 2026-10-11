@@ -88,6 +88,8 @@ const LOG_DELIVERY_PRICE: int = 8
 const GAME_SPEEDS: Array[float] = [1.0, 2.0, 5.0, 10.0]
 const SimClock = preload("res://scripts/core/sim_clock.gd")
 const BlockSignals = preload("res://scripts/core/block_signals.gd")
+const WaypointRouter = preload("res://scripts/waypoint_router.gd")
+const DirectionalRoutes = preload("res://scripts/core/directional_routes.gd")
 const RuntimeRoutes = preload("res://scripts/core/runtime_routes.gd")
 const DeadlockMonitor = preload("res://scripts/core/deadlock_monitor.gd")
 const TrafficDialog = preload("res://scripts/traffic_dialog.gd")
@@ -114,11 +116,15 @@ var switch_states: Dictionary = {}
 var reservations = Reservations.new()
 var deadlocks = DeadlockMonitor.new()
 var movement_blocks: Dictionary = {}
+var passenger_travel = DirectionalRoutes.new()
+var freight_travel = DirectionalRoutes.new()
 var passenger_returning: bool = false
 var passenger_return_stop: int = 0
 var passenger_held: bool = false
 var track_signals: Dictionary = {}
 var block_signals = BlockSignals.new()
+var waypoint_tool_mode: bool = false
+var waypoint_button: Button
 var signal_tool_mode: bool = false
 var speed_selector: OptionButton
 var signal_button: Button
@@ -285,6 +291,7 @@ func _ready() -> void:
 	_setup_traffic_dialog()
 	_setup_signal_tool()
 	_setup_speed_control()
+	_setup_waypoint_tool()
 	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
@@ -321,6 +328,7 @@ func _process(delta: float) -> void:
 func _simulation_step(step_seconds: float) -> void:
 	_generate_passengers(step_seconds)
 	_produce_logs(step_seconds)
+	_refresh_directional_routes()
 	_rebuild_reservations(true)
 	movement_blocks.clear()
 	forest_stock -= freight_train.advance(step_seconds, forest_stock)
@@ -331,6 +339,7 @@ func _simulation_step(step_seconds: float) -> void:
 
 	_update_deadlocks()
 	_check_scenario_objectives()
+	_refresh_directional_routes()
 
 
 func _record_event(type: String, subject: String, data: Dictionary = {}) -> void:
@@ -396,6 +405,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_inspect_station_at(cell)
 				return
 
+			if waypoint_tool_mode:
+				_use_waypoint_tool(cell)
+				return
 			if signal_tool_mode:
 				_use_signal_tool(cell)
 				return
@@ -441,12 +453,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_finish_demolition(cell)
 
 func _check_route(force_reset: bool = false) -> void:
-	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE))
+	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}))
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
 	for cell in track_signals.keys():
 		if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]): track_signals.erase(cell)
-	var was_connected := route_connected
 	var at_home := route_distance <= 0.001 and passenger_stop_index == 0 and passengers_on_train == 0 and not passenger_returning
 	# Only adopt new geometry at the same physical starting position. Away from
 	# home, retain the entire travelled path and its distance until repaired.
@@ -461,13 +472,9 @@ func _check_route(force_reset: bool = false) -> void:
 			wait_remaining = 0.0
 			train_needs_boarding = true
 			_record_event(EventLog.ROUTE_CHANGED, "passenger", {"connected": true, "tiles": route_cells.size()})
-	route_connected = RuntimeRoutes.connected(route_cells, tracks)
-	passenger_route_error = "" if route_connected else "Route incomplete — stopped here. Restore the train's existing path to continue."
 	_refresh_freight_route(new_route)
 	_refresh_switch_states(route_cells)
-	if was_connected != route_connected:
-		_reset_traffic_state("Track connection changed")
-		if not route_connected: _show_notice("Passenger train stopped in place: route incomplete. Repair its path to continue.")
+	_refresh_directional_routes()
 	_update_train_transform()
 	_rebuild_reservations()
 
@@ -562,6 +569,8 @@ func _update_instructions() -> void:
 	var direction: String = "Draw track: follow the mouse" if draw_track_mode else "Connect track: drag between two points"
 	if inspect_mode:
 		direction = "Inspect: click a station or industry"
+	elif waypoint_tool_mode:
+		direction = "Waypoints: click track, then choose service/leg in Routes"
 	elif signal_tool_mode:
 		direction = "Signals: click straight track — automatic / stop / remove"
 	elif is_dragging and demolition_mode:
@@ -717,6 +726,7 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
 	if reservation_overlay:
 		_draw_reservations()
+	_draw_waypoints()
 	_draw_signals()
 	_draw_train()
 
@@ -1403,7 +1413,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		loaded_tracks[cell] = entry[2]
 	var runtime: Dictionary = data["runtime"]
 	var saved_passenger := RuntimeRoutes.decode(runtime["passenger_cells"])
-	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE)) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE))
+	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {})) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}))
 	var loaded_cells: Array[Vector2i] = []
 	loaded_cells.assign(built["cells"])
 	var loaded_path: Curve2D = built["path"]
@@ -1433,7 +1443,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 			_show_notice("Saved train is waiting away from a station.")
 			return
 	var loaded_freight_cells: Array[Vector2i] = RuntimeRoutes.decode(runtime["freight_cells"])
-	if loaded_freight_cells.is_empty(): loaded_freight_cells = _find_freight_route(loaded_tracks, loaded_cells)
+	if loaded_freight_cells.is_empty(): loaded_freight_cells = WaypointRouter.find_route(loaded_tracks, FOREST_SITE, CARGO_TERMINAL, data["services"]["freight"].get("waypoints", {}).get("forest>terminal", []))
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
 	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"])):
 		_show_notice("Saved freight train state is invalid.")
@@ -1446,15 +1456,13 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	for entry in data["switches"]:
 		switch_states[Vector2i(int(entry[0]), int(entry[1]))] = int(entry[2])
 	freight_route_cells = loaded_freight_cells
-	services = data["services"].duplicate(true)
+	services = ServiceRoutes.from_save(data["services"])
 	fleet = Fleet.from_save(data["fleet"])
 	_apply_fleet_specs()
 	route_cells = loaded_cells
 	route_path = loaded_path
 	stop_distances.assign(built["distances"])
 	passenger_route_error = built["error"]
-	route_connected = RuntimeRoutes.connected(route_cells, tracks)
-	passenger_route_error = "" if route_connected else "Route incomplete — stopped here. Repair the existing path to continue."
 	passenger_returning = runtime["passenger_returning"]
 	passenger_return_stop = int(runtime["passenger_return_stop"])
 	passenger_held = runtime["passenger_held"]
@@ -1468,10 +1476,10 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	_update_train_transform()
 	freight_train.route_cells = loaded_freight_cells.duplicate()
 	freight_train.route_path = loaded_freight_path
-	freight_train.route_valid = RuntimeRoutes.connected(loaded_freight_cells, tracks)
 	freight_train.recovery_returning = runtime["freight_returning"]
 	freight_train.held = runtime["freight_held"]
 	freight_train.restore_state(data["freight"])
+	_refresh_directional_routes(false)
 	_reset_traffic_state()
 	_rebuild_reservations()
 	scenario_goals.current_index = int(data["scenario_stage"])
@@ -1548,6 +1556,7 @@ func _select_straight_track() -> void:
 	inspect_mode = false
 	switch_tool_mode = false
 	signal_tool_mode = false
+	waypoint_tool_mode = false
 	_close_station_inspector()
 	is_dragging = false
 	draw_track_mode = false
@@ -1559,6 +1568,7 @@ func _select_curved_track() -> void:
 	inspect_mode = false
 	switch_tool_mode = false
 	signal_tool_mode = false
+	waypoint_tool_mode = false
 	_close_station_inspector()
 	is_dragging = false
 	draw_track_mode = true
@@ -1568,6 +1578,7 @@ func _select_curved_track() -> void:
 
 func _toggle_switch_tool() -> void:
 	signal_tool_mode = false
+	waypoint_tool_mode = false
 	switch_tool_mode = not switch_tool_mode
 	inspect_mode = false
 	_close_station_inspector()
@@ -1598,13 +1609,15 @@ func _update_toolbar() -> void:
 	inspect_button.set_pressed_no_signal(inspect_mode)
 
 	straight_button.set_pressed_no_signal(
-		not inspect_mode and not switch_tool_mode and not signal_tool_mode and not draw_track_mode
+		not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and not draw_track_mode
 	)
 
 	curve_button.set_pressed_no_signal(
-		not inspect_mode and not switch_tool_mode and not signal_tool_mode and draw_track_mode
+		not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and draw_track_mode
 	)
 
+	if waypoint_button != null:
+		waypoint_button.set_pressed_no_signal(waypoint_tool_mode)
 	if signal_button != null:
 		signal_button.set_pressed_no_signal(signal_tool_mode)
 	if switch_button != null:
@@ -1796,6 +1809,7 @@ func _toggle_inspect_mode() -> void:
 	inspect_mode = not inspect_mode
 	switch_tool_mode = false
 	signal_tool_mode = false
+	waypoint_tool_mode = false
 	is_dragging = false
 
 	if not inspect_mode:
@@ -2191,7 +2205,7 @@ func _find_freight_route(
 	track_data: Dictionary,
 	_passenger_cells: Array[Vector2i]
 ) -> Array[Vector2i]:
-	return RailRouter.find_route(track_data, FOREST_SITE, CARGO_TERMINAL)
+	return WaypointRouter.find_route(track_data, FOREST_SITE, CARGO_TERMINAL, services["freight"].get("waypoints", {}).get("forest>terminal", []))
 
 func _refresh_freight_route(passenger_cells: Array[Vector2i]) -> void:
 	if freight_train == null:
@@ -2202,10 +2216,7 @@ func _refresh_freight_route(passenger_cells: Array[Vector2i]) -> void:
 	if freight_train.route_cells.is_empty() or at_home:
 		if not cells.is_empty(): freight_train.set_route(cells, float(TILE_SIZE))
 	freight_route_cells = freight_train.route_cells.duplicate()
-	var was_valid: bool = freight_train.route_valid
-	freight_train.route_valid = RuntimeRoutes.connected(freight_route_cells, tracks)
-	if was_valid and not freight_train.route_valid:
-		_show_notice("Freight train stopped in place: route incomplete. Repair its path to continue.")
+
 
 
 # Drop removed switches; reservation owners set the positions of active ones.
@@ -3237,11 +3248,11 @@ func _setup_routes_editor() -> void:
 	routes_button = Button.new()
 	routes_button.text = "Routes"
 	routes_button.focus_mode = Control.FOCUS_NONE
-	routes_button.tooltip_text = "Name services and edit ordered stops"
+	routes_button.tooltip_text = "Name services; edit ordered stops and pass-through waypoints"
 	routes_button.pressed.connect(_open_routes_editor)
 	$Interface/HeaderBox/Toolbar.add_child(routes_button)
 
-func _open_routes_editor() -> void:
+func _open_routes_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 	paused = true
 	is_dragging = false
 	is_panning = false
@@ -3249,19 +3260,26 @@ func _open_routes_editor() -> void:
 	build_plan.clear()
 	_close_station_inspector()
 	_update_toolbar()
-	route_editor.open_editor()
+	route_editor.open_editor(cell)
 
 func apply_service_routes(configuration: Dictionary) -> String:
 	if not ServiceRoutes.is_valid(configuration):
 		return "Use a name of 1–40 characters and at least two different passenger stops."
 	if not paused:
 		return "Pause before changing routes."
-	var changed: bool = configuration["passenger"]["stops"] != services["passenger"]["stops"]
+	configuration = ServiceRoutes.from_save(configuration)
+	var changed: bool = configuration["passenger"]["stops"] != services["passenger"]["stops"] or configuration["passenger"].get("waypoints", {}) != services["passenger"].get("waypoints", {})
+	var freight_changed: bool = configuration["freight"].get("waypoints", {}) != services["freight"].get("waypoints", {})
+	if freight_changed:
+		if freight_train.distance_along_route > 0.001 or freight_train.recovery_returning:
+			return "Freight waypoint edits require the train physically at the forest. Hold or withdraw it first."
+		if WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, configuration["freight"].get("waypoints", {}).get("forest>terminal", [])).is_empty():
+			return "Complete a valid freight path through the selected waypoints before applying."
 	if changed:
 		var new_home: Vector2 = _cell_center(ServiceRoutes.STATIONS[configuration["passenger"]["stops"][0]]["cell"])
 		if passengers_on_train > 0 or passenger_returning or train_position.distance_to(new_home) > 0.1:
-			return "Finish the trip or reverse back first. Stop order can only change with an empty train at the new first stop."
-		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE))["cells"].is_empty():
+			return "Finish the trip or reverse back first. Stops and waypoints can only change with an empty train at the first stop."
+		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE), configuration["passenger"].get("waypoints", {}))["cells"].is_empty():
 			return "Complete the new route before changing the stop order."
 		# Reparameterise a path only when its origin is this exact physical spot.
 		route_cells.clear()
@@ -3270,7 +3288,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 		passenger_stop_index = 0
 		passenger_return_stop = 0
 	services = configuration.duplicate(true)
-	if changed:
+	if changed or freight_changed:
 		_check_route(true)
 	_update_instructions()
 	_update_station_inspector()
@@ -3568,6 +3586,7 @@ func reverse_deadlocked_train(id: int) -> String:
 		freight_train._update_transform()
 	else: return "Select an assigned passenger or freight train."
 	var old_cycles: Array = deadlocks.cycles.duplicate(true)
+	_refresh_directional_routes(false)
 	_reset_traffic_state()
 	_rebuild_reservations()
 	_record_event(EventLog.TRAIN_REVERSED, str(id), {"service": service, "action": "return to departure stop"})
@@ -3628,6 +3647,7 @@ func _setup_signal_tool() -> void:
 	signal_button.tooltip_text = "Click straight track: automatic block signal → manual stop → remove. Signals apply in both directions."
 	signal_button.pressed.connect(func() -> void:
 		signal_tool_mode = not signal_tool_mode
+		waypoint_tool_mode = false
 		switch_tool_mode = false
 		inspect_mode = false
 		is_dragging = false
@@ -3698,3 +3718,56 @@ func _set_game_speed(index: int) -> void:
 	sim_clock.speed = GAME_SPEEDS[index]
 	speed_selector.select(index)
 	_show_notice("Simulation speed %d×%s." % [int(sim_clock.speed), " — still paused" if paused else ""])
+
+
+func _refresh_directional_routes(notify: bool = true) -> void:
+	var passenger_was_clear := route_connected
+	var next_stop := _next_passenger_stop()
+	route_connected = next_stop >= 0 and next_stop < stop_distances.size() and passenger_travel.is_clear(route_cells, route_path, route_distance, stop_distances[next_stop], tracks, float(TILE_SIZE))
+	passenger_route_error = "" if route_connected else "Route incomplete ahead — stopped here. Repair the path to the next destination."
+	if freight_train == null: return
+	var freight_was_clear: bool = freight_train.route_valid
+	var target: float = freight_train.route_path.get_baked_length() if freight_train.to_terminal else 0.0
+	freight_train.route_valid = freight_travel.is_clear(freight_train.route_cells, freight_train.route_path, freight_train.distance_along_route, target, tracks, float(TILE_SIZE))
+	if notify:
+		if passenger_was_clear and not route_connected:
+			_show_notice("Passenger train stopped: track incomplete ahead. Repair its path to continue.")
+		if freight_was_clear and not freight_train.route_valid:
+			_show_notice("Freight train stopped: track incomplete ahead. Repair its path to continue.")
+
+
+func can_place_waypoint(cell: Vector2i) -> bool:
+	return tracks.has(cell) and not _is_station_space(cell) and cell not in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
+
+func _setup_waypoint_tool() -> void:
+	waypoint_button = Button.new()
+	waypoint_button.text = "Waypoint"
+	waypoint_button.toggle_mode = true
+	waypoint_button.focus_mode = Control.FOCUS_NONE
+	waypoint_button.tooltip_text = "Select a track cell, then assign it to a service leg in Routes."
+	waypoint_button.pressed.connect(func() -> void:
+		waypoint_tool_mode = not waypoint_tool_mode
+		signal_tool_mode = false
+		switch_tool_mode = false
+		inspect_mode = false
+		is_dragging = false
+		_close_station_inspector()
+		_update_toolbar())
+	$Interface/HeaderBox/Toolbar.add_child(waypoint_button)
+
+func _use_waypoint_tool(cell: Vector2i) -> void:
+	if not can_place_waypoint(cell):
+		_show_notice("Choose existing track outside station/industry platforms.")
+		return
+	_open_routes_editor(cell)
+
+func _draw_waypoints() -> void:
+	for service in ["passenger", "freight"]:
+		var directives: Dictionary = services[service].get("waypoints", {})
+		for leg in directives:
+			for index in range(directives[leg].size()):
+				var point: Array = directives[leg][index]
+				var center := _cell_center(Vector2i(int(point[0]), int(point[1]))) + Vector2(0, 11)
+				var diamond := PackedVector2Array([center + Vector2(0, -5), center + Vector2(5, 0), center + Vector2(0, 5), center + Vector2(-5, 0), center + Vector2(0, -5)])
+				draw_polyline(diamond, Color(1, 0.9, 0.5), 1.5)
+				draw_string(ThemeDB.fallback_font, center + Vector2(7, 4), "%s%d" % ["P" if service == "passenger" else "F", index + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.9, 0.5))

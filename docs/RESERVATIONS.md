@@ -1,7 +1,7 @@
 # Track reservations (Phase 1)
 
 Passenger and freight services can now share tiles. Freight planning uses the
-shortest port-valid path; passenger tiles and platforms are no longer excluded.
+shortest port-valid path through any assigned waypoints; passenger tiles and platforms are no longer excluded.
 
 ## Operating rules
 
@@ -30,15 +30,15 @@ shortest port-valid path; passenger tiles and platforms are no longer excluded.
 
 ## Saves and limits
 
-The current schema is **v19** (retained paths, physical recovery and signals). Reservations are transient and are reconstructed from
+The current schema is **v20** (retained paths, recovery, signals and waypoints). Reservations are transient and are reconstructed from
 restored fleet IDs, paths, positions and direction before any train moves.
 
 Opposing trains on a single track can wait indefinitely without player action.
 [Deadlock detection and physical reversal](DEADLOCKS.md) now identify sustained
 mutual waits and let the player clear them. [Automatic block signals and manual holds](SIGNALS.md) are available. Automatic
 rerouting remains subsequent work. A passing loop helps only when the
-planned services actually use separate paths; this version does not automatically
-reroute a held train into an alternate loop. Lower IDs win simultaneous requests;
+planned services actually use separate paths; [waypoint directives](WAYPOINTS.md)
+can choose those paths. This version does not automatically reroute a held train into an alternate loop. Lower IDs win simultaneous requests;
 priority classes and fairness policies come later. There is still one running
 train per service. Longer consists will need updated body occupancy.
 

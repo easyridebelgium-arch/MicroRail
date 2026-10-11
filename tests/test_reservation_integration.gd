@@ -25,10 +25,10 @@ func _run() -> void:
 			var vertical: Array[Vector2i] = []
 			for x in range(4, 21): horizontal.append(Vector2i(x, 8))
 			for y in range(17): vertical.append(Vector2i(12, y))
+			for cell in horizontal: game.tracks[cell] = false
+			for cell in vertical: game.tracks[cell] = true
+			game.tracks[Vector2i(12, 8)] = "cross_0_2"
 			if with_signals:
-				for cell in horizontal: game.tracks[cell] = false
-				for cell in vertical: game.tracks[cell] = true
-				game.tracks[Vector2i(12, 8)] = "cross_0_2"
 				game.track_signals = {Vector2i(11, 8): "auto", Vector2i(13, 8): "auto", Vector2i(12, 7): "auto", Vector2i(12, 9): "auto"}
 			game.route_cells = horizontal
 			game.route_path = Router.make_path(horizontal, 32)

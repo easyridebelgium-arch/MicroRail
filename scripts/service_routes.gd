@@ -1,5 +1,6 @@
 extends RefCounted
 
+const WaypointRouter = preload("res://scripts/waypoint_router.gd")
 const Router = preload("res://scripts/rail_router.gd")
 const STATIONS: Dictionary = {
 	"a": {"name": "Station A", "cell": Vector2i(4, 8)},
@@ -9,8 +10,8 @@ const STATIONS: Dictionary = {
 
 static func defaults() -> Dictionary:
 	return {
-		"passenger": {"name": "Passenger Shuttle", "stops": ["a", "b"]},
-		"freight": {"name": "Timber Service", "stops": ["forest", "terminal"]},
+		"passenger": {"name": "Passenger Shuttle", "stops": ["a", "b"], "waypoints": {}},
+		"freight": {"name": "Timber Service", "stops": ["forest", "terminal"], "waypoints": {}},
 	}
 
 static func is_valid(value: Variant) -> bool:
@@ -33,9 +34,10 @@ static func is_valid(value: Variant) -> bool:
 		if not stop is String or not STATIONS.has(stop) or seen.has(stop):
 			return false
 		seen[stop] = true
-	return value["freight"]["stops"] == ["forest", "terminal"]
+	if value["freight"]["stops"] != ["forest", "terminal"]: return false
+	return valid_waypoints(value["passenger"]) and valid_waypoints(value["freight"])
 
-static func build(tracks: Dictionary, stops: Array, tile_size: float) -> Dictionary:
+static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}) -> Dictionary:
 	var cells: Array[Vector2i] = []
 	var path := Curve2D.new()
 	path.bake_interval = 1.0
@@ -43,9 +45,9 @@ static func build(tracks: Dictionary, stops: Array, tile_size: float) -> Diction
 	for index in range(stops.size() - 1):
 		var from_stop: Dictionary = STATIONS[stops[index]]
 		var to_stop: Dictionary = STATIONS[stops[index + 1]]
-		var leg: Array[Vector2i] = Router.find_route(tracks, from_stop["cell"], to_stop["cell"])
+		var leg: Array[Vector2i] = WaypointRouter.find_route(tracks, from_stop["cell"], to_stop["cell"], waypoints.get(leg_key(stops, index), []))
 		if leg.is_empty():
-			return {"cells": [], "path": Curve2D.new(), "distances": [], "error": "Missing track: %s → %s" % [from_stop["name"], to_stop["name"]]}
+			return {"cells": [], "path": Curve2D.new(), "distances": [], "error": "Missing track or waypoint path: %s → %s" % [from_stop["name"], to_stop["name"]]}
 		for cell in leg:
 			if cells.is_empty() or cells.back() != cell:
 				cells.append(cell)
@@ -57,3 +59,44 @@ static func build(tracks: Dictionary, stops: Array, tile_size: float) -> Diction
 				path.add_point(point)
 		distances.append(path.get_baked_length())
 	return {"cells": cells, "path": path, "distances": distances, "error": ""}
+
+
+static func leg_key(stops: Array, index: int) -> String:
+	return "%s>%s" % [stops[index], stops[index + 1]]
+
+static func valid_waypoints(service: Dictionary) -> bool:
+	var directives: Variant = service.get("waypoints", {})
+	if not directives is Dictionary: return false
+	var legs: Array[String] = []
+	for index in range(service["stops"].size() - 1): legs.append(leg_key(service["stops"], index))
+	for key in directives:
+		if not key is String or not legs.has(key) or not directives[key] is Array or directives[key].size() > 16: return false
+		var seen: Dictionary = {}
+		for point in directives[key]:
+			if not point is Array or point.size() != 2: return false
+			for number in point:
+				if typeof(number) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(number)) or float(number) != floor(float(number)): return false
+			if point[0] < 0 or point[0] >= 80 or point[1] < 0 or point[1] >= 50: return false
+			var cell := Vector2i(int(point[0]), int(point[1]))
+			if seen.has(cell) or cell in [Vector2i(4, 8), Vector2i(20, 8), Vector2i(36, 8), Vector2i(8, 24), Vector2i(28, 24)]: return false
+			seen[cell] = true
+	return true
+
+
+static func waypoints_in_order(cells: Array[Vector2i], points: Array) -> bool:
+	var progress := 0
+	for cell in cells:
+		if progress < points.size() and cell == Vector2i(int(points[progress][0]), int(points[progress][1])): progress += 1
+	return progress == points.size()
+
+
+static func from_save(value: Dictionary) -> Dictionary:
+	var result := value.duplicate(true)
+	for service in ["passenger", "freight"]:
+		var directives: Dictionary = result[service].get("waypoints", {})
+		for leg in directives:
+			var normalized: Array = []
+			for point in directives[leg]: normalized.append([int(point[0]), int(point[1])])
+			directives[leg] = normalized
+		result[service]["waypoints"] = directives
+	return result

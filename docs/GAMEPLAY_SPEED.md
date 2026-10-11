@@ -8,8 +8,8 @@ current bindings. Management dialogs and text entry suppress speed shortcuts.
 
 Pause stays independent: selecting a speed while paused does not resume the game.
 Space resumes at the chosen speed. Starting the application defaults to 1×;
-loading a save keeps the current session's selection. Speed is UI state, so the
-save schema remains v19.
+loading a save keeps the current session's selection. Speed is UI state and adds no save fields. The current v20 schema adds waypoint
+directives; loading keeps the session speed.
 
 Trains, reservations, signals, station waits, production, income, running costs and
 deadlock confirmation all advance with simulation time. Camera motion, interface

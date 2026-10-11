@@ -8,10 +8,16 @@ func _init(costs: Dictionary = {"track": 10, "refund": 5, "switch": 100}) -> voi
 
 var before: Dictionary = {}
 var changes: Dictionary = {}
+var signal_before: Dictionary = {}
+var signal_changes: Dictionary = {}
+var signal_track_before: Dictionary = {}
 
 func clear() -> void:
 	before.clear()
 	changes.clear()
+	signal_before.clear()
+	signal_changes.clear()
+	signal_track_before.clear()
 
 func stage(updates: Dictionary, live: Dictionary) -> void:
 	for cell in updates:
@@ -20,6 +26,27 @@ func stage(updates: Dictionary, live: Dictionary) -> void:
 			changes.erase(cell)
 			before.erase(cell)
 		else: changes[cell] = updates[cell]
+
+func is_empty() -> bool:
+	return changes.is_empty() and signal_changes.is_empty()
+
+func stage_signals(updates: Dictionary, live: Dictionary, tracks: Dictionary) -> void:
+	for cell in updates:
+		if not signal_before.has(cell):
+			signal_before[cell] = live.get(cell)
+			signal_track_before[cell] = tracks.get(cell)
+		if _same(updates[cell], signal_before[cell]):
+			signal_changes.erase(cell)
+			signal_before.erase(cell)
+			signal_track_before.erase(cell)
+		else: signal_changes[cell] = updates[cell]
+
+func projected_signals(live: Dictionary) -> Dictionary:
+	var result := live.duplicate()
+	for cell in signal_changes:
+		if signal_changes[cell] == null: result.erase(cell)
+		else: result[cell] = signal_changes[cell]
+	return result
 
 func projected(live: Dictionary) -> Dictionary:
 	var result := live.duplicate()
@@ -41,22 +68,29 @@ func quote() -> Dictionary:
 	return {"cost": cost, "refund": refund, "net": cost - refund}
 
 func validate(live: Dictionary, owners: Dictionary, signals: Dictionary, size: Vector2i, protected: Callable, money: int) -> String:
-	if changes.is_empty(): return "The plan is empty."
+	if is_empty(): return "The plan is empty."
+	var proposed_signals := projected_signals(signals)
 	for cell in changes:
 		if cell.x < 0 or cell.y < 0 or cell.x >= size.x or cell.y >= size.y: return "Plan goes outside the map."
 		if not _same(live.get(cell), before[cell]): return "Track changed at %d,%d since drafting. Discard and redraw the plan." % [cell.x, cell.y]
 		if protected.call(cell): return "Platforms and facility grounds cannot be changed."
 		if owners.has(cell): return "Track %d,%d is reserved by train #%d; let it clear before applying." % [cell.x, cell.y, int(owners[cell])]
 		if changes[cell] != null and Geometry.connections(changes[cell]).size() < 2: return "Invalid track geometry."
-		if signals.has(cell) and changes[cell] != null and not Geometry.is_straight(changes[cell]): return "Remove the signal before changing its track geometry."
+		if proposed_signals.has(cell) and changes[cell] != null and not Geometry.is_straight(changes[cell]): return "Remove the signal before changing its track geometry."
 	var proposed := projected(live)
+	for cell in signal_changes:
+		if cell.x < 0 or cell.y < 0 or cell.x >= size.x or cell.y >= size.y or protected.call(cell): return "Signals cannot be placed outside the map or on platforms/grounds."
+		if not _same(live.get(cell), signal_track_before[cell]): return "Signal track changed at %d,%d since drafting." % [cell.x, cell.y]
+		if not _same(signals.get(cell), signal_before[cell]): return "Signal changed at %d,%d since drafting." % [cell.x, cell.y]
+		if owners.has(cell): return "Signal track %d,%d is reserved by train #%d." % [cell.x, cell.y, int(owners[cell])]
+		if signal_changes[cell] != null and (signal_changes[cell] not in ["auto", "stop"] or not proposed.has(cell) or not Geometry.is_straight(proposed[cell])): return "Planned signals need straight track."
 	for cell in proposed:
 		for port in Geometry.connections(proposed[cell]):
 			if port.x == 0 or port.y == 0: continue
 			var a: Vector2i = cell + Vector2i(port.x, 0)
 			var b: Vector2i = cell + Vector2i(0, port.y)
 			if (proposed.has(a) and Geometry.connections(proposed[a]).has(Vector2i(-port.x, port.y))) or (proposed.has(b) and Geometry.connections(proposed[b]).has(Vector2i(port.x, -port.y))): return "Diagonal tracks cannot cross at a tile corner."
-	if quote().net > money: return "Insufficient funds: plan needs £%d, available £%d." % [quote().net, money]
+	if quote().net > 0 and quote().net > money: return "Insufficient funds: plan needs £%d, available £%d." % [quote().net, money]
 	return ""
 
 static func _same(a: Variant, b: Variant) -> bool:

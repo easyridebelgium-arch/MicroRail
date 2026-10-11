@@ -32,6 +32,10 @@ a newly drafted tile cancels its cost and gives no refund. Each new tile is char
 once; switches include their normal surcharge. Real removals use the normal track
 refund and switch-to-straight conversions use the normal switch refund.
 
+Signal clicks also stage their automatic/stop/remove cycle while drafting.
+[Corridor controls](CORRIDOR_SIGNALS.md) stage spaced signals or remove a batch;
+these can be applied together with track edits.
+
 Drafts are session-only. Apply or discard before saving; a successful load clears
 any old draft. Blueprint storage and additional corridor tools are separate steps.
 

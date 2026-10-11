@@ -4,6 +4,11 @@ signal changed
 signal planning_changed(enabled: bool)
 signal apply_plan
 signal discard_plan
+signal pick_corridor(which: int)
+signal draft_corridor
+var corridor_label: Label
+var corridor_spacing: SpinBox
+var corridor_mode: OptionButton
 var plan_toggle: CheckButton
 var plan_summary: Label
 var plan_controls: VBoxContainer
@@ -54,6 +59,32 @@ func _ready() -> void:
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(emit_signal.bind(entry[1]))
 		actions.add_child(button)
+	corridor_label = Label.new()
+	corridor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	plan_controls.add_child(corridor_label)
+	var endpoints := HFlowContainer.new()
+	plan_controls.add_child(endpoints)
+	for which in [1, 2]:
+		var pick := Button.new()
+		pick.text = "Pick start" if which == 1 else "Pick end"
+		pick.focus_mode = Control.FOCUS_NONE
+		pick.pressed.connect(func() -> void: pick_corridor.emit(which))
+		endpoints.add_child(pick)
+	corridor_spacing = SpinBox.new()
+	corridor_spacing.min_value = 3
+	corridor_spacing.max_value = 30
+	corridor_spacing.value = 5
+	corridor_spacing.prefix = "Spacing"
+	corridor_spacing.suffix = "tiles"
+	plan_controls.add_child(corridor_spacing)
+	corridor_mode = OptionButton.new()
+	for text in ["Automatic signals", "Manual stop signals", "Remove all corridor signals"]: corridor_mode.add_item(text)
+	plan_controls.add_child(corridor_mode)
+	var stage := Button.new()
+	stage.text = "Draft corridor signals"
+	stage.focus_mode = Control.FOCUS_NONE
+	stage.pressed.connect(func() -> void: draft_corridor.emit())
+	plan_controls.add_child(stage)
 	selector = OptionButton.new()
 	selector.fit_to_longest_item = false
 	selector.custom_minimum_size.x = 260

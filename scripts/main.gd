@@ -32,6 +32,12 @@ var traffic_wait_samples: Dictionary = {}
 var problems_dialog: ConfirmationDialog
 var problems_button: Button
 
+const SignalCorridor = preload("res://scripts/core/signal_corridor.gd")
+var corridor_pick := 0
+var corridor_start := Vector2i(-1, -1)
+var corridor_end := Vector2i(-1, -1)
+var corridor_cells: Array[Vector2i] = []
+
 const ConstructionPlan = preload("res://scripts/core/construction_plan.gd")
 var construction_plan = ConstructionPlan.new({"track": TRACK_BUILD_COST, "refund": TRACK_REFUND, "switch": SWITCH_COST})
 var planning_mode := false
@@ -410,6 +416,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed(InputActions.CANCEL):
+		corridor_pick = 0
 		is_dragging = false
 		demolition_cells.clear()
 		demolition_blocked.clear()
@@ -431,6 +438,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var cell: Vector2i = _mouse_to_cell()
 
 		if event.is_action_pressed(InputActions.BUILD):
+			if corridor_pick > 0:
+				_pick_corridor_cell(cell)
+				return
 			# Left-click cancels an active demolition gesture.
 			if is_dragging and demolition_mode:
 				is_dragging = false
@@ -1147,7 +1157,7 @@ func _get_preview_cost() -> int:
 
 
 func _save_game() -> void:
-	if not construction_plan.changes.is_empty():
+	if not construction_plan.is_empty():
 		_show_notice("Apply or discard the construction draft before saving.")
 		return
 	if is_dragging:
@@ -1603,6 +1613,8 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	event_log.restore_state(data["sim"]["events"])
 	notifications.reset()
 	construction_plan.clear()
+	corridor_pick = 0
+	corridor_cells.clear()
 	planning_mode = false
 	inspection_panel.plan_toggle.set_pressed_no_signal(false)
 	traffic_metrics.reset()
@@ -2501,7 +2513,7 @@ func _remove_track_with_history(cell: Vector2i) -> void:
 	queue_redraw()
 
 func _undo_construction() -> void:
-	if planning_mode and not construction_plan.changes.is_empty():
+	if planning_mode and not construction_plan.is_empty():
 		_show_notice("Apply or discard the draft before Undo.")
 		return
 	if not paused:
@@ -2524,7 +2536,7 @@ func _undo_construction() -> void:
 
 
 func _redo_construction() -> void:
-	if planning_mode and not construction_plan.changes.is_empty():
+	if planning_mode and not construction_plan.is_empty():
 		_show_notice("Apply or discard the draft before Redo.")
 		return
 	if not paused:
@@ -2579,6 +2591,10 @@ func _apply_construction_history(
 
 	var signal_target: Dictionary = change.get("signals_before" if undo else "signals_after", {})
 	var signal_expected: Dictionary = change.get("signals_after" if undo else "signals_before", {})
+	for cell in signal_target:
+		if reservations.owners.has(cell):
+			_show_notice("Cannot undo/redo a signal on reserved track.")
+			return false
 	for cell in signal_expected:
 		if track_signals.get(cell) != signal_expected[cell]:
 			_show_notice("Signal changed since this edit; Undo/Redo cannot overwrite it.")
@@ -3893,7 +3909,11 @@ func _setup_signal_tool() -> void:
 
 func _use_signal_tool(cell: Vector2i) -> void:
 	if planning_mode:
-		_show_notice("Apply or discard the draft before editing signals.")
+		var working: Dictionary = construction_plan.projected(tracks)
+		if _plan_protected(cell) or not working.has(cell) or not TrackGeometry.is_straight(working[cell]): return
+		var signs: Dictionary = construction_plan.projected_signals(track_signals)
+		var mode: Variant = "auto" if not signs.has(cell) else "stop" if signs[cell] == "auto" else null
+		construction_plan.stage_signals({cell: mode}, track_signals, tracks)
 		return
 	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
 		_show_notice("Place a signal on straight track outside station platforms.")
@@ -4147,6 +4167,10 @@ func _setup_inspection() -> void:
 	inspection_panel.planning_changed.connect(_set_planning_mode)
 	inspection_panel.apply_plan.connect(_apply_draft)
 	inspection_panel.discard_plan.connect(_discard_draft)
+	inspection_panel.pick_corridor.connect(func(which: int) -> void:
+		corridor_pick = which
+		_show_notice("Click track to choose corridor %s." % ("start" if which == 1 else "end")))
+	inspection_panel.draft_corridor.connect(_draft_corridor_signals)
 	inspection_button = Button.new()
 	inspection_button.text = "Overlays"
 	inspection_button.toggle_mode = true
@@ -4166,6 +4190,15 @@ func _update_inspection() -> void:
 		else:
 			changes.merge(build_plan.get("changes", {}), true)
 	construction_feedback = construction_analyzer.analyze(tracks, changes, trains, reservations.owners, float(TILE_SIZE)) if not changes.is_empty() else {"affected": [], "blocked": {}}
+	if planning_mode:
+		for cell in construction_plan.signal_changes:
+			if reservations.owners.has(cell): construction_feedback.blocked[cell] = reservations.owners[cell]
+		for train in trains:
+			var touched := false
+			for cell in train.cells:
+				if construction_plan.signal_changes.has(cell): touched = true
+			if touched and construction_feedback.affected.filter(func(row: Dictionary) -> bool: return row.id == train.id).is_empty():
+				construction_feedback.affected.append({"key": train.key, "id": train.id, "name": train.name, "effect": "Signal authority changes on this route; inspect block boundaries"})
 	if is_dragging and demolition_mode:
 		for cell in demolition_blocked:
 			if reservations.owners.has(cell): construction_feedback.blocked[cell] = reservations.owners[cell]
@@ -4174,7 +4207,8 @@ func _update_inspection() -> void:
 	if planning_mode:
 		var quote: Dictionary = construction_plan.quote()
 		var error: String = construction_plan.validate(tracks, reservations.owners, track_signals, Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected, money)
-		inspection_panel.plan_summary.text = "Draft: %d tiles\nBuild £%d | Refund £%d | Net £%d\n%s" % [construction_plan.changes.size(), quote.cost, quote.refund, quote.net, "Ready to apply as one action." if error.is_empty() else error]
+		inspection_panel.plan_summary.text = "Draft: %d tracks / %d signals\nBuild £%d | Refund £%d | Net £%d\n%s" % [construction_plan.changes.size(), construction_plan.signal_changes.size(), quote.cost, quote.refund, quote.net, "Ready to apply as one action." if error.is_empty() else error]
+	inspection_panel.corridor_label.text = "Signal corridor: %s → %s\n%d selected route tiles" % [str(corridor_start), str(corridor_end), corridor_cells.size()]
 	var lines: PackedStringArray = ["Paths: retained train routes; gaps remain visible. Squares mark route origins; circles mark the next destination. Labels use permanent train IDs.", "Reservations: use the toolbar toggle for hatched ownership."]
 	if inspection_panel.blocks:
 		lines.append("Blocks: dotted outlines, B = block ID. Authority includes reservations; it does not mean every tile is occupied.")
@@ -4190,7 +4224,7 @@ func _update_inspection() -> void:
 		var ids: PackedStringArray = []
 		for id in block_signals.block_owners.get(block, {}): ids.append("#%d" % int(id))
 		lines.append("Block B%d authority: %s" % [block, ", ".join(ids) if not ids.is_empty() else "none"])
-	if is_dragging or (planning_mode and not construction_plan.changes.is_empty()):
+	if is_dragging or (planning_mode and not construction_plan.is_empty()):
 		lines.append("Preview only; traffic may change before release.")
 		for affected in construction_feedback.affected:
 			lines.append("#%d %s: %s" % [affected.id, affected.name, affected.effect])
@@ -4347,7 +4381,7 @@ func _plan_protected(cell: Vector2i) -> bool:
 	return _is_station_space(cell) or cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
 
 func _set_planning_mode(enabled: bool) -> void:
-	if not enabled and not construction_plan.changes.is_empty():
+	if not enabled and not construction_plan.is_empty():
 		inspection_panel.plan_toggle.set_pressed_no_signal(true)
 		_show_notice("Apply or discard the draft before leaving planning mode.")
 		return
@@ -4364,6 +4398,8 @@ func _set_planning_mode(enabled: bool) -> void:
 	queue_redraw()
 
 func _discard_draft() -> void:
+	corridor_pick = 0
+	corridor_cells.clear()
 	construction_plan.clear()
 	is_dragging = false
 	build_plan.clear()
@@ -4386,6 +4422,11 @@ func _apply_draft() -> bool:
 	for cell in after:
 		signals_before[cell] = track_signals.get(cell)
 		signals_after[cell] = track_signals.get(cell) if after[cell] != null and TrackGeometry.is_straight(after[cell]) else null
+	signals_before.merge(construction_plan.signal_before, true)
+	signals_after.merge(construction_plan.signal_changes, true)
+	for cell in signals_after:
+		if signals_after[cell] == null: track_signals.erase(cell)
+		else: track_signals[cell] = signals_after[cell]
 	for cell in after:
 		if after[cell] == null: tracks.erase(cell)
 		else: tracks[cell] = after[cell]
@@ -4394,16 +4435,21 @@ func _apply_draft() -> bool:
 	_record_construction_change(before, after, -int(quote.net), int(quote.cost))
 	construction_undo.back()["signals_before"] = signals_before
 	construction_undo.back()["signals_after"] = signals_after
-	_record_event(EventLog.TRACK_BUILT, "player", {"tiles": after.size(), "cost": quote.cost, "refund": quote.refund, "plan": true})
+	_record_event(EventLog.CONSTRUCTION_APPLIED, "player", {"tracks": after.size(), "signals": signals_after.size(), "cost": quote.cost, "refund": quote.refund})
 	construction_plan.clear()
 	_check_route()
-	_show_notice("Applied %d planned edits; net cost £%d. Undo treats the plan as one action." % [after.size(), quote.net])
+	_show_notice("Applied %d tracks and %d signals; net cost £%d. Undo treats the plan as one action." % [after.size(), signals_after.size(), quote.net])
 	_update_toolbar()
 	queue_redraw()
 	return true
 
 func _draw_construction_draft() -> void:
 	if not planning_mode: return
+	for cell in corridor_cells:
+		draw_rect(Rect2(Vector2(cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE).grow(-2), Color.WHITE, false, 1.0)
+	for cell in construction_plan.signal_changes:
+		var mode: Variant = construction_plan.signal_changes[cell]
+		draw_string(ThemeDB.fallback_font, _cell_center(cell) + Vector2(-8, -16), "P×" if mode == null else "PA" if mode == "auto" else "PS", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 	for cell in construction_plan.changes:
 		var tile: Variant = construction_plan.changes[cell]
 		var center := _cell_center(cell)
@@ -4412,3 +4458,29 @@ func _draw_construction_draft() -> void:
 			draw_line(center - Vector2(10, 10), center + Vector2(10, 10), Color.WHITE, 2.0)
 			draw_line(center - Vector2(10, -10), center + Vector2(10, -10), Color.WHITE, 2.0)
 		draw_string(ThemeDB.fallback_font, center + Vector2(-13, -8), "P", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
+
+
+func _pick_corridor_cell(cell: Vector2i) -> void:
+	var working: Dictionary = construction_plan.projected(tracks)
+	if not working.has(cell):
+		_show_notice("Choose existing or drafted track for the corridor endpoint.")
+		return
+	if corridor_pick == 1: corridor_start = cell
+	else: corridor_end = cell
+	corridor_pick = 0
+	corridor_cells = RailRouter.find_route(working, corridor_start, corridor_end)
+	queue_redraw()
+
+func _draft_corridor_signals() -> bool:
+	if not planning_mode: return false
+	var working: Dictionary = construction_plan.projected(tracks)
+	var modes: Array[String] = ["auto", "stop", ""]
+	var result: Dictionary = SignalCorridor.plan(working, corridor_start, corridor_end, int(inspection_panel.corridor_spacing.value), modes[inspection_panel.corridor_mode.selected], _plan_protected)
+	if not result.error.is_empty():
+		_show_notice(result.error)
+		return false
+	corridor_cells.assign(result.cells)
+	construction_plan.stage_signals(result.updates, track_signals, tracks)
+	_show_notice("Corridor signals drafted; inspect block boundaries before Apply plan.")
+	queue_redraw()
+	return true

@@ -24,6 +24,8 @@ const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const ServiceRoutes = preload("res://scripts/service_routes.gd")
 const RouteEditor = preload("res://scripts/route_editor.gd")
+const Fleet = preload("res://scripts/fleet.gd")
+const FleetEditor = preload("res://scripts/fleet_editor.gd")
 
 const TRAIN_SPEED: float = 80.0
 const STATION_WAIT: float = 2.0
@@ -37,6 +39,7 @@ const SAVE_FIELDS: Array[String] = [
 	"money",
 	"total_operating_cost",
 	"total_construction_cost",
+	"total_vehicle_cost",
 	"waiting_at_a",
 	"waiting_at_b",
 	"waiting_at_c",
@@ -82,7 +85,7 @@ const LOGS_PER_BATCH: int = 5
 const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
-const SAVE_VERSION: int = 14
+const SAVE_VERSION: int = 15
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const TOOLBAR_ICON_SHEET = preload("res://assets/ui/icons/toolbar.svg")
 const NetworkMap = preload("res://scripts/network_map.gd")
@@ -110,6 +113,10 @@ var waiting_at_c: int = 8
 var passenger_stop_index: int = 0
 var stop_distances: Array[float] = []
 var services: Dictionary = ServiceRoutes.defaults()
+var fleet: Dictionary = Fleet.defaults()
+var fleet_editor: FleetEditor
+var fleet_button: Button
+var total_vehicle_cost: int = 0
 var route_editor: RouteEditor
 var routes_button: Button
 var passenger_route_error: String = "No connected passenger route"
@@ -210,6 +217,8 @@ func _ready() -> void:
 	_setup_network_map()
 	_setup_objective_panel()
 	_setup_routes_editor()
+	_setup_fleet_editor()
+	_apply_fleet_specs()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
 
@@ -244,7 +253,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	
 func _unhandled_input(event: InputEvent) -> void:
-	if route_editor != null and route_editor.visible:
+	if _management_window_is_open():
 		return
 	if event is InputEventKey:
 		if event.pressed and not event.echo:
@@ -464,13 +473,14 @@ func _update_instructions() -> void:
 			_get_train_capacity(),
 			passengers_delivered
 		]
-		+ "\nBalance: £%d | Fares: £%d | Freight: £%d | Build: £%d | Running: £%d"
+		+ "\nBalance: £%d | Fares: £%d | Freight: £%d | Build: £%d | Running: £%d | Fleet: £%d"
 		% [
 			money,
 			passengers_delivered * TICKET_PRICE,
 			freight_income,
 			total_construction_cost,
-			total_operating_cost + freight_operating_cost
+			total_operating_cost + freight_operating_cost,
+			total_vehicle_cost
 		]
 	)
 
@@ -685,8 +695,9 @@ func _charge_operating_cost(delta: float) -> void:
 
 	while operating_timer >= 1.0:
 		operating_timer -= 1.0
-		money -= OPERATING_COST_PER_SECOND
-		total_operating_cost += OPERATING_COST_PER_SECOND
+		var cost: int = int(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["running_cost"])
+		money -= cost
+		total_operating_cost += cost
 
 
 func _show_notice(message: String) -> void:
@@ -704,6 +715,7 @@ func _save_game() -> void:
 		_show_notice("Finish or cancel track placement before saving.")
 		return
 
+	_sync_fleet_upgrades()
 	var saved_tracks: Array = []
 
 	for cell in tracks:
@@ -725,7 +737,8 @@ func _save_game() -> void:
 		"state": state,
 		"freight": freight_train.save_state(),
 		"scenario_stage": scenario_goals.current_index,
-		"services": services.duplicate(true)
+		"services": services.duplicate(true),
+		"fleet": fleet.duplicate(true)
 	}
 
 	# Prepare the new save before touching the existing one.
@@ -776,7 +789,7 @@ func _is_valid_number(value: Variant) -> bool:
 
 
 func _is_valid_save(data: Dictionary) -> bool:
-	if not ServiceRoutes.is_valid(data.get("services")):
+	if not ServiceRoutes.is_valid(data.get("services")) or not Fleet.is_valid(data.get("fleet")):
 		return false
 	var saved_version: Variant = data.get("version")
 
@@ -859,10 +872,14 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if saved_speed_level < 0 or saved_speed_level > MAX_SPEED_LEVEL:
 		return false
 
-	var saved_capacity: int = (
-		TRAIN_CAPACITY
-		+ saved_capacity_level * CAPACITY_PER_UPGRADE
-	)
+	var saved_passenger: Dictionary = Fleet.assigned(data["fleet"], "passenger")
+	var saved_freight: Dictionary = Fleet.assigned(data["fleet"], "freight")
+	if int(saved_passenger["capacity_level"]) != saved_capacity_level or int(saved_passenger["speed_level"]) != saved_speed_level:
+		return false
+	for field in ["capacity_level", "speed_level"]:
+		if not _is_valid_number(data["freight"].get(field)) or float(data["freight"][field]) != float(saved_freight[field]):
+			return false
+	var saved_capacity: int = Fleet.capacity(saved_passenger)
 
 	if float(state["passengers_on_train"]) > saved_capacity:
 		return false
@@ -995,12 +1012,14 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 			return
 	var loaded_freight_cells: Array[Vector2i] = _find_freight_route(loaded_tracks, loaded_cells)
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
-	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length()):
+	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"])):
 		_show_notice("Saved freight train state is invalid.")
 		return
 	# Commit only after validating every service and train.
 	tracks = loaded_tracks
 	services = data["services"].duplicate(true)
+	fleet = Fleet.from_save(data["fleet"])
+	_apply_fleet_specs()
 	route_cells = loaded_cells
 	route_path = loaded_path
 	stop_distances.assign(built["distances"])
@@ -1127,7 +1146,7 @@ func _update_toolbar() -> void:
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
-	if route_editor != null and route_editor.visible:
+	if _management_window_is_open():
 		return
 	if event is InputEventMouseButton:
 		# Release the middle button anywhere to stop panning.
@@ -1370,7 +1389,7 @@ func _update_station_inspector() -> void:
 		"Route: %s"
 		+ "\n\nWaiting passengers: %d"
 		+ "\nIncoming passengers: %d"
-		+ "\n\nShared train"
+		+ "\n\nTrain: %s"
 		+ "\nCapacity: %d passengers (%d/%d)"
 		+ "\nSpeed: %.0f px/s (%d/%d)"
 		+ "\n\n%s"
@@ -1378,6 +1397,7 @@ func _update_station_inspector() -> void:
 		destination_name,
 		waiting,
 		incoming,
+		Fleet.assigned(fleet, "passenger")["name"],
 		_get_train_capacity(),
 		capacity_upgrade_level,
 		MAX_CAPACITY_LEVEL,
@@ -1456,11 +1476,11 @@ func _remove_station_space_tracks(track_data: Dictionary) -> int:
 
 	return removed_count
 func _get_train_capacity() -> int:
-	return TRAIN_CAPACITY + capacity_upgrade_level * CAPACITY_PER_UPGRADE
+	return int(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["capacity"]) + capacity_upgrade_level * CAPACITY_PER_UPGRADE
 
 
 func _get_train_speed() -> float:
-	return TRAIN_SPEED + speed_upgrade_level * SPEED_PER_UPGRADE
+	return float(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["speed"]) + speed_upgrade_level * SPEED_PER_UPGRADE
 
 func _get_capacity_upgrade_price() -> int:
 	return BASE_CAPACITY_UPGRADE_PRICE * (capacity_upgrade_level + 1)
@@ -1490,6 +1510,8 @@ func _upgrade_capacity() -> void:
 
 	money -= price
 	capacity_upgrade_level += 1
+	total_vehicle_cost += price
+	_sync_fleet_upgrades()
 
 	_show_notice(
 		"Capacity upgraded to %d passengers." % _get_train_capacity()
@@ -1518,6 +1540,8 @@ func _upgrade_speed() -> void:
 
 	money -= price
 	speed_upgrade_level += 1
+	total_vehicle_cost += price
+	_sync_fleet_upgrades()
 
 	_show_notice(
 		"Speed upgraded to %.0f pixels/second." % _get_train_speed()
@@ -1568,7 +1592,7 @@ func _update_freight_inspector() -> void:
 
 	if rule_index >= 0:
 		freight_rule_option.select(rule_index)
-	var train_status: String = services["freight"]["name"] + " — " + freight_train.status_text()
+	var train_status: String = services["freight"]["name"] + " / " + Fleet.assigned(fleet, "freight")["name"] + " — " + freight_train.status_text()
 
 	if paused:
 		train_status = "Paused — " + train_status
@@ -1623,7 +1647,7 @@ func _update_freight_inspector() -> void:
 			operating_profit,
 			freight_train.cargo,
 			freight_train.get_capacity(),
-			FreightTrain.OPERATING_COST_PER_SECOND,
+			freight_train.running_cost_per_second,
 			train_status
 		]
 		station_details.text += (
@@ -1664,7 +1688,7 @@ func _add_camera_key(action: StringName, physical_key: Key) -> void:
 
 
 func _move_camera_with_keyboard(delta: float) -> void:
-	if route_editor != null and route_editor.visible:
+	if _management_window_is_open():
 		return
 	# Avoid shifting an unfinished construction preview.
 	if is_dragging or is_panning:
@@ -1771,6 +1795,8 @@ func _upgrade_freight_capacity() -> void:
 
 	money -= price
 	freight_train.capacity_level += 1
+	total_vehicle_cost += price
+	_sync_fleet_upgrades()
 
 	_show_notice(
 		"Freight capacity increased to %d logs."
@@ -1797,6 +1823,8 @@ func _upgrade_freight_speed() -> void:
 
 	money -= price
 	freight_train.speed_level += 1
+	total_vehicle_cost += price
+	_sync_fleet_upgrades()
 
 	_show_notice(
 		"Freight speed increased to %.0f pixels/second."
@@ -2662,3 +2690,155 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	_update_station_inspector()
 	queue_redraw()
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
+
+func _management_window_is_open() -> bool:
+	return (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible)
+
+func _setup_fleet_editor() -> void:
+	fleet_editor = FleetEditor.new()
+	fleet_editor.configure(self)
+	$Interface.add_child(fleet_editor)
+	fleet_button = Button.new()
+	fleet_button.text = "Fleet"
+	fleet_button.focus_mode = Control.FOCUS_NONE
+	fleet_button.tooltip_text = "Buy, name and assign individual trains"
+	fleet_button.pressed.connect(_open_fleet_editor)
+	$Interface/Toolbar.add_child(fleet_button)
+
+func _open_fleet_editor() -> void:
+	paused = true
+	is_dragging = false
+	is_panning = false
+	demolition_cells.clear()
+	build_plan.clear()
+	_close_station_inspector()
+	_update_toolbar()
+	fleet_editor.open_editor()
+
+func _sync_fleet_upgrades() -> void:
+	var passenger: Dictionary = Fleet.assigned(fleet, "passenger")
+	passenger["capacity_level"] = capacity_upgrade_level
+	passenger["speed_level"] = speed_upgrade_level
+	if freight_train != null:
+		var freight: Dictionary = Fleet.assigned(fleet, "freight")
+		freight["capacity_level"] = freight_train.capacity_level
+		freight["speed_level"] = freight_train.speed_level
+
+func _apply_fleet_specs() -> void:
+	var passenger: Dictionary = Fleet.assigned(fleet, "passenger")
+	capacity_upgrade_level = int(passenger["capacity_level"])
+	speed_upgrade_level = int(passenger["speed_level"])
+	var freight: Dictionary = Fleet.assigned(fleet, "freight")
+	var model: Dictionary = Fleet.MODELS[freight["model"]]
+	freight_train.base_capacity = int(model["capacity"])
+	freight_train.base_speed = float(model["speed"])
+	freight_train.running_cost_per_second = int(model["running_cost"])
+	freight_train.capacity_level = int(freight["capacity_level"])
+	freight_train.speed_level = int(freight["speed_level"])
+
+func buy_fleet_train(model_id: String) -> Dictionary:
+	if not paused:
+		return {"ok": false, "message": "Pause before buying trains."}
+	if not Fleet.MODELS.has(model_id):
+		return {"ok": false, "message": "Unknown train model."}
+	if fleet["trains"].size() >= Fleet.MAX_TRAINS:
+		return {"ok": false, "message": "The fleet is full."}
+	var model: Dictionary = Fleet.MODELS[model_id]
+	var price: int = int(model["price"])
+	if money < price:
+		return {"ok": false, "message": "Insufficient funds: this train costs £%d." % price}
+	var id: int = int(fleet["next_id"])
+	fleet["next_id"] = id + 1
+	fleet["trains"].append(Fleet.make_train(id, model_id))
+	money -= price
+	total_vehicle_cost += price
+	_update_instructions()
+	return {"ok": true, "id": id, "message": "Bought %s for £%d. It is stored until assigned." % [model["name"], price]}
+
+func rename_fleet_train(id: int, new_name: String) -> String:
+	if not paused:
+		return "Pause before editing the fleet."
+	var train: Dictionary = Fleet.find(fleet, id)
+	var cleaned: String = new_name.strip_edges()
+	if train.is_empty() or not Fleet.valid_name(cleaned):
+		return "Choose an existing train and a name of 1–40 characters."
+	train["name"] = cleaned
+	_update_station_inspector()
+	return "Train renamed."
+
+func _can_replace_service_train(service: String) -> bool:
+	if service == "passenger":
+		return route_distance <= 0.001 and travelling_to_b and passenger_stop_index == 0 and passengers_on_train == 0
+	if service == "freight":
+		return freight_train.distance_along_route <= 0.001 and freight_train.to_terminal and freight_train.cargo == 0
+	return false
+
+func assign_fleet_train(id: int, service: String) -> String:
+	if not paused:
+		return "Pause before assigning trains."
+	var train: Dictionary = Fleet.find(fleet, id)
+	if train.is_empty() or not service in ["passenger", "freight"]:
+		return "Choose a valid train and service."
+	if Fleet.MODELS[train["model"]]["kind"] != service:
+		return "This train cannot carry that service's passengers or cargo."
+	if train["service"] != "":
+		return "This train is already assigned."
+	if not _can_replace_service_train(service):
+		return "Withdraw the current train, close this window and resume until it is empty at its first stop. Then pause and assign the replacement."
+	_sync_fleet_upgrades()
+	var old_train: Dictionary = Fleet.assigned(fleet, service)
+	old_train["service"] = ""
+	train["service"] = service
+	_apply_fleet_specs()
+	if service == "passenger":
+		wait_remaining = 0.0
+		train_needs_boarding = true
+		passenger_service_enabled = true
+	else:
+		freight_train.dwell = 0.0
+		freight_train.service_enabled = true
+	_update_instructions()
+	_update_station_inspector()
+	return "%s assigned to %s. %s is now stored. Resume to run the new train." % [train["name"], services[service]["name"], old_train["name"]]
+
+func sell_fleet_train(id: int) -> String:
+	if not paused:
+		return "Pause before selling trains."
+	var train: Dictionary = Fleet.find(fleet, id)
+	if train.is_empty():
+		return "That train no longer exists."
+	if train["service"] != "":
+		return "Assign a replacement first; only stored trains can be sold."
+	var refund: int = Fleet.sale_price(train)
+	fleet["trains"].erase(train)
+	money += refund
+	total_vehicle_cost -= refund
+	_update_instructions()
+	return "Sold %s for £%d." % [train["name"], refund]
+
+func toggle_fleet_service(id: int) -> String:
+	if not paused:
+		return "Pause before editing the fleet."
+	var train: Dictionary = Fleet.find(fleet, id)
+	if train.is_empty() or train["service"] == "":
+		return "Assign this train before changing its service."
+	var service: String = train["service"]
+	var enabled: bool
+	if service == "passenger":
+		passenger_service_enabled = not passenger_service_enabled
+		enabled = passenger_service_enabled
+	else:
+		freight_train.service_enabled = not freight_train.service_enabled
+		enabled = freight_train.service_enabled
+	_update_station_inspector()
+	return "Service enabled. Close and resume to run." if enabled else "Withdrawal requested. Close and resume: the train will finish its round trip and stop at its first station."
+
+func fleet_train_status(id: int) -> String:
+	var train: Dictionary = Fleet.find(fleet, id)
+	if train.is_empty():
+		return "Unknown train"
+	if train["service"] == "":
+		return "Stored off-map — no running costs"
+	if train["service"] == "passenger":
+		return _passenger_service_status()
+	return services["freight"]["name"] + ": " + freight_train.status_text()

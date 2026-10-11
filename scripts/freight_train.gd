@@ -23,6 +23,9 @@ enum LoadingRule {
 	FULL
 }
 
+var base_capacity: int = CAPACITY
+var base_speed: float = SPEED
+var running_cost_per_second: int = OPERATING_COST_PER_SECOND
 var loading_rule: int = LoadingRule.ANY
 var home_position: Vector2 = Vector2.ZERO
 var cargo: int = 0
@@ -205,7 +208,7 @@ static func empty_state() -> Dictionary:
 	}
 
 
-static func is_valid_state(state: Dictionary, route_length: float) -> bool:
+static func is_valid_state(state: Dictionary, route_length: float, model_capacity: int = CAPACITY) -> bool:
 	if typeof(state.get("service_enabled")) != TYPE_BOOL:
 		return false
 	if typeof(state.get("to_terminal")) != TYPE_BOOL:
@@ -252,7 +255,7 @@ static func is_valid_state(state: Dictionary, route_length: float) -> bool:
 		return false
 
 	var saved_capacity: int = (
-		CAPACITY + int(saved_capacity_level) * CAPACITY_PER_UPGRADE
+		model_capacity + int(saved_capacity_level) * CAPACITY_PER_UPGRADE
 	)
 
 	if float(state["cargo"]) > saved_capacity:
@@ -279,7 +282,7 @@ func _charge_operating_expenses(delta: float) -> void:
 
 	while operating_timer >= 1.0:
 		operating_timer -= 1.0
-		operating_expense.emit(OPERATING_COST_PER_SECOND)
+		operating_expense.emit(running_cost_per_second)
 func get_minimum_load() -> int:
 	match loading_rule:
 		LoadingRule.HALF:
@@ -291,11 +294,11 @@ func get_minimum_load() -> int:
 		_:
 			return 1
 func get_capacity() -> int:
-	return CAPACITY + capacity_level * CAPACITY_PER_UPGRADE
+	return base_capacity + capacity_level * CAPACITY_PER_UPGRADE
 
 
 func get_speed() -> float:
-	return SPEED + speed_level * SPEED_PER_UPGRADE
+	return base_speed + speed_level * SPEED_PER_UPGRADE
 
 
 func get_capacity_upgrade_price() -> int:

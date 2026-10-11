@@ -2,7 +2,8 @@
 
 Use GitHub Desktop to select `codex/mouse-track-building`, Fetch origin, then
 Pull origin. Close Godot before pulling and reopen the existing project afterward.
-This update uses save version 14. Start a fresh game; older saves are not migrated.
+The current fleet update uses save version 15. Start a fresh game; older saves are
+not migrated. See [Fleet management](FLEET.md) for purchasing and assigning trains.
 
 ## Try a three-stop passenger service
 
@@ -24,7 +25,8 @@ Station C appears in the minimap and supports the existing station inspector.
 
 ## Editing behaviour
 
-- Each existing train has one named service. Purchasing more trains is a later step.
+- Each service has one assigned train. Use Fleet to buy spares and assign replacements;
+  multiple simultaneous trains on the same service remain a later step.
 - Passenger routes use two or three unique stations. Lists run as shuttles, not loops.
 - Renaming a route does not interrupt its train.
 - Applying a different stop order returns onboard passengers to their departure

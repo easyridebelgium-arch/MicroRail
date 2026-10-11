@@ -13,16 +13,20 @@ each system, with Godot and GDScript as the main development tools.
 - Passenger and log-freight services, production and delivery income.
 - Separate speed and capacity upgrades.
 - Named services and ordered passenger stops across Stations A, B and C.
+- A fleet roster with permanent train IDs, four purchasable models, individual
+  names, stored spares, replacement assignment, sales and per-train upgrades.
 - Station inspection, camera scrolling, minimap, introductory objectives and saves.
 
-These are prototype foundations. Named services do not yet include a purchasable
-fleet, individual passenger destinations, junction dispatching or shared-track safety.
+These are prototype foundations. The fleet currently assigns one train to each of
+the two services; spares remain off-map. Individual passenger destinations, multiple
+simultaneous trains per service, junction dispatching and shared-track safety are
+still planned. See [Fleet management](FLEET.md) for the implemented controls.
 
 ## Phase 1 — Routing, fleet control and readable feedback
 
 | Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
 | --- | --- | --- |
-| Train purchasing and route assignment | Buy additional trains and allocate capacity where demand is highest. Retain separate speed and capacity purchases. | Build a fleet model with persistent train identities; enable multiple trains on a shared track only once reservations and signals are ready. |
+| Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices and stored spares are implemented. Multiple trains on a shared track depend on reservations and signals. |
 | Train consists and rolling stock | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Extend the fleet model with vehicle composition, cargo compatibility and total train length. Account for platform and block lengths before running long consists. Introduce stock types as their passenger classes or cargo types become available. |
 | Junctions and switches | Build branching networks and share infrastructure between services. | Extend track connections and route selection beyond two-port pieces. |
 | Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Support safe waiting, junction conflicts and recovery from blocked routes. |
@@ -30,7 +34,7 @@ fleet, individual passenger destinations, junction dispatching or shared-track s
 | Waypoints and waypoint directives | Place lightweight markers or directional waypoints to force a train through a particular track without constructing a station. Allow routing directives associated with signals. | Extend ordered routes with pass-through instructions and direction constraints. Keep routing directives distinct from a signal's safety role: a directive must never override an occupied or reserved block. |
 | Passing loops and multiple platforms | Reduce bottlenecks and let faster services pass slower trains. | Depends on junctions, reservations and platform assignment. |
 | Route performance panel and company dashboard | Compare income, running costs, occupancy, waiting passengers and delays. Expand into historical graphs of profit, ridership, occupancy and punctuality per route and across the company. | Attribute costs and deliveries to services and individual trains. Start recording bounded historical data early; add delay statistics when timetables are introduced. |
-| Custom livery and individual train naming | Rename locomotives and select fleet colour palettes. | Use stable train identities and palette-friendly artwork; preserve readable service indicators. Service names already exist, individual train names do not. |
+| Custom livery | Add selectable fleet colour palettes to the existing individual train names. | Stable identities and train renaming are implemented. Palette-friendly artwork and readable service indicators remain to be added. |
 | Detailed station life and waiting passengers | Show tiny pixel-art passengers accumulating on platforms during delays and boarding when trains arrive. | Drive visuals from actual queues; cap or group sprites for performance without changing simulated passenger counts. |
 
 ## Phase 2 — Passenger demand, freight chains and growth
@@ -89,9 +93,9 @@ fleet, individual passenger destinations, junction dispatching or shared-track s
 
 ## Suggested next implementation
 
-Introduce the fleet data model and train assignment UI with room for vehicle
-consists, then junctions and block reservations before allowing multiple trains to
-share a line. Extend ordered routes with waypoint directives and dispatch priorities
+Build junctions and block reservations on the implemented fleet model and replacement
+assignment UI before allowing multiple trains to share a line. Preserve room for
+vehicle consists. Extend ordered routes with waypoint directives and dispatch priorities
 once alternate safe paths are available. Timetables then connect operations to
 passenger satisfaction and contract performance. Visual passenger queues, liveries,
 sound and spectator controls can develop alongside these systems. Add tutorial

@@ -75,8 +75,12 @@ copy them over the current scripts.
   saves tick-stamped commands, but build, demolish, purchase and route changes
   still act directly from input handlers. Moving them onto the queue (then adding
   a `commands` block to the save, version 17) is the remaining step for
-  command-at-tick determinism. Neither file has been run in Godot; run
-  `godot --headless --path . --script res://tests/test_command_queue.gd`.
+  command-at-tick determinism. `tests/test_command_queue.gd` passes (27 checks, Godot on the owner's machine,
+  11 Oct 2026).
+- **Open design question for the wiring:** construction and Undo/Redo work while
+  the game is paused, but a command queued for a future tick would wait until
+  the game resumes. Decide whether paused edits run immediately (and are logged
+  with the current tick) or the clock gets a single paused-edit step.
 
 - **Interface scale scales the whole view** (map and interface together), and
   stops at 150%. At 200% the header text and toolbar do not fit; they need

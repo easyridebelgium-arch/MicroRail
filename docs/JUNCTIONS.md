@@ -50,11 +50,14 @@ cannot change line.
 
 ## Still to do (in order)
 
-1. **A way to create switches.** Planned: a Switch tool that turns a straight
-   tile into a switch (click again to cycle the variants, and back to a
-   straight), through the command queue, with Undo/Redo and a cost. Crossings and
-   branching from the Connect/Draw tools come after.
-2. Switch changes recorded as a `SWITCH_THROWN` event; a manual toggle once there
+1. **Switch tool (written, not yet run).** The toolbar's Switch button turns a
+   straight tile into a switch (£100); each further click cycles the eight
+   variants (either end as the stem, the branch on any valid side) and the last
+   click removes it (refund £100). It goes through the command queue, records a
+   `SWITCH_CHANGED` event and supports paused Undo/Redo. Stem and through ports
+   never change, so routes stay valid. Crossings and branching from the
+   Connect/Draw tools come after.
+2. A manual toggle once there
    is something for it to control (reservations and signals).
 3. Trains set facing switches along their route and refuse to move a switch under
    a train (reservation check).

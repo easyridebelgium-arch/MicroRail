@@ -15,6 +15,7 @@ const TRAIN_ARRIVED: String = "train_arrived"
 const CARGO_DELIVERED: String = "cargo_delivered"
 const TRACK_BUILT: String = "track_built"
 const TRACK_DEMOLISHED: String = "track_demolished"
+const SWITCH_CHANGED: String = "switch_changed"
 const ROUTE_CHANGED: String = "route_changed"
 const OBJECTIVE_COMPLETED: String = "objective_completed"
 const UPGRADE_BOUGHT: String = "upgrade_bought"
@@ -121,6 +122,8 @@ static func summary(event: Dictionary) -> String:
 			return "Built %s tiles" % str(int(data.get("new_tiles", data.get("tiles", 0))))
 		TRACK_DEMOLISHED:
 			return "Removed %s tiles" % str(int(data.get("tiles", 0)))
+		SWITCH_CHANGED:
+			return "Switch %s" % str(data.get("change", "changed"))
 		ROUTE_CHANGED:
 			return "Passenger route updated"
 		OBJECTIVE_COMPLETED:

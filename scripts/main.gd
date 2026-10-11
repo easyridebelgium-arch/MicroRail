@@ -15,6 +15,7 @@ const TICKET_PRICE: int = 5
 const STARTING_BALANCE: int = 1000
 const TRACK_BUILD_COST: int = 10
 const TRACK_REFUND: int = 5
+const SWITCH_COST: int = 100
 const OPERATING_COST_PER_SECOND: int = 1
 
 # Station positions in grid coordinates.
@@ -181,6 +182,8 @@ var redo_button: Button
 var passenger_service_enabled: bool = true
 var service_button: Button
 var demolition_mode: bool = false
+var switch_tool_mode: bool = false
+var switch_button: Button
 var demolition_cells: Dictionary = {}
 var demolition_last_cell: Vector2i = Vector2i.ZERO
 var toolbar_icon_textures: Array[Texture2D] = []
@@ -353,6 +356,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 			if inspect_mode:
 				_inspect_station_at(cell)
+				return
+
+			if switch_tool_mode:
+				_use_switch_tool(cell)
 				return
 
 			if _can_build_at(cell):
@@ -834,6 +841,67 @@ func _execute_command(command: Dictionary) -> void:
 			_execute_build(data)
 		"demolish":
 			_execute_demolish(data)
+		"set_tile":
+			_execute_set_tile(data)
+
+
+func _use_switch_tool(cell: Vector2i) -> void:
+	if not _can_demolish(cell):
+		_show_notice("Click a straight piece of track to place a switch.")
+		return
+
+	var next: Variant = TrackGeometry.next_switch_variant(tracks[cell])
+
+	if next == null:
+		_show_notice("Switches can only replace straight track.")
+		return
+
+	_submit_command("set_tile", {"x": cell.x, "y": cell.y, "tile": next})
+
+
+# Swaps one tile between a straight and its switch variants. The stem and
+# through ports never change, so existing routes stay valid.
+func _execute_set_tile(data: Dictionary) -> void:
+	var cell := Vector2i(int(data["x"]), int(data["y"]))
+	var new_tile: Variant = data["tile"]
+
+	if not _can_demolish(cell) or not _is_valid_track_type(new_tile):
+		return
+
+	var old_tile: Variant = tracks[cell]
+	var old_base: Variant = TrackGeometry.straight_base(old_tile)
+	var new_base: Variant = TrackGeometry.straight_base(new_tile)
+
+	if old_base == null or new_base == null or not TrackGeometry.same_connections(old_base, new_base):
+		return
+
+	var cost: int = 0
+	var change: String = "changed"
+
+	if not TrackGeometry.is_switch(old_tile) and TrackGeometry.is_switch(new_tile):
+		cost = SWITCH_COST
+		change = "placed"
+	elif TrackGeometry.is_switch(old_tile) and not TrackGeometry.is_switch(new_tile):
+		cost = -SWITCH_COST
+		change = "removed"
+
+	if cost > 0 and money < cost:
+		_show_notice("Insufficient funds: a switch costs £%d, available £%d." % [cost, money])
+		return
+
+	tracks[cell] = new_tile
+	money -= cost
+	total_construction_cost += maxi(cost, 0)
+	_record_construction_change({cell: old_tile}, {cell: new_tile}, -cost, maxi(cost, 0))
+	_record_event(EventLog.SWITCH_CHANGED, "player", {"change": change, "x": cell.x, "y": cell.y, "cost": cost})
+	_check_route()
+
+	match change:
+		"placed": _show_notice("Switch placed for £%d. Click it again to change it." % cost)
+		"removed": _show_notice("Switch removed. Refunded £%d." % -cost)
+		_: _show_notice("Switch changed.")
+
+	queue_redraw()
 
 
 # Rules are checked again here because time may have passed since the click.
@@ -1354,11 +1422,20 @@ func _setup_toolbar() -> void:
 	backup_button.pressed.connect(_load_game.bind(SAVE_BACKUP_PATH))
 	for button in [straight_button, curve_button, pause_button, save_button, load_button, folder_button, inspect_button, backup_button]:
 		button.focus_mode = Control.FOCUS_NONE
+
+	switch_button = Button.new()
+	switch_button.text = "Switch"
+	switch_button.toggle_mode = true
+	switch_button.focus_mode = Control.FOCUS_NONE
+	switch_button.tooltip_text = "Switch tool: click a straight track to add a switch (£%d); click it again to cycle its shape, and the last click removes it" % SWITCH_COST
+	switch_button.pressed.connect(_toggle_switch_tool)
+	$Interface/HeaderBox/Toolbar.add_child(switch_button)
 	_update_toolbar()
 
 
 func _select_straight_track() -> void:
 	inspect_mode = false
+	switch_tool_mode = false
 	_close_station_inspector()
 	is_dragging = false
 	draw_track_mode = false
@@ -1368,9 +1445,20 @@ func _select_straight_track() -> void:
 
 func _select_curved_track() -> void:
 	inspect_mode = false
+	switch_tool_mode = false
 	_close_station_inspector()
 	is_dragging = false
 	draw_track_mode = true
+	build_plan.clear()
+	_update_toolbar()
+
+
+func _toggle_switch_tool() -> void:
+	switch_tool_mode = not switch_tool_mode
+	inspect_mode = false
+	_close_station_inspector()
+	is_dragging = false
+	demolition_cells.clear()
 	build_plan.clear()
 	_update_toolbar()
 
@@ -1395,12 +1483,15 @@ func _update_toolbar() -> void:
 	inspect_button.set_pressed_no_signal(inspect_mode)
 
 	straight_button.set_pressed_no_signal(
-		not inspect_mode and not draw_track_mode
+		not inspect_mode and not switch_tool_mode and not draw_track_mode
 	)
 
 	curve_button.set_pressed_no_signal(
-		not inspect_mode and draw_track_mode
+		not inspect_mode and not switch_tool_mode and draw_track_mode
 	)
+
+	if switch_button != null:
+		switch_button.set_pressed_no_signal(switch_tool_mode)
 	pause_button.set_pressed_no_signal(paused)
 
 	pause_button.text = ""
@@ -1586,6 +1677,7 @@ func _setup_station_inspector() -> void:
 
 func _toggle_inspect_mode() -> void:
 	inspect_mode = not inspect_mode
+	switch_tool_mode = false
 	is_dragging = false
 
 	if not inspect_mode:

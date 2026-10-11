@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_routing_crossing()
 	_test_simple_routing()
 	_test_drawing()
+	_test_variants()
 	print("%d checks, %d failed" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -196,3 +197,37 @@ func _test_drawing() -> void:
 	check(crossing["extra"].size() == 1, "a crossing draws two lines")
 	check(Geometry.drawing_data("junction_0_4_1", 32.0).is_empty(), "an invalid tile draws nothing")
 	check(Geometry.drawing_pairs("junction_6_2_3") == [[W, E], [W, SE]], "switch pairs are stem-through and stem-branch")
+
+
+func _test_variants() -> void:
+	var horizontal: Array = Geometry.switch_variants(false)
+	check(horizontal.size() == 8, "a straight has eight switch variants (got %d)" % horizontal.size())
+	check(Geometry.switch_variants(true).size() == 8, "a vertical straight has eight variants")
+	check(Geometry.switch_variants("NE").is_empty(), "a bend has no switch variants")
+
+	var all_valid: bool = true
+	var same_ports: bool = true
+
+	for kind in horizontal:
+		if Geometry.connections(kind).size() != 3:
+			all_valid = false
+		if not Geometry.same_connections(Geometry.straight_base(kind), false):
+			same_ports = false
+
+	check(all_valid, "every variant is a valid switch")
+	check(same_ports, "every variant keeps the straight's stem and through ports")
+	check(Geometry.is_straight(false) and Geometry.is_straight("rail_1_5") and not Geometry.is_straight("NE"), "is_straight")
+	check(Geometry.straight_base("junction_6_2_3") != null and Geometry.same_connections(Geometry.straight_base("junction_6_2_3"), false), "a switch's base is its stem-through straight")
+	check(Geometry.straight_base("cross_0_2") == null and Geometry.straight_base("NE") == null, "crossings and bends have no base")
+
+	var tile: Variant = false
+	var seen: Dictionary = {}
+
+	for step in range(8):
+		tile = Geometry.next_switch_variant(tile)
+		check(Geometry.is_switch(tile) and not seen.has(tile), "step %d gives a new switch" % step)
+		seen[tile] = true
+
+	check(Geometry.same_connections(Geometry.next_switch_variant(tile), false) and not Geometry.is_switch(Geometry.next_switch_variant(tile)), "the ninth click returns to a straight")
+	check(Geometry.next_switch_variant("NE") == null, "a bend cannot hold a switch")
+	check(Geometry.next_switch_variant("cross_0_2") == null, "a crossing cannot hold a switch")

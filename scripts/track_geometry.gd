@@ -204,6 +204,78 @@ static func crossing_type(first: Vector2i, second: Vector2i) -> Variant:
 	return "cross_%d_%d" % [mini(a, b), maxi(a, b)]
 
 
+## True for a simple tile whose two ports are opposite (a straight piece).
+static func is_straight(track_type: Variant) -> bool:
+	var ports: Array[Vector2i] = connections(track_type)
+	return ports.size() == 2 and ports[0] == -ports[1]
+
+
+## The straight piece a tile is built on: the tile itself if straight, or a
+## switch's stem and through ports as a straight. Null for anything else.
+static func straight_base(track_type: Variant) -> Variant:
+	if is_straight(track_type):
+		return track_type
+
+	if is_switch(track_type):
+		var ports: Array[Vector2i] = connections(track_type)
+		if ports[0] == -ports[1]:
+			return from_ports(ports[0], ports[1])
+
+	return null
+
+
+## Every switch that can replace a straight tile without changing where its
+## stem and through ports are: either end may be the stem, and the branch may
+## leave on any side that makes a valid piece with the stem. Ordered.
+static func switch_variants(straight: Variant) -> Array:
+	var result: Array = []
+
+	if not is_straight(straight):
+		return result
+
+	var ports: Array[Vector2i] = connections(straight)
+
+	for stem_index in range(2):
+		var stem: Vector2i = ports[stem_index]
+		var through: Vector2i = ports[1 - stem_index]
+
+		for branch in DIRECTIONS:
+			if branch == stem or branch == through:
+				continue
+
+			var kind: Variant = switch_type(stem, through, branch)
+
+			if kind != null:
+				result.append(kind)
+
+	return result
+
+
+## What clicking a tile with the Switch tool turns it into: a straight becomes
+## the first switch variant, each switch becomes the next variant, and the last
+## goes back to the straight. Null for tiles that cannot hold a switch.
+static func next_switch_variant(track_type: Variant) -> Variant:
+	var base: Variant = straight_base(track_type)
+
+	if base == null:
+		return null
+
+	var variants: Array = switch_variants(base)
+
+	if variants.is_empty():
+		return null
+
+	if not is_switch(track_type):
+		return variants[0]
+
+	var position: int = variants.find(track_type)
+
+	if position < 0 or position + 1 >= variants.size():
+		return base
+
+	return variants[position + 1]
+
+
 ## Whether two tiles have identical ports. Simple tiles compare their two
 ## ports in any order; switches and crossings must match exactly (a switch
 ## with a different stem is a different tile).

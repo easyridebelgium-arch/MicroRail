@@ -165,7 +165,8 @@ static func key_label(action: StringName) -> String:
 static func code_text(action: StringName, code: int) -> String:
 	var logical: int = code
 
-	if uses_physical_keys(action):
+	# The headless display server (used by the tests) cannot translate keys.
+	if uses_physical_keys(action) and DisplayServer.get_name() != "headless":
 		logical = int(DisplayServer.keyboard_get_keycode_from_physical(code as Key))
 
 	return OS.get_keycode_string(logical as Key)

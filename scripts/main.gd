@@ -5,7 +5,6 @@ const TILE_SIZE: int = 32
 const GRID_COLOR: Color = Color(0.18, 0.23, 0.25)
 const SLEEPER_COLOR: Color = Color(0.43, 0.29, 0.17)
 const RAIL_COLOR: Color = Color(0.78, 0.82, 0.85)
-const PREVIEW_COLOR: Color = Color(0.35, 0.9, 0.55, 0.8)
 
 const TRAIN_CAPACITY: int = 20
 const PASSENGER_INTERVAL: float = 5.0
@@ -21,6 +20,9 @@ const OPERATING_COST_PER_SECOND: int = 1
 # Station positions in grid coordinates.
 const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
+const STATION_C: Vector2i = Vector2i(36, 8)
+const ServiceRoutes = preload("res://scripts/service_routes.gd")
+const RouteEditor = preload("res://scripts/route_editor.gd")
 
 const TRAIN_SPEED: float = 80.0
 const STATION_WAIT: float = 2.0
@@ -28,12 +30,16 @@ const STATION_WAIT: float = 2.0
 const SAVE_PATH: String = "user://trainz_save.json"
 const SAVE_TEMP_PATH: String = "user://trainz_save.tmp"
 const RailRouter = preload("res://scripts/rail_router.gd")
+const TrackGeometry = preload("res://scripts/track_geometry.gd")
+const TrackBuilder = preload("res://scripts/track_builder.gd")
 const SAVE_FIELDS: Array[String] = [
 	"money",
 	"total_operating_cost",
 	"total_construction_cost",
 	"waiting_at_a",
 	"waiting_at_b",
+	"waiting_at_c",
+	"passenger_stop_index",
 	"passengers_on_train",
 	"passengers_delivered",
 	"passenger_timer",
@@ -75,7 +81,15 @@ const LOGS_PER_BATCH: int = 5
 const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
-const SAVE_VERSION: int = 12
+const SimClock = preload("res://scripts/core/sim_clock.gd")
+const SimRng = preload("res://scripts/core/sim_rng.gd")
+const EventLog = preload("res://scripts/core/event_log.gd")
+const SaveMigrations = preload("res://scripts/core/save_migrations.gd")
+const GameSettings = preload("res://scripts/core/game_settings.gd")
+const InputActions = preload("res://scripts/core/input_actions.gd")
+const Palette = preload("res://scripts/core/palette.gd")
+const SettingsDialog = preload("res://scripts/settings_dialog.gd")
+const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const TOOLBAR_ICON_SHEET = preload("res://assets/ui/icons/toolbar.svg")
 const NetworkMap = preload("res://scripts/network_map.gd")
@@ -83,7 +97,10 @@ const ScenarioGoals = preload("res://scripts/scenario_goals.gd")
 
 # A false value means horizontal; true means vertical.
 var tracks: Dictionary = {}
-var placing_vertical: bool = false
+var draw_track_mode: bool = false
+var build_stroke: Array[Vector2i] = []
+var build_plan: Dictionary = {}
+var build_last_hover: Vector2i = Vector2i(-99999, -99999)
 var hovered_cell: Vector2i = Vector2i(-1, -1)
 
 var route_connected: bool = false
@@ -96,6 +113,13 @@ var drag_start: Vector2i = Vector2i.ZERO
 
 var waiting_at_a: int = 8
 var waiting_at_b: int = 8
+var waiting_at_c: int = 8
+var passenger_stop_index: int = 0
+var stop_distances: Array[float] = []
+var services: Dictionary = ServiceRoutes.defaults()
+var route_editor: RouteEditor
+var routes_button: Button
+var passenger_route_error: String = "No connected passenger route"
 var passengers_on_train: int = 0
 
 var passengers_delivered: int = 0
@@ -114,8 +138,6 @@ var route_cells: Array[Vector2i] = []
 var route_path: Curve2D = Curve2D.new()
 var route_distance: float = 0.0
 var train_heading: float = 0.0
-# Empty means straight track. Other values connect two compass directions.
-var selected_curve: String = ""
 var is_panning: bool = false
 var inspect_mode: bool = false
 var selected_station: Vector2i = Vector2i(-1, -1)
@@ -153,6 +175,13 @@ var network_map: NetworkMap
 var map_button: Button
 var scenario_goals: ScenarioGoals = ScenarioGoals.new()
 
+# Phase 0 foundations: fixed-step clock, seeded RNG and the event stream.
+var sim_clock: SimClock = SimClock.new()
+var sim_rng: SimRng = SimRng.new()
+var event_log: EventLog = EventLog.new()
+var settings_dialog: SettingsDialog
+var settings_button: Button
+
 var objective_panel: PanelContainer
 var objective_heading: Label
 var objective_description: Label
@@ -176,9 +205,19 @@ var goals_button: Button
 func _ready() -> void:
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
 
+	# Player settings first, so keys, scale and colours are right from frame one.
+	GameSettings.load_settings()
+	InputActions.register_defaults()
+	InputActions.apply_bindings(GameSettings.key_bindings)
+	GameSettings.apply(get_window())
+
+	# A new game gets a fresh seed; loading a save restores the saved one.
+	sim_rng.randomize_seed()
+
 	# Each station includes a horizontal platform track.
 	tracks[STATION_A] = false
 	tracks[STATION_B] = false
+	tracks[STATION_C] = false
 	tracks[FOREST_SITE] = false
 	tracks[CARGO_TERMINAL] = false
 
@@ -188,33 +227,33 @@ func _ready() -> void:
 	_setup_toolbar()
 	_reset_camera()
 	_setup_station_inspector()
-	_setup_camera_keys()
 	_setup_freight_train()
 	_setup_history_controls()
 	_setup_network_map()
 	_setup_objective_panel()
+	_setup_routes_editor()
+	_setup_settings_dialog()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
+	_apply_settings()
 
 func _process(delta: float) -> void:
 	_move_camera_with_keyboard(delta)
 	hovered_cell = _mouse_to_cell()
 	if is_dragging and demolition_mode:
 		_collect_demolition_cells(hovered_cell)
+	elif is_dragging:
+		_refresh_build_plan(hovered_cell)
 
 	# Interface messages expire even while simulation is paused.
 	if notice_remaining > 0.0:
 		notice_remaining = maxf(0.0, notice_remaining - delta)
 
+	# The simulation advances in fixed steps, whatever the frame rate.
 	if not paused:
-		_generate_passengers(delta)
-		_produce_logs(delta)
-		forest_stock -= freight_train.advance(delta, forest_stock)
-
-		if _passenger_service_is_active():
-			_move_train(delta)
-			_charge_operating_cost(delta)
-			_check_scenario_objectives()
+		for _step in sim_clock.advance(delta):
+			sim_clock.begin_tick()
+			_simulation_step(SimClock.TICK_SECONDS)
 
 	_update_instructions()
 	_update_toolbar()
@@ -224,42 +263,61 @@ func _process(delta: float) -> void:
 	_update_objective_panel()
 	queue_redraw()
 	
+func _simulation_step(step_seconds: float) -> void:
+	_generate_passengers(step_seconds)
+	_produce_logs(step_seconds)
+	forest_stock -= freight_train.advance(step_seconds, forest_stock)
+
+	if _passenger_service_is_active():
+		_move_train(step_seconds)
+		_charge_operating_cost(step_seconds)
+
+	_check_scenario_objectives()
+
+
+func _record_event(type: String, subject: String, data: Dictionary = {}) -> void:
+	event_log.record(sim_clock.tick, type, subject, data)
+
+
+# True while a dialog owns the keyboard, so game shortcuts stay quiet.
+func _modal_open() -> bool:
+	if route_editor != null and route_editor.visible:
+		return true
+
+	return settings_dialog != null and settings_dialog.visible
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		if event.pressed and not event.echo:
-			if event.keycode == KEY_M:
-				_toggle_network_map()
-				return
-			if event.keycode == KEY_HOME:
-				is_dragging = false
-				is_panning = false
-				demolition_cells.clear()
-				_reset_camera()
-				return
+	if _modal_open():
+		return
 
-			if event.keycode == KEY_ESCAPE:
-				is_dragging = false
-				demolition_cells.clear()
-				return
+	if event.is_action_pressed(InputActions.TOGGLE_MAP):
+		_toggle_network_map()
+		return
 
-			if event.keycode == KEY_I:
-				_toggle_inspect_mode()
-				return
+	if event.is_action_pressed(InputActions.RESET_CAMERA):
+		is_dragging = false
+		is_panning = false
+		demolition_cells.clear()
+		_reset_camera()
+		return
 
-			if event.keycode == KEY_T and not is_dragging:
-				if selected_curve.is_empty():
-					_select_curved_track()
-				else:
-					_select_straight_track()
+	if event.is_action_pressed(InputActions.CANCEL):
+		is_dragging = false
+		demolition_cells.clear()
+		return
 
-			if event.keycode == KEY_R and not is_dragging:
-				_rotate_selected_track()
+	if event.is_action_pressed(InputActions.TOGGLE_INSPECT):
+		_toggle_inspect_mode()
+		return
 
-			if event.keycode == KEY_SPACE:
-				_toggle_pause()
-			if event.keycode == KEY_G:
-				_toggle_objective_panel()
-				return
+	if event.is_action_pressed(InputActions.TOGGLE_PAUSE):
+		_toggle_pause()
+		return
+
+	if event.is_action_pressed(InputActions.TOGGLE_GOALS):
+		_toggle_objective_panel()
+		return
 
 	if event is InputEventMouseButton:
 		var cell: Vector2i = _mouse_to_cell()
@@ -282,7 +340,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					demolition_mode = false
 					demolition_cells.clear()
 					drag_start = cell
+					build_stroke.assign([cell])
 					is_dragging = true
+					_refresh_build_plan(cell, true)
 			elif is_dragging:
 				_finish_track_drag(cell)
 
@@ -311,65 +371,53 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif is_dragging and demolition_mode:
 				_finish_demolition(cell)
 
-func _check_route() -> void:
-	var new_route: Array[Vector2i] = RailRouter.find_route(
-		tracks,
-		STATION_A,
-		STATION_B
-	)
+func _check_route(force_reset: bool = false) -> void:
+	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE))
+	var new_route: Array[Vector2i] = []
+	new_route.assign(built["cells"])
 	_refresh_freight_route(new_route)
-
-	# Building elsewhere should not interrupt the current service.
-	if new_route == route_cells:
+	passenger_route_error = built["error"]
+	if not force_reset and new_route == route_cells:
 		return
-
-	# Return onboard passengers before resetting a changed route.
-	if passengers_on_train > 0:
-		if travelling_to_b:
-			waiting_at_a += passengers_on_train
-		else:
-			waiting_at_b += passengers_on_train
-
-	passengers_on_train = 0
-
+	_return_onboard_passengers()
+	_record_event(EventLog.ROUTE_CHANGED, "passenger", {"connected": not new_route.is_empty(), "tiles": new_route.size()})
 	route_cells = new_route
-	route_path = RailRouter.make_path(route_cells, float(TILE_SIZE))
+	route_path = built["path"]
+	stop_distances.assign(built["distances"])
 	route_connected = not route_cells.is_empty()
-
 	route_distance = 0.0
+	passenger_stop_index = 0
 	travelling_to_b = true
 	wait_remaining = 0.0
 	train_needs_boarding = true
-
 	_update_train_transform()
 
 
 func _move_train(delta: float) -> void:
+	if not route_connected:
+		return
 	if wait_remaining > 0.0:
 		wait_remaining = maxf(0.0, wait_remaining - delta)
 		return
-
 	if train_needs_boarding:
 		_board_passengers()
 		train_needs_boarding = false
-
-	var route_length: float = route_path.get_baked_length()
-	var target_distance: float = route_length if travelling_to_b else 0.0
-
-	route_distance = move_toward(
-		route_distance,
-		target_distance,
-		_get_train_speed() * delta
-	)
-
+		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
+	var next_stop: int = _next_passenger_stop()
+	var target_distance: float = stop_distances[next_stop]
+	route_distance = move_toward(route_distance, target_distance, _get_train_speed() * delta)
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
+		var unloaded: int = passengers_on_train
 		_unload_passengers()
-
-		travelling_to_b = not travelling_to_b
+		passenger_stop_index = next_stop
+		_record_event(EventLog.TRAIN_ARRIVED, "passenger", {"stop": services["passenger"]["stops"][next_stop], "passengers": unloaded})
+		if passenger_stop_index == stop_distances.size() - 1:
+			travelling_to_b = false
+		elif passenger_stop_index == 0:
+			travelling_to_b = true
 		wait_remaining = STATION_WAIT
 		train_needs_boarding = true
-
 	_update_train_transform()
 
 
@@ -399,7 +447,7 @@ func _is_inside_map(cell: Vector2i) -> bool:
 
 
 func _is_station_space(cell: Vector2i) -> bool:
-	for station in [STATION_A, STATION_B, FOREST_SITE, CARGO_TERMINAL]:
+	for station in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
 		var inside_columns: bool = (
 			cell.x >= station.x - 1
 			and cell.x <= station.x + 1
@@ -421,22 +469,13 @@ func _can_build_at(cell: Vector2i) -> bool:
 
 
 func _update_instructions() -> void:
-	var direction: String = "Vertical" if placing_vertical else "Horizontal"
+	var direction: String = "Draw track: follow the mouse" if draw_track_mode else "Connect track: drag between two points"
 	if inspect_mode:
-		direction = "Inspect: click a station track"
+		direction = "Inspect: click a station or industry"
 	elif is_dragging and demolition_mode:
-		direction = "Remove %d tracks — refund £%d" % [
-			demolition_cells.size(),
-			demolition_cells.size() * TRACK_REFUND
-		]
-
-	if not selected_curve.is_empty():
-		direction = "Curve " + selected_curve
-	elif is_dragging:
-		direction = (
-			"Vertical" if _drag_is_vertical(hovered_cell)
-			else "Horizontal"
-		)
+		direction = "Remove %d tracks — refund £%d" % [demolition_cells.size(), demolition_cells.size() * TRACK_REFUND]
+	elif is_dragging and not build_plan.get("error", "").is_empty():
+		direction = "Blocked: " + str(build_plan["error"])
 
 	var status: String = _passenger_service_status()
 
@@ -453,9 +492,12 @@ func _update_instructions() -> void:
 		affordability = " — insufficient funds"
 
 	instructions.text = (
-		"Left-drag: build | Right-click: remove"
-		+ " | T: straight/curve | R: rotate"
-		+ " | Space: pause | Esc: cancel"
+		"Left-drag: automatic track | Right-drag: remove"
+		+ " | Right-click: cancel | Use toolbar to choose Connect or Draw"
+		+ " | %s: pause | %s: cancel" % [
+			InputActions.key_label(InputActions.TOGGLE_PAUSE),
+			InputActions.key_label(InputActions.CANCEL)
+		]
 		+ "\n%s | Cell: %d,%d | Build: £%d%s | %s"
 		% [
 			direction,
@@ -465,10 +507,11 @@ func _update_instructions() -> void:
 			affordability,
 			status
 		]
-		+ "\nWaiting: A %d / B %d | Onboard: %d/%d | Delivered: %d"
+		+ "\nWaiting: A %d / B %d / C %d | Onboard: %d/%d | Delivered: %d"
 		% [
 			waiting_at_a,
 			waiting_at_b,
+			waiting_at_c,
 			passengers_on_train,
 			_get_train_capacity(),
 			passengers_delivered
@@ -490,52 +533,28 @@ func _on_viewport_size_changed() -> void:
 
 func _draw() -> void:
 	_draw_grid()
-
 	for cell in tracks:
 		_draw_track(cell, tracks[cell], false)
-
 	_draw_station(STATION_A, "Station A")
 	_draw_station(STATION_B, "Station B")
+	_draw_station(STATION_C, "Station C")
 	_draw_station(FOREST_SITE, "Forest")
 	_draw_station(CARGO_TERMINAL, "Terminal")
-
 	if inspect_mode:
 		if selected_station != Vector2i(-1, -1):
-			var selection_rect := Rect2(
-				Vector2(selected_station) * TILE_SIZE,
-				Vector2(TILE_SIZE, TILE_SIZE)
-			)
-
-			draw_rect(
-				selection_rect.grow(3.0),
-				Color(1.0, 0.85, 0.25),
-				false,
-				2.0
-			)
-
+			draw_rect(Rect2(Vector2(selected_station) * TILE_SIZE, Vector2.ONE * TILE_SIZE).grow(3.0), Color(1.0, 0.85, 0.25), false, 2.0)
 	elif is_dragging and demolition_mode:
 		_draw_demolition_preview()
-
 	elif is_dragging:
-		var track_type: Variant = _drag_is_vertical(hovered_cell)
-
-		if not selected_curve.is_empty():
-			track_type = selected_curve
-
-		for cell in _get_drag_cells(hovered_cell):
-			if not tracks.has(cell):
-				_draw_build_preview(cell, track_type)
-
-	else:
-		if _is_inside_map(hovered_cell) and not tracks.has(hovered_cell):
-			var track_type: Variant = placing_vertical
-
-			if not selected_curve.is_empty():
-				track_type = selected_curve
-
-			_draw_build_preview(hovered_cell, track_type)
-
+		for cell in build_plan.get("tiles", {}):
+			_draw_track(cell, build_plan["tiles"][cell], true)
+		for cell in build_plan.get("invalid", {}):
+			_draw_invalid_build_cell(cell)
+	elif _is_inside_map(hovered_cell):
+		var color: Color = Palette.get_color(Palette.Role.HOVER_OK if _can_build_at(hovered_cell) else Palette.Role.HOVER_BAD)
+		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
 	_draw_train()
+
 
 func _draw_grid() -> void:
 	var map_size := Vector2(
@@ -574,59 +593,22 @@ func _draw_grid() -> void:
 	)
 
 
-func _draw_track(
-	cell: Vector2i,
-	track_type: Variant,
-	preview: bool
-) -> void:
-	if track_type is String:
-		_draw_curve(cell, track_type, preview)
+func _draw_track(cell: Vector2i, track_type: Variant, preview: bool) -> void:
+	var geometry: Dictionary = TrackGeometry.drawing_data(track_type, float(TILE_SIZE))
+	if geometry.is_empty():
 		return
-
-	var vertical: bool = bool(track_type)
-	var origin: Vector2 = Vector2(cell) * TILE_SIZE
-	var rail_color: Color = PREVIEW_COLOR if preview else RAIL_COLOR
+	draw_set_transform(Vector2(cell) * TILE_SIZE)
+	var rail_color: Color = Palette.get_color(Palette.Role.PREVIEW) if preview else RAIL_COLOR
 	var sleeper_color: Color = SLEEPER_COLOR
-
 	if preview:
 		sleeper_color.a = 0.5
-
-		draw_rect(
-			Rect2(origin, Vector2(TILE_SIZE, TILE_SIZE)),
-			Color(0.35, 0.9, 0.55, 0.12)
-		)
-
-	for offset in [5, 13, 21, 29]:
-		var sleeper_position: Vector2
-		var sleeper_size: Vector2
-
-		if vertical:
-			sleeper_position = origin + Vector2(6, offset - 2)
-			sleeper_size = Vector2(20, 4)
-		else:
-			sleeper_position = origin + Vector2(offset - 2, 6)
-			sleeper_size = Vector2(4, 20)
-
-		draw_rect(
-			Rect2(sleeper_position, sleeper_size),
-			sleeper_color
-		)
-
-	for rail_offset in [10, 22]:
-		if vertical:
-			draw_line(
-				origin + Vector2(rail_offset, 0),
-				origin + Vector2(rail_offset, TILE_SIZE),
-				rail_color,
-				2.0
-			)
-		else:
-			draw_line(
-				origin + Vector2(0, rail_offset),
-				origin + Vector2(TILE_SIZE, rail_offset),
-				rail_color,
-				2.0
-			)
+		draw_rect(Rect2(Vector2.ZERO, Vector2.ONE * TILE_SIZE), Palette.get_color(Palette.Role.PREVIEW_FILL))
+	var sleepers: PackedVector2Array = geometry["sleepers"]
+	for index in range(0, sleepers.size(), 2):
+		draw_line(sleepers[index], sleepers[index + 1], sleeper_color, 4.0)
+	draw_polyline(geometry["left"], rail_color, 2.0)
+	draw_polyline(geometry["right"], rail_color, 2.0)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _draw_station(cell: Vector2i, station_name: String) -> void:
@@ -686,7 +668,7 @@ func _draw_train() -> void:
 		Vector2(26, 14)
 	)
 
-	draw_rect(body, Color(0.85, 0.22, 0.18))
+	draw_rect(body, Palette.get_color(Palette.Role.TRAIN_PASSENGER))
 	draw_rect(body, Color(0.15, 0.08, 0.08), false, 1.0)
 
 	# The front of the train always points along its heading.
@@ -698,142 +680,51 @@ func _draw_train() -> void:
 	# Restore normal drawing coordinates.
 	draw_set_transform(Vector2.ZERO, 0.0)
 
-func _drag_is_vertical(end_cell: Vector2i) -> bool:
-	var difference: Vector2i = end_cell - drag_start
-
-	# A single click uses the orientation selected with R.
-	if difference == Vector2i.ZERO:
-		return placing_vertical
-
-	# A drag snaps to the axis with the largest movement.
-	return abs(difference.y) > abs(difference.x)
 
 
-func _get_drag_cells(end_cell: Vector2i) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
 
-	if not selected_curve.is_empty():
-		if _is_inside_map(drag_start):
-			cells.append(drag_start)
 
-		return cells
-
-	if _drag_is_vertical(end_cell):
-		var first_y: int = mini(drag_start.y, end_cell.y)
-		var last_y: int = maxi(drag_start.y, end_cell.y)
-
-		for y in range(first_y, last_y + 1):
-			var cell := Vector2i(drag_start.x, y)
-
-			if _is_inside_map(cell):
-				cells.append(cell)
-	else:
-		var first_x: int = mini(drag_start.x, end_cell.x)
-		var last_x: int = maxi(drag_start.x, end_cell.x)
-
-		for x in range(first_x, last_x + 1):
-			var cell := Vector2i(x, drag_start.y)
-
-			if _is_inside_map(cell):
-				cells.append(cell)
-
-	return cells
 
 
 func _finish_track_drag(end_cell: Vector2i) -> void:
-	var vertical: bool = _drag_is_vertical(end_cell)
-	var new_cells: Array[Vector2i] = []
-
-	for cell in _get_drag_cells(end_cell):
-		if _is_station_space(cell):
-			is_dragging = false
-			_show_notice("Cannot build through a station platform.")
-			queue_redraw()
-			return
-
-		if not tracks.has(cell):
-			new_cells.append(cell)
-
+	_refresh_build_plan(end_cell, true)
 	is_dragging = false
-
-	if new_cells.is_empty():
-		queue_redraw()
+	if not build_plan.get("error", "").is_empty():
+		_show_notice(build_plan["error"])
 		return
-
-	var cost: int = new_cells.size() * TRACK_BUILD_COST
-
-	if money < cost:
-		_show_notice(
-			"Insufficient funds: need £%d, available £%d."
-			% [cost, money]
-		)
-		queue_redraw()
+	var changes: Dictionary = build_plan["changes"]
+	if changes.is_empty():
+		_show_notice("This route is already built.")
 		return
-
+	var cost: int = int(build_plan["new_count"]) * TRACK_BUILD_COST
+	if cost > 0 and money < cost:
+		_show_notice("Insufficient funds: need £%d, available £%d." % [cost, money])
+		return
 	var before: Dictionary = {}
-	var after: Dictionary = {}
-
-	for cell in new_cells:
-		before[cell] = null
-
-		if selected_curve.is_empty():
-			tracks[cell] = vertical
-		else:
-			tracks[cell] = selected_curve
-
-		after[cell] = tracks[cell]
-
+	for cell in changes:
+		before[cell] = tracks.get(cell)
+		tracks[cell] = changes[cell]
 	money -= cost
 	total_construction_cost += cost
-
-	_record_construction_change(
-		before,
-		after,
-		-cost,
-		cost
-	)
-
+	_record_construction_change(before, changes, -cost, cost)
+	_record_event(EventLog.TRACK_BUILT, "player", {"tiles": changes.size(), "new_tiles": int(build_plan["new_count"]), "cost": cost})
 	_check_route()
-
-	_show_notice(
-		"Built %d track tiles for £%d."
-		% [new_cells.size(), cost]
-	)
-
+	_show_notice("Built %d new tiles for £%d; connections adjusted automatically." % [build_plan["new_count"], cost])
 	queue_redraw()
+
 
 func _generate_passengers(delta: float) -> void:
 	passenger_timer += delta
-
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
-
-		if waiting_at_a < MAX_STATION_QUEUE:
-			waiting_at_a = mini(
-				waiting_at_a + PASSENGERS_PER_BATCH,
-				MAX_STATION_QUEUE
-			)
-
-		if waiting_at_b < MAX_STATION_QUEUE:
-			waiting_at_b = mini(
-				waiting_at_b + PASSENGERS_PER_BATCH,
-				MAX_STATION_QUEUE
-			)
+		for key in ServiceRoutes.STATIONS:
+			_set_waiting(key, mini(_waiting(key) + PASSENGERS_PER_BATCH, MAX_STATION_QUEUE))
 
 
 func _board_passengers() -> void:
-	var available_seats: int = _get_train_capacity() - passengers_on_train
-	var boarding: int = 0
-
-	if travelling_to_b:
-		# Departing Station A.
-		boarding = mini(waiting_at_a, available_seats)
-		waiting_at_a -= boarding
-	else:
-		# Departing Station B.
-		boarding = mini(waiting_at_b, available_seats)
-		waiting_at_b -= boarding
-
+	var key: String = services["passenger"]["stops"][passenger_stop_index]
+	var boarding: int = mini(_waiting(key), _get_train_capacity() - passengers_on_train)
+	_set_waiting(key, _waiting(key) - boarding)
 	passengers_on_train += boarding
 
 
@@ -856,18 +747,10 @@ func _show_notice(message: String) -> void:
 	notice_remaining = 4.0
 	
 func _get_preview_cost() -> int:
-	if inspect_mode or (is_dragging and demolition_mode):
+	if inspect_mode or not is_dragging or demolition_mode:
 		return 0
-	var tile_count: int = 0
+	return int(build_plan.get("new_count", 0)) * TRACK_BUILD_COST
 
-	if is_dragging:
-		for cell in _get_drag_cells(hovered_cell):
-			if not tracks.has(cell):
-				tile_count += 1
-	elif _can_build_at(hovered_cell) and not tracks.has(hovered_cell):
-		tile_count = 1
-
-	return tile_count * TRACK_BUILD_COST
 
 func _save_game() -> void:
 	if is_dragging:
@@ -894,7 +777,13 @@ func _save_game() -> void:
 		"route_distance": route_distance,
 		"state": state,
 		"freight": freight_train.save_state(),
-		"scenario_stage": scenario_goals.current_index
+		"scenario_stage": scenario_goals.current_index,
+		"services": services.duplicate(true),
+		"sim": {
+			"clock": sim_clock.save_state(),
+			"rng": sim_rng.save_state(),
+			"events": event_log.save_state()
+		}
 	}
 
 	# Prepare the new save before touching the existing one.
@@ -904,7 +793,7 @@ func _save_game() -> void:
 		_show_notice("Could not open the temporary save file.")
 		return
 
-	file.store_string(JSON.stringify(data, "\t"))
+	file.store_string(JSON.stringify(data, "\t", true, true))
 	file.flush()
 
 	var write_error: Error = file.get_error()
@@ -945,6 +834,17 @@ func _is_valid_number(value: Variant) -> bool:
 
 
 func _is_valid_save(data: Dictionary) -> bool:
+	if not ServiceRoutes.is_valid(data.get("services")):
+		return false
+	var sim: Variant = data.get("sim")
+	if not sim is Dictionary:
+		return false
+	if not SimClock.is_valid_state(sim.get("clock")):
+		return false
+	if not SimRng.is_valid_state(sim.get("rng")):
+		return false
+	if not EventLog.is_valid_state(sim.get("events")):
+		return false
 	var saved_version: Variant = data.get("version")
 
 	if not _is_valid_number(saved_version):
@@ -1015,6 +915,8 @@ func _is_valid_save(data: Dictionary) -> bool:
 			if field != "money" and number < 0.0:
 				return false
 
+	if int(state["passenger_stop_index"]) >= data["services"]["passenger"]["stops"].size():
+		return false
 	var saved_capacity_level: int = int(state["capacity_upgrade_level"])
 	var saved_speed_level: int = int(state["speed_upgrade_level"])
 
@@ -1086,8 +988,8 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 		checked_tracks[cell] = entry[2]
 
-	# Both stations must retain their horizontal tracks.
-	for station in [STATION_A, STATION_B]:
+	# Every facility must retain its horizontal platform track.
+	for station in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
 		if not checked_tracks.has(station):
 			return false
 
@@ -1107,241 +1009,102 @@ func _is_valid_save(data: Dictionary) -> bool:
 	
 func _load_game(save_path: String = SAVE_PATH) -> void:
 	if not FileAccess.file_exists(save_path):
-		if save_path == SAVE_BACKUP_PATH:
-			_show_notice("No previous save yet. Save twice to create one.")
-		else:
-			_show_notice("No saved game yet. Click Save first.")
+		_show_notice("No saved game at this location yet.")
 		return
-
 	var file := FileAccess.open(save_path, FileAccess.READ)
-
 	if file == null:
 		_show_notice("Could not open the saved game.")
 		return
-
+	var parser := JSON.new()
 	var contents: String = file.get_as_text()
 	file.close()
-
-	var parser := JSON.new()
-
-	if parser.parse(contents) != OK:
+	if parser.parse(contents) != OK or not parser.data is Dictionary:
 		_show_notice("The save file could not be read.")
 		return
-
-	if not parser.data is Dictionary:
-		_show_notice("The save file has an invalid format.")
+	var migration: Dictionary = SaveMigrations.migrate(parser.data)
+	if not migration["ok"]:
+		_show_notice(migration["error"])
 		return
-
-	var data: Dictionary = parser.data
-	if not _is_valid_number(data.get("version")):
-		_show_notice("Save file has no valid format version.")
-		return
-
-	if float(data["version"]) != float(SAVE_VERSION):
-		_show_notice("This save is from another development version. Start a new game.")
-		return
+	var data: Dictionary = migration["data"]
 	if not _is_valid_save(data):
 		_show_notice("The save file is damaged or incompatible.")
 		return
-
 	var loaded_tracks: Dictionary = {}
-
 	for entry in data["tracks"]:
 		var cell := Vector2i(int(entry[0]), int(entry[1]))
+		if not _is_inside_map(cell) or _is_station_space(cell):
+			_show_notice("Save contains track outside buildable ground.")
+			return
 		loaded_tracks[cell] = entry[2]
-
-	var removed_count: int = _remove_station_space_tracks(loaded_tracks)
-	var loaded_cells: Array[Vector2i] = RailRouter.find_route(
-		loaded_tracks,
-		STATION_A,
-		STATION_B
-	)
-	var loaded_path: Curve2D = RailRouter.make_path(
-		loaded_cells,
-		float(TILE_SIZE)
-	)
-
-	var loaded_distance: float = 0.0
-
-	if int(data["version"]) >= 3:
-		loaded_distance = float(data["route_distance"])
-	else:
-		# Earlier versions only moved along the direct horizontal route.
-		loaded_distance = (
-			float(data["train_x"]) - _cell_center(STATION_A).x
-		)
-
+	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE))
+	var loaded_cells: Array[Vector2i] = []
+	loaded_cells.assign(built["cells"])
+	var loaded_path: Curve2D = built["path"]
 	var state: Dictionary = data["state"]
-	if removed_count > 0:
-		state["money"] = (
-			int(state["money"])
-			+ removed_count * TRACK_BUILD_COST
-		)
-
-		# Return passengers before resetting the affected saved session.
-		var onboard: int = int(state["passengers_on_train"])
-
-		if bool(state["travelling_to_b"]):
-			state["waiting_at_a"] = int(state["waiting_at_a"]) + onboard
-		else:
-			state["waiting_at_b"] = int(state["waiting_at_b"]) + onboard
-
-		state["passengers_on_train"] = 0
-		state["travelling_to_b"] = true
-		state["wait_remaining"] = 0.0
-		state["train_needs_boarding"] = true
-		loaded_distance = 0.0
-
+	var loaded_distance: float = float(data["route_distance"])
+	var stop_index: int = int(state["passenger_stop_index"])
 	if loaded_cells.is_empty():
-		if loaded_distance > 0.001 or int(state["passengers_on_train"]) > 0:
+		if loaded_distance > 0.001 or int(state["passengers_on_train"]) > 0 or stop_index != 0:
 			_show_notice("Save contains a train without a valid route.")
 			return
-	elif loaded_distance > loaded_path.get_baked_length() + 0.001:
-		_show_notice("Saved train position is outside the route.")
-		return
-	var loaded_freight_cells: Array[Vector2i] = _find_freight_route(
-		loaded_tracks,
-		loaded_cells
-	)
-
-	var loaded_freight_path: Curve2D = RailRouter.make_path(
-		loaded_freight_cells,
-		float(TILE_SIZE)
-	)
-
-	var loaded_freight_state: Dictionary = data["freight"].duplicate()
-
-	# If facility cleanup changed the map, return the freight train
-	# to the forest while keeping its cargo onboard.
-	if removed_count > 0:
-		loaded_freight_state["distance"] = 0.0
-		loaded_freight_state["to_terminal"] = true
-		loaded_freight_state["dwell"] = 0.0
-
-	if not FreightTrain.is_valid_state(
-		loaded_freight_state,
-		loaded_freight_path.get_baked_length()
-	):
+	else:
+		var distances: Array = built["distances"]
+		var next_stop: int = stop_index + (1 if state["travelling_to_b"] else -1)
+		if next_stop < 0 or next_stop >= distances.size():
+			_show_notice("Saved train stop direction is invalid.")
+			return
+		var lower: float = minf(distances[stop_index], distances[next_stop])
+		var upper: float = maxf(distances[stop_index], distances[next_stop])
+		if loaded_distance < lower - 0.001 or loaded_distance > upper + 0.001:
+			_show_notice("Saved train position is outside its current leg.")
+			return
+		if (state["train_needs_boarding"] or float(state["wait_remaining"]) > 0.0) and absf(loaded_distance - distances[stop_index]) > 0.001:
+			_show_notice("Saved train is waiting away from a station.")
+			return
+	var loaded_freight_cells: Array[Vector2i] = _find_freight_route(loaded_tracks, loaded_cells)
+	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
+	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length()):
 		_show_notice("Saved freight train state is invalid.")
 		return
-	# All checks passed. Apply the loaded state.
+	# Commit only after validating every service and train.
 	tracks = loaded_tracks
+	services = data["services"].duplicate(true)
 	route_cells = loaded_cells
 	route_path = loaded_path
+	stop_distances.assign(built["distances"])
+	passenger_route_error = built["error"]
 	route_connected = not route_cells.is_empty()
-
 	for field in SAVE_FIELDS:
-		var current_value: Variant = get(field)
-
-		match typeof(current_value):
-			TYPE_INT:
-				set(field, int(state[field]))
-			TYPE_FLOAT:
-				set(field, float(state[field]))
-			TYPE_BOOL:
-				set(field, state[field])
-
-	route_distance = clampf(
-		loaded_distance,
-		0.0,
-		route_path.get_baked_length()
-	)
-
+		match typeof(get(field)):
+			TYPE_INT: set(field, int(state[field]))
+			TYPE_FLOAT: set(field, float(state[field]))
+			TYPE_BOOL: set(field, state[field])
+	route_distance = loaded_distance
 	is_dragging = false
-
 	_update_train_transform()
 	freight_train.set_route(loaded_freight_cells, float(TILE_SIZE))
-	freight_train.restore_state(loaded_freight_state)
+	freight_train.restore_state(data["freight"])
 	scenario_goals.current_index = int(data["scenario_stage"])
-	if removed_count > 0:
-		_show_notice(
-			"Loaded: removed %d tracks from station space; refunded £%d."
-			% [removed_count, removed_count * TRACK_BUILD_COST]
-		)
-	elif save_path == SAVE_BACKUP_PATH:
-		_show_notice("Previous save loaded.")
-	else:
-		_show_notice("Game loaded.")
+	sim_clock.restore_state(data["sim"]["clock"])
+	sim_rng.restore_state(data["sim"]["rng"])
+	event_log.restore_state(data["sim"]["events"])
+	var loaded_notice: String = "Previous save loaded." if save_path == SAVE_BACKUP_PATH else "Game loaded."
+	if migration["migrated"]:
+		loaded_notice += " Upgraded from save version %d; saving again keeps the new format." % int(migration["from_version"])
+	_show_notice(loaded_notice)
 	_update_instructions()
 	_clear_construction_history()
 	_update_history_controls()
 	queue_redraw()
 
-func _draw_curve(
-	cell: Vector2i,
-	curve: String,
-	preview: bool
-) -> void:
-	var origin: Vector2 = Vector2(cell) * TILE_SIZE
-	var center: Vector2
-	var start_angle: float
 
-	match curve:
-		"NE":
-			center = origin + Vector2(TILE_SIZE, 0)
-			start_angle = PI / 2.0
-		"SE":
-			center = origin + Vector2(TILE_SIZE, TILE_SIZE)
-			start_angle = PI
-		"SW":
-			center = origin + Vector2(0, TILE_SIZE)
-			start_angle = PI * 1.5
-		"NW":
-			center = origin
-			start_angle = 0.0
-		_:
-			return
-
-	var end_angle: float = start_angle + PI / 2.0
-	var rail_color: Color = PREVIEW_COLOR if preview else RAIL_COLOR
-	var sleeper_color: Color = SLEEPER_COLOR
-
-	if preview:
-		sleeper_color.a = 0.5
-
-		draw_rect(
-			Rect2(origin, Vector2(TILE_SIZE, TILE_SIZE)),
-			Color(0.35, 0.9, 0.55, 0.12)
-		)
-
-	# Sleepers cross the curved rails.
-	for index in range(4):
-		var fraction: float = (float(index) + 0.5) / 4.0
-		var angle: float = lerpf(start_angle, end_angle, fraction)
-		var direction := Vector2(cos(angle), sin(angle))
-
-		draw_line(
-			center + direction * 6.0,
-			center + direction * 26.0,
-			sleeper_color,
-			4.0
-		)
-
-	# Match the spacing of the straight rails at each cell edge.
-	for radius in [10.0, 22.0]:
-		draw_arc(
-			center,
-			radius,
-			start_angle,
-			end_angle,
-			13,
-			rail_color,
-			2.0,
-			false
-		)
-		
 func _is_valid_track_type(value: Variant) -> bool:
-	if typeof(value) == TYPE_BOOL:
-		return true
+	return TrackGeometry.connections(value).size() == 2
 
-	if typeof(value) == TYPE_STRING:
-		return value in ["NE", "SE", "SW", "NW"]
-
-	return false
 
 func _update_train_transform() -> void:
 	if not route_connected:
-		train_position = _cell_center(STATION_A)
+		train_position = _cell_center(ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["cell"])
 		train_heading = 0.0
 		return
 
@@ -1365,41 +1128,15 @@ func _update_train_transform() -> void:
 func _setup_toolbar() -> void:
 	straight_button.pressed.connect(_select_straight_track)
 	curve_button.pressed.connect(_select_curved_track)
-	rotate_button.pressed.connect(_rotate_selected_track)
+	rotate_button.hide()
 	pause_button.pressed.connect(_toggle_pause)
 	save_button.pressed.connect(_save_game)
 	load_button.pressed.connect(_load_game)
 	folder_button.pressed.connect(_open_save_folder)
 	inspect_button.pressed.connect(_toggle_inspect_mode)
-	inspect_button.tooltip_text = "Inspect a station. Shortcut: I"
-	inspect_button.focus_mode = Control.FOCUS_NONE
-
-	straight_button.tooltip_text = "Drag to build straight track."
-	curve_button.tooltip_text = "Click to place a curved track."
-	rotate_button.tooltip_text = "Rotate the selected piece. Shortcut: R"
-	pause_button.tooltip_text = "Pause or resume. Shortcut: Space"
-	save_button.tooltip_text = "Save your current railway."
-	load_button.tooltip_text = "Restore your latest saved railway."
-	folder_button.tooltip_text = "Open the folder containing your saved game."
-
-	# Keep Space available for pausing after clicking a button.
-	for button in [
-		straight_button,
-		curve_button,
-		rotate_button,
-		pause_button,
-		save_button,
-		load_button,
-		folder_button
-	]:
+	backup_button.pressed.connect(_load_game.bind(SAVE_BACKUP_PATH))
+	for button in [straight_button, curve_button, pause_button, save_button, load_button, folder_button, inspect_button, backup_button]:
 		button.focus_mode = Control.FOCUS_NONE
-		backup_button.pressed.connect(
-		_load_game.bind(SAVE_BACKUP_PATH)
-	)
-
-	backup_button.tooltip_text = "Restore the version before your latest save."
-	backup_button.focus_mode = Control.FOCUS_NONE
-
 	_update_toolbar()
 
 
@@ -1407,7 +1144,8 @@ func _select_straight_track() -> void:
 	inspect_mode = false
 	_close_station_inspector()
 	is_dragging = false
-	selected_curve = ""
+	draw_track_mode = false
+	build_plan.clear()
 	_update_toolbar()
 
 
@@ -1415,30 +1153,8 @@ func _select_curved_track() -> void:
 	inspect_mode = false
 	_close_station_inspector()
 	is_dragging = false
-
-	if selected_curve.is_empty():
-		selected_curve = "NE"
-
-	_update_toolbar()
-
-
-func _rotate_selected_track() -> void:
-	if is_dragging or inspect_mode:
-		return
-
-	if selected_curve.is_empty():
-		placing_vertical = not placing_vertical
-	else:
-		match selected_curve:
-			"NE":
-				selected_curve = "SE"
-			"SE":
-				selected_curve = "SW"
-			"SW":
-				selected_curve = "NW"
-			"NW":
-				selected_curve = "NE"
-
+	draw_track_mode = true
+	build_plan.clear()
 	_update_toolbar()
 
 
@@ -1462,11 +1178,11 @@ func _update_toolbar() -> void:
 	inspect_button.set_pressed_no_signal(inspect_mode)
 
 	straight_button.set_pressed_no_signal(
-		not inspect_mode and selected_curve.is_empty()
+		not inspect_mode and not draw_track_mode
 	)
 
 	curve_button.set_pressed_no_signal(
-		not inspect_mode and not selected_curve.is_empty()
+		not inspect_mode and draw_track_mode
 	)
 	pause_button.set_pressed_no_signal(paused)
 
@@ -1475,17 +1191,17 @@ func _update_toolbar() -> void:
 	if toolbar_icon_textures.size() == 10:
 		pause_button.icon = toolbar_icon_textures[5 if paused else 4]
 
-	pause_button.tooltip_text = (
-		"Resume simulation — Space"
-		if paused
-		else "Pause simulation — Space"
-	)
+	pause_button.tooltip_text = "%s — %s" % [
+		"Resume simulation" if paused else "Pause simulation",
+		InputActions.key_label(InputActions.TOGGLE_PAUSE)
+	]
 
-	rotate_button.disabled = is_dragging or inspect_mode
 	save_button.disabled = is_dragging
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
+	if _modal_open():
+		return
 	if event is InputEventMouseButton:
 		# Release the middle button anywhere to stop panning.
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
@@ -1671,7 +1387,7 @@ func _close_station_inspector() -> void:
 
 
 func _inspect_station_at(cell: Vector2i) -> void:
-	for station in [STATION_A, STATION_B, FOREST_SITE, CARGO_TERMINAL]:
+	for station in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
 		var inside_station_grounds: bool = (
 			cell.x >= station.x - 1
 			and cell.x <= station.x + 1
@@ -1702,18 +1418,15 @@ func _update_station_inspector() -> void:
 	freight_rule_label.hide()
 	freight_rule_option.hide()
 
-	var is_station_a: bool = selected_station == STATION_A
-	var station_name: String = "Station A" if is_station_a else "Station B"
-	var destination_name: String = "Station B" if is_station_a else "Station A"
-
-	var waiting: int = waiting_at_a if is_station_a else waiting_at_b
+	var station_key: String = _station_key(selected_station)
+	var station_name: String = ServiceRoutes.STATIONS[station_key]["name"]
+	var destination_name: String = services["passenger"]["name"]
+	if not services["passenger"]["stops"].has(station_key):
+		destination_name += " (not served)"
+	var waiting: int = _waiting(station_key)
 	var incoming: int = 0
-
-	if route_connected:
-		if is_station_a and not travelling_to_b:
-			incoming = passengers_on_train
-		elif not is_station_a and travelling_to_b:
-			incoming = passengers_on_train
+	if route_connected and services["passenger"]["stops"][_next_passenger_stop()] == station_key:
+		incoming = passengers_on_train
 
 	var train_at_station: bool = (
 		train_position.distance_to(_cell_center(selected_station)) < 0.5
@@ -1727,7 +1440,7 @@ func _update_station_inspector() -> void:
 	station_title.text = station_name
 
 	station_details.text = (
-		"Destination: %s"
+		"Route: %s"
 		+ "\n\nWaiting passengers: %d"
 		+ "\nIncoming passengers: %d"
 		+ "\n\nShared train"
@@ -1789,33 +1502,13 @@ func _update_upgrade_button(
 	else:
 		button.tooltip_text = benefit
 
-func _draw_build_preview(cell: Vector2i, track_type: Variant) -> void:
-	if _is_station_space(cell):
-		var origin: Vector2 = Vector2(cell) * TILE_SIZE
-		var warning_color := Color(1.0, 0.3, 0.25)
+func _draw_invalid_build_cell(cell: Vector2i) -> void:
+	var origin: Vector2 = Vector2(cell) * TILE_SIZE
+	var mark_color: Color = Palette.get_color(Palette.Role.BAD_MARK)
+	draw_rect(Rect2(origin, Vector2.ONE * TILE_SIZE), Palette.get_color(Palette.Role.BAD_FILL))
+	draw_line(origin + Vector2(6, 6), origin + Vector2(TILE_SIZE - 6, TILE_SIZE - 6), mark_color, 2.0)
+	draw_line(origin + Vector2(TILE_SIZE - 6, 6), origin + Vector2(6, TILE_SIZE - 6), mark_color, 2.0)
 
-		draw_rect(
-			Rect2(origin, Vector2(TILE_SIZE, TILE_SIZE)),
-			Color(1.0, 0.15, 0.1, 0.25)
-		)
-
-		draw_line(
-			origin + Vector2(6, 6),
-			origin + Vector2(TILE_SIZE - 6, TILE_SIZE - 6),
-			warning_color,
-			2.0
-		)
-
-		draw_line(
-			origin + Vector2(TILE_SIZE - 6, 6),
-			origin + Vector2(6, TILE_SIZE - 6),
-			warning_color,
-			2.0
-		)
-
-		return
-
-	_draw_track(cell, track_type, true)
 
 func _remove_station_space_tracks(track_data: Dictionary) -> int:
 	var removed_count: int = 0
@@ -1871,6 +1564,7 @@ func _upgrade_capacity() -> void:
 
 	money -= price
 	capacity_upgrade_level += 1
+	_record_event(EventLog.UPGRADE_BOUGHT, "passenger", {"kind": "capacity", "level": capacity_upgrade_level, "price": price})
 
 	_show_notice(
 		"Capacity upgraded to %d passengers." % _get_train_capacity()
@@ -1899,6 +1593,7 @@ func _upgrade_speed() -> void:
 
 	money -= price
 	speed_upgrade_level += 1
+	_record_event(EventLog.UPGRADE_BOUGHT, "passenger", {"kind": "speed", "level": speed_upgrade_level, "price": price})
 
 	_show_notice(
 		"Speed upgraded to %.0f pixels/second." % _get_train_speed()
@@ -1949,7 +1644,7 @@ func _update_freight_inspector() -> void:
 
 	if rule_index >= 0:
 		freight_rule_option.select(rule_index)
-	var train_status: String = freight_train.status_text()
+	var train_status: String = services["freight"]["name"] + " — " + freight_train.status_text()
 
 	if paused:
 		train_status = "Paused — " + train_status
@@ -2019,32 +1714,9 @@ func _update_freight_inspector() -> void:
 		FreightTrain.MAX_SPEED_LEVEL
 	]
 		
-func _setup_camera_keys() -> void:
-	_add_camera_key(&"camera_up", KEY_W)
-	_add_camera_key(&"camera_up", KEY_UP)
-
-	_add_camera_key(&"camera_down", KEY_S)
-	_add_camera_key(&"camera_down", KEY_DOWN)
-
-	_add_camera_key(&"camera_left", KEY_A)
-	_add_camera_key(&"camera_left", KEY_LEFT)
-
-	_add_camera_key(&"camera_right", KEY_D)
-	_add_camera_key(&"camera_right", KEY_RIGHT)
-
-
-func _add_camera_key(action: StringName, physical_key: Key) -> void:
-	if not InputMap.has_action(action):
-		InputMap.add_action(action)
-
-	var key_event := InputEventKey.new()
-	key_event.physical_keycode = physical_key
-
-	if not InputMap.action_has_event(action, key_event):
-		InputMap.action_add_event(action, key_event)
-
-
 func _move_camera_with_keyboard(delta: float) -> void:
+	if _modal_open():
+		return
 	# Avoid shifting an unfinished construction preview.
 	if is_dragging or is_panning:
 		return
@@ -2066,7 +1738,7 @@ func _move_camera_with_keyboard(delta: float) -> void:
 
 	var speed: float = KEYBOARD_PAN_SPEED
 
-	if Input.is_key_pressed(KEY_SHIFT):
+	if Input.is_action_pressed(InputActions.CAMERA_FAST):
 		speed *= 2.0
 
 	camera.position += direction * speed * delta / camera.zoom.x
@@ -2100,7 +1772,7 @@ func _find_freight_route(
 		if passenger_cells.has(cell):
 			return empty_route
 
-		if cell == STATION_A or cell == STATION_B:
+		if cell in [STATION_A, STATION_B, STATION_C]:
 			return empty_route
 
 	return candidate
@@ -2124,6 +1796,7 @@ func _on_logs_delivered(amount: int) -> void:
 	logs_delivered += amount
 	freight_income += payment
 	money += payment
+	_record_event(EventLog.CARGO_DELIVERED, "freight", {"logs": amount, "payment": payment})
 func _on_freight_operating_expense(amount: int) -> void:
 	money -= amount
 	freight_operating_cost += amount
@@ -2150,6 +1823,7 @@ func _upgrade_freight_capacity() -> void:
 
 	money -= price
 	freight_train.capacity_level += 1
+	_record_event(EventLog.UPGRADE_BOUGHT, "freight", {"kind": "capacity", "level": freight_train.capacity_level, "price": price})
 
 	_show_notice(
 		"Freight capacity increased to %d logs."
@@ -2176,6 +1850,7 @@ func _upgrade_freight_speed() -> void:
 
 	money -= price
 	freight_train.speed_level += 1
+	_record_event(EventLog.UPGRADE_BOUGHT, "freight", {"kind": "speed", "level": freight_train.speed_level, "price": price})
 
 	_show_notice(
 		"Freight speed increased to %.0f pixels/second."
@@ -2372,21 +2047,16 @@ func _passenger_service_is_active() -> bool:
 
 
 func _passenger_service_status() -> String:
+	var title: String = services["passenger"]["name"]
 	if not route_connected:
-		return "No connected passenger route"
-
+		return title + ": " + passenger_route_error
+	var home: String = ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["name"]
 	if not passenger_service_enabled:
-		if _passenger_service_is_active():
-			return "Withdrawing after return to Station A"
-
-		return "Passenger service stopped at Station A"
-
+		return title + (": withdrawing to " if _passenger_service_is_active() else ": stopped at ") + home
 	if wait_remaining > 0.0:
-		return "At station: departing in %.1f seconds." % wait_remaining
+		return "%s: departing %s in %.1f seconds" % [title, ServiceRoutes.STATIONS[services["passenger"]["stops"][passenger_stop_index]]["name"], wait_remaining]
+	return title + ": travelling to " + ServiceRoutes.STATIONS[services["passenger"]["stops"][_next_passenger_stop()]]["name"]
 
-	return "Travelling to " + (
-		"Station B." if travelling_to_b else "Station A."
-	)
 
 func _selected_service_is_freight() -> bool:
 	return (
@@ -2398,6 +2068,7 @@ func _selected_service_is_freight() -> bool:
 func _toggle_selected_service() -> void:
 	if _selected_service_is_freight():
 		freight_train.service_enabled = not freight_train.service_enabled
+		_record_event(EventLog.SERVICE_TOGGLED, "freight", {"enabled": freight_train.service_enabled})
 
 		if freight_train.service_enabled:
 			_show_notice("Freight service enabled.")
@@ -2405,11 +2076,12 @@ func _toggle_selected_service() -> void:
 			_show_notice("Freight service will stop at the forest.")
 	else:
 		passenger_service_enabled = not passenger_service_enabled
+		_record_event(EventLog.SERVICE_TOGGLED, "passenger", {"enabled": passenger_service_enabled})
 
 		if passenger_service_enabled:
 			_show_notice("Passenger service enabled.")
 		else:
-			_show_notice("Passenger service will stop at Station A.")
+			_show_notice("Passenger service will stop at its first route stop.")
 
 	_update_station_inspector()
 
@@ -2430,7 +2102,7 @@ func _update_service_button() -> void:
 		if passenger_service_enabled:
 			service_button.text = "Withdraw passenger service"
 			service_button.tooltip_text = (
-				"Finish the current round trip, then stop at Station A."
+				"Finish the current round trip, then stop at the first route stop."
 			)
 		else:
 			service_button.text = "Enable passenger service"
@@ -2444,7 +2116,7 @@ func _can_demolish(cell: Vector2i) -> bool:
 	if not tracks.has(cell) or _is_station_space(cell):
 		return false
 
-	if cell in [STATION_A, STATION_B, FOREST_SITE, CARGO_TERMINAL]:
+	if cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
 		return false
 
 	return true
@@ -2504,6 +2176,7 @@ func _finish_demolition(target: Vector2i) -> void:
 		0
 	)
 
+	_record_event(EventLog.TRACK_DEMOLISHED, "player", {"tiles": before.size(), "refund": refund})
 	_check_route()
 
 	_show_notice(
@@ -2687,7 +2360,6 @@ func _setup_toolbar_icons() -> void:
 	var buttons: Array[Button] = [
 		straight_button,
 		curve_button,
-		rotate_button,
 		inspect_button,
 		pause_button,
 		save_button,
@@ -2697,7 +2369,7 @@ func _setup_toolbar_icons() -> void:
 	]
 
 	var icon_indices: Array[int] = [
-		0, 1, 2, 3, 4, 6, 7, 8, 9
+		0, 1, 3, 4, 6, 7, 8, 9
 	]
 
 	for index in range(buttons.size()):
@@ -2713,9 +2385,8 @@ func _setup_toolbar_icons() -> void:
 		# Smooth UI icons while the map retains its pixel-art filtering.
 		button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 
-	straight_button.tooltip_text = "Straight track — drag to build"
-	curve_button.tooltip_text = "Curved track — click to place"
-	rotate_button.tooltip_text = "Rotate track — R"
+	straight_button.tooltip_text = "Connect track — drag between two points; automatic diagonal and platform approaches"
+	curve_button.tooltip_text = "Draw track — hold left mouse and change direction; bends are automatic"
 	inspect_button.tooltip_text = "Inspect stations and industries — I"
 	save_button.tooltip_text = "Save game"
 	load_button.tooltip_text = "Load latest save"
@@ -2723,6 +2394,63 @@ func _setup_toolbar_icons() -> void:
 	backup_button.tooltip_text = "Load previous save"
 
 	_update_toolbar()
+func _setup_settings_dialog() -> void:
+	settings_dialog = SettingsDialog.new()
+	settings_dialog.configure()
+	settings_dialog.settings_applied.connect(_apply_settings)
+	$Interface.add_child(settings_dialog)
+
+	settings_button = Button.new()
+	settings_button.text = "Settings"
+	settings_button.focus_mode = Control.FOCUS_NONE
+	settings_button.tooltip_text = "Interface scale, colours and keys"
+	settings_button.pressed.connect(_open_settings)
+	$Interface/Toolbar.add_child(settings_button)
+
+
+func _open_settings() -> void:
+	is_dragging = false
+	is_panning = false
+	demolition_cells.clear()
+	build_plan.clear()
+	settings_dialog.open_dialog()
+
+
+# Pushes the current player settings to everything that shows them.
+func _apply_settings() -> void:
+	GameSettings.apply(get_window())
+	network_map.facilities = _facility_markers()
+	freight_train.queue_redraw()
+	_refresh_shortcut_tooltips()
+	queue_redraw()
+
+
+func _facility_markers() -> Array[Dictionary]:
+	var markers: Array[Dictionary] = []
+
+	for station in [STATION_A, STATION_B, STATION_C]:
+		markers.append({
+			"cell": station,
+			"color": Palette.get_color(Palette.Role.FACILITY_STATION)
+		})
+
+	markers.append({
+		"cell": FOREST_SITE,
+		"color": Palette.get_color(Palette.Role.FACILITY_FOREST)
+	})
+	markers.append({
+		"cell": CARGO_TERMINAL,
+		"color": Palette.get_color(Palette.Role.FACILITY_TERMINAL)
+	})
+	return markers
+
+
+func _refresh_shortcut_tooltips() -> void:
+	inspect_button.tooltip_text = "Inspect stations and industries — %s" % InputActions.key_label(InputActions.TOGGLE_INSPECT)
+	map_button.tooltip_text = "Show or hide the network map — %s" % InputActions.key_label(InputActions.TOGGLE_MAP)
+	goals_button.tooltip_text = "Show or hide scenario objectives — %s" % InputActions.key_label(InputActions.TOGGLE_GOALS)
+
+
 func _setup_network_map() -> void:
 	network_map = NetworkMap.new()
 	network_map.name = "NetworkMap"
@@ -2736,6 +2464,10 @@ func _setup_network_map() -> void:
 		},
 		{
 			"cell": STATION_B,
+			"color": Color("#F4D56A")
+		},
+		{
+			"cell": STATION_C,
 			"color": Color("#F4D56A")
 		},
 		{
@@ -2842,6 +2574,7 @@ func _check_scenario_objectives() -> void:
 		return
 
 	money += reward
+	_record_event(EventLog.OBJECTIVE_COMPLETED, "player", {"count": completed, "reward": reward, "stage": scenario_goals.current_index})
 
 	if scenario_goals.is_complete():
 		_show_notice(
@@ -2960,3 +2693,87 @@ func _update_objective_panel() -> void:
 		target,
 		int(goal["reward"])
 	]
+
+
+func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
+	if not force and target == build_last_hover:
+		return
+	build_last_hover = target
+	var cells: Array[Vector2i]
+	if draw_track_mode:
+		if build_stroke.is_empty():
+			build_stroke.append(drag_start)
+		if target != build_stroke.back():
+			if build_stroke.size() <= 2 and tracks.has(drag_start):
+				# A pointer update on the first new tile must not let the
+				# next update turn that tile into a bend.
+				build_stroke = TrackBuilder.line(drag_start, target, tracks)
+			elif tracks.has(target):
+				var addition: Array[Vector2i] = TrackBuilder.line(build_stroke.back(), target, tracks)
+				for index in range(1, addition.size()):
+					TrackBuilder.append_stroke(build_stroke, addition[index])
+			else:
+				TrackBuilder.append_stroke(build_stroke, target)
+		cells = build_stroke
+	else:
+		cells = TrackBuilder.line(drag_start, target, tracks)
+	var fixed: Array[Vector2i] = [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
+	build_plan = TrackBuilder.plan(cells, tracks, Vector2i(MAP_WIDTH, MAP_HEIGHT), _is_station_space, fixed)
+
+func _waiting(key: String) -> int:
+	return int(get("waiting_at_" + key))
+
+func _set_waiting(key: String, count: int) -> void:
+	set("waiting_at_" + key, count)
+
+func _station_key(cell: Vector2i) -> String:
+	for key in ServiceRoutes.STATIONS:
+		if ServiceRoutes.STATIONS[key]["cell"] == cell:
+			return key
+	return "a"
+
+func _next_passenger_stop() -> int:
+	return passenger_stop_index + (1 if travelling_to_b else -1)
+
+func _return_onboard_passengers() -> void:
+	if passengers_on_train > 0:
+		var key: String = services["passenger"]["stops"][passenger_stop_index]
+		_set_waiting(key, _waiting(key) + passengers_on_train)
+	passengers_on_train = 0
+
+func _setup_routes_editor() -> void:
+	route_editor = RouteEditor.new()
+	route_editor.configure(self)
+	$Interface.add_child(route_editor)
+	routes_button = Button.new()
+	routes_button.text = "Routes"
+	routes_button.focus_mode = Control.FOCUS_NONE
+	routes_button.tooltip_text = "Name services and edit ordered stops"
+	routes_button.pressed.connect(_open_routes_editor)
+	$Interface/Toolbar.add_child(routes_button)
+
+func _open_routes_editor() -> void:
+	paused = true
+	is_dragging = false
+	is_panning = false
+	demolition_cells.clear()
+	build_plan.clear()
+	_close_station_inspector()
+	_update_toolbar()
+	route_editor.open_editor()
+
+func apply_service_routes(configuration: Dictionary) -> String:
+	if not ServiceRoutes.is_valid(configuration):
+		return "Use a name of 1–40 characters and at least two different passenger stops."
+	if not paused:
+		return "Pause before changing routes."
+	var changed: bool = configuration["passenger"]["stops"] != services["passenger"]["stops"]
+	if changed:
+		_return_onboard_passengers()
+	services = configuration.duplicate(true)
+	if changed:
+		_check_route(true)
+	_update_instructions()
+	_update_station_inspector()
+	queue_redraw()
+	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error

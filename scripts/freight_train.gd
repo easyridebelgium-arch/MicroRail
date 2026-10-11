@@ -3,6 +3,7 @@ extends Node2D
 signal delivered(amount: int)
 signal operating_expense(amount: int)
 const Router = preload("res://scripts/rail_router.gd")
+const Palette = preload("res://scripts/core/palette.gd")
 
 const CAPACITY: int = 20
 const SPEED: float = 60.0
@@ -127,7 +128,7 @@ func _update_transform() -> void:
 func _draw() -> void:
 	var body := Rect2(Vector2(-14, -8), Vector2(28, 16))
 
-	draw_rect(body, Color(0.15, 0.45, 0.85))
+	draw_rect(body, Palette.get_color(Palette.Role.TRAIN_FREIGHT))
 	draw_rect(body, Color(0.05, 0.12, 0.22), false, 1.0)
 
 	draw_rect(

@@ -44,6 +44,9 @@ func _run() -> void:
 	game._reset_camera()
 	check(is_equal_approx(game.camera.zoom.x, 0.5), "reset gives the compensated zoom at 200%")
 
+	check(not game.header_title.visible and Settings.use_compact_header(), "200% uses the compact header")
+	check(game.instructions.text.count("\n") == 1, "compact status text is two lines")
+
 	# The Apply button must stay reachable at the largest scale.
 	game.settings_dialog.open_dialog()
 	await process_frame
@@ -58,6 +61,7 @@ func _run() -> void:
 	Settings.ui_scale = 1.0
 	game._apply_settings()
 	check(is_equal_approx(game.camera.zoom.x, 1.0), "back to 100% restores the camera zoom")
+	check(game.header_title.visible and not Settings.use_compact_header(), "100% uses the full header")
 
 	check(game.header_box.get_parent() == game.get_node("Interface"), "header box exists")
 	game._layout_header()

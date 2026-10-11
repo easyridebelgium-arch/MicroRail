@@ -28,6 +28,10 @@ static var ui_scale: float = 1.0
 static var palette_mode: int = PaletteMode.DEFAULT
 static var reduced_motion: bool = false
 
+## Hides the title and key hints and shortens the status text. Always on at 150%
+## and above, where the header would otherwise fill the window.
+static var compact_header: bool = false
+
 ## {action name: [key codes]} as saved. Empty means "use the defaults".
 static var key_bindings: Dictionary = {}
 
@@ -45,6 +49,7 @@ static func load_settings() -> void:
 		PaletteMode.size() - 1
 	)
 	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
+	compact_header = bool(config.get_value("display", "compact_header", false))
 
 	var saved_bindings: Variant = config.get_value("input", "bindings", {})
 	key_bindings = saved_bindings if saved_bindings is Dictionary else {}
@@ -57,6 +62,7 @@ static func save_settings() -> bool:
 	config.set_value("display", "ui_scale", ui_scale)
 	config.set_value("display", "palette", palette_mode)
 	config.set_value("display", "reduced_motion", reduced_motion)
+	config.set_value("display", "compact_header", compact_header)
 	config.set_value("input", "bindings", key_bindings)
 
 	return config.save(SETTINGS_PATH) == OK
@@ -65,6 +71,10 @@ static func save_settings() -> bool:
 ## Applies the settings that act on the window itself.
 static func apply(window: Window) -> void:
 	window.content_scale_factor = ui_scale
+
+
+static func use_compact_header() -> bool:
+	return compact_header or ui_scale >= 1.5
 
 
 static func nearest_scale(value: float) -> float:

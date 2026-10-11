@@ -10,6 +10,7 @@ const Actions = preload("res://scripts/core/input_actions.gd")
 var scale_choice: OptionButton
 var palette_choice: OptionButton
 var reduced_motion_check: CheckBox
+var compact_header_check: CheckBox
 var key_grid: GridContainer
 var status: Label
 
@@ -53,6 +54,10 @@ func configure() -> void:
 	reduced_motion_check.text = "Reduced motion (fewer moving effects as they are added)"
 	box.add_child(reduced_motion_check)
 
+	compact_header_check = CheckBox.new()
+	compact_header_check.text = "Compact header (always on at 150% and above)"
+	box.add_child(compact_header_check)
+
 	box.add_child(_heading("Keys — click one, then press the new key"))
 
 	key_grid = GridContainer.new()
@@ -93,6 +98,7 @@ func open_dialog() -> void:
 	scale_choice.select(Settings.UI_SCALES.find(Settings.ui_scale))
 	palette_choice.select(Settings.palette_mode)
 	reduced_motion_check.button_pressed = Settings.reduced_motion
+	compact_header_check.button_pressed = Settings.compact_header
 	draft_bindings = Actions.export_bindings()
 	capturing_action = &""
 	status.text = ""
@@ -207,6 +213,7 @@ func _apply() -> void:
 	Settings.ui_scale = Settings.UI_SCALES[scale_index]
 	Settings.palette_mode = maxi(palette_choice.selected, 0)
 	Settings.reduced_motion = reduced_motion_check.button_pressed
+	Settings.compact_header = compact_header_check.button_pressed
 
 	Actions.apply_bindings(draft_bindings)
 	Settings.key_bindings = Actions.export_bindings()

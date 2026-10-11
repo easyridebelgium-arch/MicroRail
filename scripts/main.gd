@@ -212,6 +212,8 @@ var goals_button: Button
 @onready var camera: Camera2D = $Camera2D
 @onready var header_background: ColorRect = $Interface/HeaderBackground
 @onready var header_box: VBoxContainer = $Interface/HeaderBox
+@onready var header_title: Label = $Interface/HeaderBox/Title
+@onready var header_toolbar: HFlowContainer = $Interface/HeaderBox/Toolbar
 @onready var backup_button: Button = $Interface/HeaderBox/Toolbar/BackupButton
 @onready var inspect_button: Button = $Interface/HeaderBox/Toolbar/InspectButton
 
@@ -506,6 +508,37 @@ func _update_instructions() -> void:
 	if preview_cost > 0 and preview_cost > money:
 		affordability = " — insufficient funds"
 
+	var status_line: String = "%s | Cell: %d,%d | Build: £%d%s | %s" % [
+		direction,
+		hovered_cell.x,
+		hovered_cell.y,
+		preview_cost,
+		affordability,
+		status
+	]
+	var waiting_line: String = "Waiting: A %d / B %d / C %d | Onboard: %d/%d | Delivered: %d" % [
+		waiting_at_a,
+		waiting_at_b,
+		waiting_at_c,
+		passengers_on_train,
+		_get_train_capacity(),
+		passengers_delivered
+	]
+	var money_line: String = "Balance: £%d | Fares: £%d | Freight: £%d | Build: £%d | Running: £%d | Fleet: £%d" % [
+		money,
+		passengers_delivered * TICKET_PRICE,
+		freight_income,
+		total_construction_cost,
+		total_operating_cost + freight_operating_cost,
+		total_vehicle_cost
+	]
+
+	if GameSettings.use_compact_header():
+		instructions.text = "%s\nBalance: £%d | %s" % [status_line, money, waiting_line]
+		instructions.tooltip_text = money_line
+		return
+
+	instructions.tooltip_text = ""
 	instructions.text = (
 		"Left-drag: automatic track | Right-drag: remove"
 		+ " | Right-click: cancel | Use toolbar to choose Connect or Draw"
@@ -513,39 +546,29 @@ func _update_instructions() -> void:
 			InputActions.key_label(InputActions.TOGGLE_PAUSE),
 			InputActions.key_label(InputActions.CANCEL)
 		]
-		+ "\n%s | Cell: %d,%d | Build: £%d%s | %s"
-		% [
-			direction,
-			hovered_cell.x,
-			hovered_cell.y,
-			preview_cost,
-			affordability,
-			status
-		]
-		+ "\nWaiting: A %d / B %d / C %d | Onboard: %d/%d | Delivered: %d"
-		% [
-			waiting_at_a,
-			waiting_at_b,
-			waiting_at_c,
-			passengers_on_train,
-			_get_train_capacity(),
-			passengers_delivered
-		]
-		+ "\nBalance: £%d | Fares: £%d | Freight: £%d | Build: £%d | Running: £%d | Fleet: £%d"
-		% [
-			money,
-			passengers_delivered * TICKET_PRICE,
-			freight_income,
-			total_construction_cost,
-			total_operating_cost + freight_operating_cost,
-			total_vehicle_cost
-		]
+		+ "\n" + status_line
+		+ "\n" + waiting_line
+		+ "\n" + money_line
 	)
 
 
 func _on_viewport_size_changed() -> void:
 	queue_redraw()
 	_layout_header()
+
+
+# Compact header: no title or key hints, shorter status text, tighter toolbar
+# and a smaller objectives panel, so the map keeps most of the window.
+func _apply_header_mode() -> void:
+	var compact: bool = GameSettings.use_compact_header()
+	header_title.visible = not compact
+	header_toolbar.add_theme_constant_override("h_separation", 4 if compact else 8)
+	instructions.mouse_filter = Control.MOUSE_FILTER_PASS if compact else Control.MOUSE_FILTER_IGNORE
+
+	if objective_progress != null:
+		objective_progress.visible = not compact
+
+	_update_instructions()
 
 
 # The header grows when the toolbar wraps onto more rows; panels below follow it.
@@ -566,10 +589,11 @@ func _layout_header() -> void:
 	var bottom_limit: float = get_viewport_rect().size.y - 64.0
 
 	if objective_panel != null:
-		_set_top_left_rect(objective_panel, column_top, column_top + 140.0)
+		var objective_height: float = 104.0 if GameSettings.use_compact_header() else 140.0
+		_set_top_left_rect(objective_panel, column_top, column_top + objective_height)
 
 		if objective_panel.visible:
-			column_top += 152.0
+			column_top += objective_height + 12.0
 
 	if network_map != null:
 		var map_height: float = clampf(bottom_limit - column_top, 120.0, 200.0)
@@ -2568,6 +2592,7 @@ func _apply_settings() -> void:
 	applied_ui_scale = GameSettings.ui_scale
 	camera.zoom = Vector2.ONE * player_zoom / applied_ui_scale
 	camera.force_update_scroll()
+	_apply_header_mode()
 	_layout_header()
 	network_map.facilities = _facility_markers()
 	freight_train.queue_redraw()

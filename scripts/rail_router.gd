@@ -8,69 +8,111 @@ static func connections(track_type: Variant) -> Array[Vector2i]:
 	return Geometry.connections(track_type)
 
 
-## Find a route using active connections at junctions.
-## switch_states: {cell: [active_port_a, active_port_b]} for junctions
+## Shortest route between two tiles, as a list of cells. Planning ignores the
+## current switch positions: the route is found over every move a train could
+## make, and find_path() reports which switch settings it needs.
 static func find_route(
 	tracks: Dictionary,
 	start: Vector2i,
-	destination: Vector2i,
-	switch_states: Dictionary = {}
+	destination: Vector2i
 ) -> Array[Vector2i]:
-	var empty_route: Array[Vector2i] = []
+	return find_path(tracks, start, destination)["cells"]
+
+
+## Like find_route, but returns {"cells": Array[Vector2i], "switches": Dictionary}.
+## "switches" maps each switch tile the route enters through its stem to the
+## state it needs (0 through, 1 branch). Trailing moves need no setting.
+##
+## The search runs over (tile, port the train entered through), so a switch
+## never lets a train pass from one exit straight to the other, and a crossing
+## never lets it change line.
+static func find_path(
+	tracks: Dictionary,
+	start: Vector2i,
+	destination: Vector2i
+) -> Dictionary:
+	var empty_cells: Array[Vector2i] = []
+	var result: Dictionary = {"cells": empty_cells, "switches": {}}
 
 	if not tracks.has(start) or not tracks.has(destination):
-		return empty_route
+		return result
 
-	var frontier: Array[Vector2i] = [start]
-	var visited: Dictionary = {start: true}
+	if start == destination:
+		var single: Array[Vector2i] = [start]
+		result["cells"] = single
+		return result
+
+	# A state is (cell, entry port index); the start has no entry port (-1).
+	var first_state := Vector3i(start.x, start.y, -1)
+	var frontier: Array[Vector3i] = [first_state]
+	var visited: Dictionary = {first_state: true}
 	var previous: Dictionary = {}
 	var index: int = 0
 
 	while index < frontier.size():
-		var current: Vector2i = frontier[index]
+		var state: Vector3i = frontier[index]
 		index += 1
+		var current := Vector2i(state.x, state.y)
 
-		if current == destination:
-			var route: Array[Vector2i] = [current]
-
-			while current != start:
-				current = previous[current]
-				route.append(current)
-
-			route.reverse()
-			return route
-
-		# Get active connections for this cell (use switch state if it's a junction)
-		var current_type: Variant = tracks[current]
-		var current_connections: Array[Vector2i]
-		if Geometry.is_junction(current_type) and switch_states.has(current):
-			current_connections = Geometry.active_connections(current_type, switch_states[current])
+		var exits: Array[Vector2i]
+		if state.z < 0:
+			exits = Geometry.connections(tracks[current])
 		else:
-			current_connections = connections(current_type)
+			exits = Geometry.exits_from(tracks[current], Geometry.DIRECTIONS[state.z])
 
-		for direction in current_connections:
+		for direction in exits:
 			var neighbor: Vector2i = current + direction
 
-			if visited.has(neighbor) or not tracks.has(neighbor):
+			if not tracks.has(neighbor):
 				continue
 
-			# Get active connections for neighbor
-			var neighbor_type: Variant = tracks[neighbor]
-			var neighbor_connections: Array[Vector2i]
-			if Geometry.is_junction(neighbor_type) and switch_states.has(neighbor):
-				neighbor_connections = Geometry.active_connections(neighbor_type, switch_states[neighbor])
-			else:
-				neighbor_connections = connections(neighbor_type)
+			# The neighbour must accept a train arriving through the shared edge.
+			var entry: Vector2i = -direction
 
-			# Both pieces must connect across their shared edge.
-			if not neighbor_connections.has(-direction):
+			if Geometry.exits_from(tracks[neighbor], entry).is_empty():
 				continue
 
-			visited[neighbor] = true
-			previous[neighbor] = current
-			frontier.append(neighbor)
+			var next_state := Vector3i(neighbor.x, neighbor.y, Geometry.DIRECTIONS.find(entry))
 
-	return empty_route
+			if visited.has(next_state):
+				continue
+
+			visited[next_state] = true
+			previous[next_state] = state
+
+			if neighbor == destination:
+				return _build_result(tracks, next_state, previous)
+
+			frontier.append(next_state)
+
+	return result
+
+
+static func _build_result(tracks: Dictionary, last: Vector3i, previous: Dictionary) -> Dictionary:
+	var states: Array[Vector3i] = [last]
+
+	while previous.has(states.back()):
+		states.append(previous[states.back()])
+
+	states.reverse()
+
+	var cells: Array[Vector2i] = []
+	var switches: Dictionary = {}
+
+	for position in range(states.size()):
+		var state: Vector3i = states[position]
+		var cell := Vector2i(state.x, state.y)
+		cells.append(cell)
+
+		# Leaving a switch through its stem side needs the right setting.
+		if state.z >= 0 and position + 1 < states.size():
+			var following := Vector2i(states[position + 1].x, states[position + 1].y)
+			var needed: int = Geometry.state_for(tracks[cell], Geometry.DIRECTIONS[state.z], following - cell)
+
+			if needed >= 0:
+				switches[cell] = needed
+
+	return {"cells": cells, "switches": switches}
 
 
 static func make_path(cells: Array[Vector2i], tile_size: float) -> Curve2D:

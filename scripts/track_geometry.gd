@@ -1,16 +1,27 @@
 extends RefCounted
 
-# Ports are clockwise from north. Simple tracks have 2 ports; junctions have 3 or 4.
+# Ports are directions from the middle of a tile toward a neighbour, clockwise
+# from north (index 0..7). A train entering a tile from the neighbour at
+# cell + d enters through port d.
+#
+# Tile kinds:
+#   simple    bool, "NE"/"SE"/"SW"/"NW" or "rail_a_b": exactly two ports.
+#   switch    "junction_<stem>_<through>_<branch>": port indices in that fixed
+#             order. Stem<->through and stem<->branch are ordinary rail shapes.
+#             The two exits are never connected to each other. State 0 sends
+#             a train from the stem to the through exit, state 1 to the branch.
+#             Trains entering from an exit always leave through the stem.
+#   crossing  "cross_<a>_<b>" (0 <= a < b <= 3): two straight lines, a<->a+4 and
+#             b<->b+4, always both usable. A train cannot change line.
 const DIRECTIONS: Array[Vector2i] = [
 	Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1),
 	Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1)
 ]
 static var _drawing_cache: Dictionary = {}
 
-## Returns all possible connection ports for a track type.
-## For simple tracks: 2 ports.
-## For T-junctions: 3 ports (junction_a_b_c).
-## For cross junctions: 4 ports (cross_a_b_c_d).
+
+## All ports of a tile. Simple: two. Switch: [stem, through, branch].
+## Crossing: [a, a+4, b, b+4]. Invalid or unknown: empty.
 static func connections(track_type: Variant) -> Array[Vector2i]:
 	var ports: Array[Vector2i] = []
 	if typeof(track_type) == TYPE_BOOL:
@@ -19,7 +30,6 @@ static func connections(track_type: Variant) -> Array[Vector2i]:
 	if typeof(track_type) != TYPE_STRING:
 		return ports
 
-	# Simple diagonal curves
 	match track_type:
 		"NE": ports.assign([Vector2i.UP, Vector2i.RIGHT])
 		"SE": ports.assign([Vector2i.RIGHT, Vector2i.DOWN])
@@ -30,98 +40,125 @@ static func connections(track_type: Variant) -> Array[Vector2i]:
 
 	var parts: PackedStringArray = track_type.split("_")
 
-	# Simple rail tracks: rail_a_b
 	if parts.size() == 3 and parts[0] == "rail":
-		if not parts[1].is_valid_int() or not parts[2].is_valid_int():
+		var rail: Array[int] = _indices(parts, 1)
+		if rail.size() != 2 or rail[0] >= rail[1] or not _valid_bend(rail[0], rail[1]):
 			return ports
-		var a: int = int(parts[1])
-		var b: int = int(parts[2])
-		if a < 0 or b > 7 or a >= b or mini(b - a, 8 - b + a) < 2:
+		if track_type != "rail_%d_%d" % [rail[0], rail[1]]:
 			return ports
-		if track_type != "rail_%d_%d" % [a, b]:
-			return ports
-		ports.assign([DIRECTIONS[a], DIRECTIONS[b]])
+		ports.assign([DIRECTIONS[rail[0]], DIRECTIONS[rail[1]]])
 		return ports
 
-	# T-junction: junction_a_b_c (three ports)
 	if parts.size() == 4 and parts[0] == "junction":
-		if not parts[1].is_valid_int() or not parts[2].is_valid_int() or not parts[3].is_valid_int():
+		var sw: Array[int] = _indices(parts, 1)
+		if sw.size() != 3 or sw[1] == sw[2]:
 			return ports
-		var a: int = int(parts[1])
-		var b: int = int(parts[2])
-		var c: int = int(parts[3])
-		if a < 0 or b < 0 or c < 0 or a > 7 or b > 7 or c > 7:
+		if not _valid_bend(sw[0], sw[1]) or not _valid_bend(sw[0], sw[2]):
 			return ports
-		if a == b or b == c or a == c:
+		if track_type != "junction_%d_%d_%d" % [sw[0], sw[1], sw[2]]:
 			return ports
-		ports.assign([DIRECTIONS[a], DIRECTIONS[b], DIRECTIONS[c]])
+		ports.assign([DIRECTIONS[sw[0]], DIRECTIONS[sw[1]], DIRECTIONS[sw[2]]])
 		return ports
 
-	# Cross junction: cross_a_b_c_d (four ports)
-	if parts.size() == 5 and parts[0] == "cross":
-		if not parts[1].is_valid_int() or not parts[2].is_valid_int() or not parts[3].is_valid_int() or not parts[4].is_valid_int():
+	if parts.size() == 3 and parts[0] == "cross":
+		var lines: Array[int] = _indices(parts, 1)
+		if lines.size() != 2 or lines[0] < 0 or lines[0] >= lines[1] or lines[1] > 3:
 			return ports
-		var a: int = int(parts[1])
-		var b: int = int(parts[2])
-		var c: int = int(parts[3])
-		var d: int = int(parts[4])
-		if a < 0 or b < 0 or c < 0 or d < 0 or a > 7 or b > 7 or c > 7 or d > 7:
+		if track_type != "cross_%d_%d" % [lines[0], lines[1]]:
 			return ports
-		if a == b or b == c or c == d or a == c or a == d or b == d:
-			return ports
-		ports.assign([DIRECTIONS[a], DIRECTIONS[b], DIRECTIONS[c], DIRECTIONS[d]])
+		ports.assign([DIRECTIONS[lines[0]], DIRECTIONS[lines[0] + 4], DIRECTIONS[lines[1]], DIRECTIONS[lines[1] + 4]])
 		return ports
 
 	return ports
 
 
-## Returns true if this track type is a junction (has 3 or 4 ports).
+# Port indices from parts[start..]; empty if any is not a plain 0..7 integer.
+static func _indices(parts: PackedStringArray, start: int) -> Array[int]:
+	var result: Array[int] = []
+	for index in range(start, parts.size()):
+		if not parts[index].is_valid_int():
+			return []
+		var value: int = int(parts[index])
+		if value < 0 or value > 7 or str(value) != parts[index]:
+			return []
+		result.append(value)
+	return result
+
+
+# Two ports form a track piece only if they are at least 90 degrees apart.
+static func _valid_bend(a: int, b: int) -> bool:
+	var gap: int = absi(a - b)
+	return a != b and mini(gap, 8 - gap) >= 2
+
+
+static func is_switch(track_type: Variant) -> bool:
+	return typeof(track_type) == TYPE_STRING and track_type.begins_with("junction_") and connections(track_type).size() == 3
+
+
+static func is_crossing(track_type: Variant) -> bool:
+	return typeof(track_type) == TYPE_STRING and track_type.begins_with("cross_") and connections(track_type).size() == 4
+
+
+## True for switches (kept for older callers); crossings have no state.
 static func is_junction(track_type: Variant) -> bool:
-	return connections(track_type).size() >= 3
+	return is_switch(track_type)
 
 
-## Returns the active connection ports for a junction given its switch state.
-## For simple tracks (2 ports), returns all connections (no switch state needed).
-## For junctions, switch_state should be a pair of port indices: [port_a, port_b]
-## Returns empty array if switch state is invalid for this track type.
-static func active_connections(track_type: Variant, switch_state: Array[Vector2i] = []) -> Array[Vector2i]:
-	var all_ports: Array[Vector2i] = connections(track_type)
+## Every exit a train may take after entering through `entry`, whatever the
+## switch is set to. Used for planning; empty if the move is impossible.
+static func exits_from(track_type: Variant, entry: Vector2i) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	var ports: Array[Vector2i] = connections(track_type)
 
-	# Simple tracks: all ports are always active
-	if all_ports.size() == 2:
-		return all_ports
+	if not ports.has(entry):
+		return result
 
-	# Junctions need a valid switch state
-	if switch_state.size() != 2:
-		return []
+	if is_switch(track_type):
+		if entry == ports[0]:
+			result.assign([ports[1], ports[2]])
+		else:
+			result.assign([ports[0]])
+	elif is_crossing(track_type):
+		result.assign([-entry])
+	else:
+		result.assign([ports[1] if entry == ports[0] else ports[0]])
 
-	var port_a: Vector2i = switch_state[0]
-	var port_b: Vector2i = switch_state[1]
-
-	if not all_ports.has(port_a) or not all_ports.has(port_b):
-		return []
-
-	return [port_a, port_b]
+	return result
 
 
-## Returns the default active ports for a junction (used when no state is set).
-## For T-junctions: the two ports that are most likely to be the "through" path.
-## For cross junctions: the two opposite ports that form a straight line.
-static func default_active_ports(track_type: Variant) -> Array[Vector2i]:
-	var all_ports: Array[Vector2i] = connections(track_type)
+## The exit a train actually takes, given the switch state (0 through, 1 branch;
+## anything else counts as 0). Vector2i.ZERO means the move is impossible.
+static func exit_for(track_type: Variant, entry: Vector2i, state: int = 0) -> Vector2i:
+	var options: Array[Vector2i] = exits_from(track_type, entry)
 
-	if all_ports.size() != 3 and all_ports.size() != 4:
-		return []
+	if options.is_empty():
+		return Vector2i.ZERO
 
-	# For cross junctions, find opposite ports
-	if all_ports.size() == 4:
-		for i in range(all_ports.size()):
-			for j in range(i + 1, all_ports.size()):
-				if all_ports[i] == -all_ports[j]:
-					return [all_ports[i], all_ports[j]]
+	if is_switch(track_type) and entry == connections(track_type)[0] and state == 1:
+		return options[1]
 
-	# For T-junctions, return the first two (convention)
-	return [all_ports[0], all_ports[1]]
+	return options[0]
+
+
+## The switch state needed to leave through `exit` when entering through the
+## stem: 0 or 1. -1 when no setting is involved (not a switch, or a trailing move)
+## or when the move is impossible.
+static func state_for(track_type: Variant, entry: Vector2i, exit: Vector2i) -> int:
+	if not is_switch(track_type):
+		return -1
+
+	var ports: Array[Vector2i] = connections(track_type)
+
+	if entry != ports[0]:
+		return -1
+
+	if exit == ports[1]:
+		return 0
+
+	if exit == ports[2]:
+		return 1
+
+	return -1
 
 
 static func from_ports(first: Vector2i, second: Vector2i) -> Variant:
@@ -144,44 +181,40 @@ static func from_ports(first: Vector2i, second: Vector2i) -> Variant:
 	return "rail_%d_%d" % [a, b]
 
 
-## Create a junction type from 3 or 4 ports.
-## For 3 ports: T-junction (junction_a_b_c)
-## For 4 ports: Cross junction (cross_a_b_c_d)
-## Returns null if invalid (not 3 or 4 ports, or invalid port indices)
-static func from_ports_junction(ports: Array[Vector2i]) -> Variant:
-	if ports.size() != 3 and ports.size() != 4:
+## Builds a switch type from its ports. Null if the shape is not allowed.
+static func switch_type(stem: Vector2i, through: Vector2i, branch: Vector2i) -> Variant:
+	var indices: Array[int] = [DIRECTIONS.find(stem), DIRECTIONS.find(through), DIRECTIONS.find(branch)]
+	if indices.has(-1):
 		return null
-
-	var indices: Array[int] = []
-	for port in ports:
-		var idx: int = DIRECTIONS.find(port)
-		if idx < 0:
-			return null
-		indices.append(idx)
-
-	# Check for duplicates
-	var seen: Dictionary = {}
-	for idx in indices:
-		if seen.has(idx):
-			return null
-		seen[idx] = true
-
-	indices.sort()
-
-	if ports.size() == 3:
-		return "junction_%d_%d_%d" % [indices[0], indices[1], indices[2]]
-	else:
-		return "cross_%d_%d_%d_%d" % [indices[0], indices[1], indices[2], indices[3]]
+	var kind: String = "junction_%d_%d_%d" % [indices[0], indices[1], indices[2]]
+	return kind if not connections(kind).is_empty() else null
 
 
+## Builds a crossing from one port of each of its two lines. Null if both
+## ports belong to the same line.
+static func crossing_type(first: Vector2i, second: Vector2i) -> Variant:
+	var a: int = DIRECTIONS.find(first)
+	var b: int = DIRECTIONS.find(second)
+	if a < 0 or b < 0:
+		return null
+	a %= 4
+	b %= 4
+	if a == b:
+		return null
+	return "cross_%d_%d" % [mini(a, b), maxi(a, b)]
+
+
+## Whether two tiles have identical ports. Simple tiles compare their two
+## ports in any order; switches and crossings must match exactly (a switch
+## with a different stem is a different tile).
 static func same_connections(first: Variant, second: Variant) -> bool:
 	var a: Array[Vector2i] = connections(first)
 	var b: Array[Vector2i] = connections(second)
-	# For simple tracks, compare exact connections
-	if a.size() == 2 and b.size() == 2:
+	if a.size() != b.size() or a.size() < 2:
+		return false
+	if a.size() == 2:
 		return b.has(a[0]) and b.has(a[1])
-	# For junctions, compare all possible ports (regardless of switch state)
-	return a.size() == b.size() and a.size() >= 3
+	return typeof(first) == TYPE_STRING and typeof(second) == TYPE_STRING and first == second
 
 
 static func centerline(entry: Vector2i, exit_port: Vector2i, tile_size: float) -> PackedVector2Array:

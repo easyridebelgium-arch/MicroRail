@@ -22,6 +22,13 @@ const OPERATING_COST_PER_SECOND: int = 1
 const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
+const TrafficMetrics = preload("res://scripts/core/traffic_metrics.gd")
+const ProblemsDialog = preload("res://scripts/problems_dialog.gd")
+var traffic_metrics = TrafficMetrics.new()
+var traffic_wait_samples: Dictionary = {}
+var problems_dialog: ConfirmationDialog
+var problems_button: Button
+
 const ConstructionImpact = preload("res://scripts/core/construction_impact.gd")
 const InspectionPanel = preload("res://scripts/inspection_panel.gd")
 var demolition_blocked: Dictionary = {}
@@ -299,6 +306,7 @@ func _ready() -> void:
 	_setup_settings_dialog()
 	_setup_reservation_overlay()
 	_setup_inspection()
+	_setup_problems()
 	_setup_traffic_dialog()
 	_setup_signal_tool()
 	_setup_speed_control()
@@ -343,6 +351,7 @@ func _simulation_step(step_seconds: float) -> void:
 	_refresh_directional_routes()
 	_rebuild_reservations(true)
 	movement_blocks.clear()
+	traffic_wait_samples.clear()
 	forest_stock -= freight_train.advance(step_seconds, forest_stock)
 
 	if _passenger_service_is_active():
@@ -351,6 +360,7 @@ func _simulation_step(step_seconds: float) -> void:
 
 	for key in additional_service_keys(): passenger_services[key].advance(self, step_seconds)
 	_update_deadlocks()
+	traffic_metrics.update(sim_clock.tick, reservation_trains.keys(), traffic_wait_samples)
 	_check_scenario_objectives()
 	_refresh_directional_routes()
 
@@ -627,6 +637,9 @@ func _update_instructions() -> void:
 	if is_dragging and not construction_feedback.blocked.is_empty():
 		direction += " | %d reserved tiles cannot be edited" % construction_feedback.blocked.size()
 
+	if problems_button != null:
+		problems_button.text = "Problems (%d)" % problem_rows().size()
+
 	var status_line: String = "%s | Cell: %d,%d | Build: £%d%s | %s" % [
 		direction,
 		hovered_cell.x,
@@ -702,8 +715,11 @@ func _layout_header() -> void:
 	if station_panel != null:
 		station_panel.offset_top = header_height + (16.0 * scale)
 	if inspection_panel != null:
-		inspection_panel.offset_top = header_height + 8.0 * scale
-		inspection_panel.offset_bottom = maxf(inspection_panel.offset_top + 80.0, get_viewport_rect().size.y - 64.0 * scale)
+		# The right column has no bottom toolbar. Let scrolling consume the
+		# available space instead of forcing a minimum beyond the viewport.
+		var inspection_bottom := get_viewport_rect().size.y - 8.0
+		inspection_panel.offset_top = minf(header_height + 8.0 * scale, inspection_bottom - 48.0)
+		inspection_panel.offset_bottom = inspection_bottom
 
 	# Left column: objectives, then the network map in whatever height is left
 	# above the bottom buttons. Recomputed every frame (cheap, and it follows
@@ -1560,6 +1576,8 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	sim_clock.restore_state(data["sim"]["clock"])
 	sim_rng.restore_state(data["sim"]["rng"])
 	event_log.restore_state(data["sim"]["events"])
+	traffic_metrics.reset()
+	traffic_wait_samples.clear()
 
 	if data["sim"].has("commands") and CommandQueue.is_valid_state(data["sim"]["commands"]):
 		command_queue.restore_state(data["sim"]["commands"])
@@ -3431,7 +3449,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
+	return (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()
@@ -3656,6 +3674,8 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 		var name: String = str(other.get("name", "another train"))
 		var place := "switch" if TrackGeometry.is_switch(tracks.get(cell)) else "track"
 		var reason := str(conflict.get("reason", "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]))
+		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001:
+			traffic_wait_samples[id] = {"reason": reason, "cell": cell}
 		if reservation_waits.get(service, "") != reason:
 			_record_event(EventLog.TRAIN_WAITING, str(id), {"reason": reason, "blocked_by": owner, "x": cell.x, "y": cell.y})
 		reservation_waits[service] = reason
@@ -4097,6 +4117,8 @@ func _update_inspection() -> void:
 	if inspection_panel.blocks:
 		lines.append("Blocks: dotted outlines, B = block ID. Authority includes reservations; it does not mean every tile is occupied.")
 	lines.append("Cell %d,%d" % [hovered_cell.x, hovered_cell.y])
+	if inspection_panel.congestion:
+		lines.append("Waiting here: %.1f train-seconds in the last ~60 simulation seconds. Bar length and text represent observed stopped traffic, not a forecast." % (float(traffic_metrics.window_cells.get(hovered_cell, 0)) / 60.0))
 	if reservations.occupied_owners.has(hovered_cell):
 		lines.append("Occupied by train #%d" % int(reservations.occupied_owners[hovered_cell]))
 	elif reservations.owners.has(hovered_cell):
@@ -4127,6 +4149,13 @@ func _draw_inspection_paths() -> void:
 				for offset in range(0, TILE_SIZE, 8):
 					draw_line(start + along * offset, start + along * (offset + 4), Color.WHITE, 1.0)
 			draw_string(ThemeDB.fallback_font, origin + Vector2(2, 29), "B%d" % block, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
+	if inspection_panel.congestion:
+		for cell in traffic_metrics.window_cells:
+			var seconds: float = float(traffic_metrics.window_cells[cell]) / 60.0
+			var origin := Vector2(cell) * TILE_SIZE
+			var length := minf(seconds / 10.0, 1.0) * (TILE_SIZE - 4)
+			draw_rect(Rect2(origin + Vector2(2, TILE_SIZE - 5), Vector2(length, 3)), Color.WHITE)
+			draw_string(ThemeDB.fallback_font, origin + Vector2(2, TILE_SIZE - 7), "%.1fs" % seconds, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
 	if not inspection_panel.routes: return
 	for train in inspection_trains():
 		if not inspection_panel.selected_service.is_empty() and train.key != inspection_panel.selected_service: continue
@@ -4145,3 +4174,98 @@ func _draw_inspection_paths() -> void:
 		draw_arc(path.sample_baked(train.target), 7, 0, TAU, 16, Color.WHITE, 2.0)
 		var label := path.sample_baked(train.distance) + Vector2(8, -12 - int(train.id) % 3 * 12)
 		draw_string(ThemeDB.fallback_font, label, "#%d %s" % [train.id, train.name], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+
+
+func _setup_problems() -> void:
+	problems_dialog = ProblemsDialog.new()
+	problems_dialog.configure(self)
+	$Interface.add_child(problems_dialog)
+	problems_button = Button.new()
+	problems_button.text = "Problems"
+	problems_button.focus_mode = Control.FOCUS_NONE
+	problems_button.tooltip_text = "Current waiting, incomplete routes, holds and deadlocks; searchable incident history. Opens paused."
+	problems_button.pressed.connect(_open_problems)
+	$Interface/HeaderBox/Toolbar.add_child(problems_button)
+
+func _open_problems() -> void:
+	paused = true
+	is_dragging = false
+	is_panning = false
+	demolition_cells.clear()
+	demolition_blocked.clear()
+	build_plan.clear()
+	_update_toolbar()
+	problems_dialog.open_dialog()
+
+func problem_rows() -> Array:
+	var rows: Array = []
+	if freight_train == null: return rows
+	for train in inspection_trains():
+		var key: String = train.key
+		var incomplete: bool
+		var held: bool
+		if key == "passenger":
+			incomplete = not route_connected
+			held = passenger_held
+		elif key == "freight":
+			incomplete = not freight_train.route_valid
+			held = freight_train.held
+		else:
+			incomplete = not passenger_services[key].connected
+			held = passenger_services[key].held
+		var stats: Dictionary = traffic_metrics.statistics(train.id)
+		var level := "Warning"
+		var issue := ""
+		var explanation := ""
+		if deadlocks.contains(train.id):
+			level = "Urgent"
+			issue = "Confirmed deadlock"
+			explanation = "Trains are waiting on each other. Check signal boundaries and the passing-loop route. Open Traffic for physical reversal if needed."
+		elif incomplete:
+			issue = "Route incomplete"
+			explanation = "Complete or repair the track and waypoint path to the next destination. A missing route does not teleport this train."
+		elif held:
+			level = "Info"
+			issue = "Dispatcher hold"
+			explanation = "This is an intentional hold, not measured congestion. Resume the train in Traffic when ready."
+		elif stats.continuous_seconds > 0.0:
+			issue = "Waiting %.1fs" % float(stats.continuous_seconds)
+			explanation = stats.reason + ". Automatic signals release when their block clears. Check Overlays for ownership; loops need boundaries on both branches."
+		if issue.is_empty(): continue
+		var owned: Dictionary = Fleet.find(fleet, train.id)
+		var title := "#%d %s — %s — %s" % [train.id, str(owned.get("name", "Train")), train.name, issue]
+		var details := "%s\n%s\nMeasured traffic waiting: %.1fs continuous, %.1fs recent (~60s), %.1fs since measurement began. Station dwell, loading and dispatcher holds are excluded. Measurements restart after loading; incident history is saved." % [title, explanation, float(stats.continuous_seconds), float(stats.recent_seconds), float(stats.total_seconds)]
+		rows.append({"key": "train:%d" % train.id, "id": train.id, "severity": level, "title": title, "details": details, "cell": Vector2i(-1, -1)})
+	return rows
+
+func incident_rows() -> Array:
+	var rows: Array = []
+	var events: Array = event_log.recent(200)
+	events.reverse()
+	for event in events:
+		if event.type not in [EventLog.TRAIN_WAITING, EventLog.DEADLOCK_DETECTED, EventLog.DEADLOCK_CLEARED, EventLog.DISPATCH_CHANGED, EventLog.TRAIN_REVERSED, EventLog.TRAIN_RECOVERED]: continue
+		var severity := "Warning" if event.type == EventLog.TRAIN_WAITING else "Info"
+		if event.type == EventLog.DEADLOCK_DETECTED: severity = "Urgent"
+		var id := int(event.subject) if str(event.subject).is_valid_int() else -1
+		if id < 0 and event.data.has("trains") and not event.data.trains.is_empty(): id = int(event.data.trains[0])
+		var train := Fleet.find(fleet, id)
+		var name: String = str(train.get("name", ""))
+		var title := "%.1fs: %s %s" % [float(event.tick) / 60.0, EventLog.summary(event), name]
+		var cell := Vector2i(int(event.data.get("x", -1)), int(event.data.get("y", -1)))
+		rows.append({"key": "event:%d" % int(event.id), "id": id, "severity": severity, "title": title, "details": "Historical incident; it may already be resolved.\n" + title + "\nLocate follows the train's current position if it is still active, otherwise the recorded track location.", "cell": cell})
+	return rows
+
+func can_locate_problem(row: Dictionary) -> bool:
+	var train := Fleet.find(fleet, int(row.get("id", -1)))
+	return (not train.is_empty() and services.has(str(train.service))) or _is_inside_map(row.get("cell", Vector2i(-1, -1)))
+
+func locate_problem(row: Dictionary) -> bool:
+	if not can_locate_problem(row): return false
+	var train := Fleet.find(fleet, int(row.get("id", -1)))
+	var key: String = str(train.get("service", ""))
+	if key == "passenger": camera.position = train_position
+	elif key == "freight": camera.position = freight_train.position
+	elif passenger_services.has(key): camera.position = passenger_services[key].position
+	else: camera.position = _cell_center(row.cell)
+	camera.force_update_scroll()
+	return true

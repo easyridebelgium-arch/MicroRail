@@ -13,7 +13,9 @@
    train. **S** stops entry from either direction until changed or removed.
    A signal placed under a train lets that train finish clearing the tile.
 4. Inspect waiting reasons in Fleet, the station inspector, Traffic or the event
-   log. A reason identifies the manual signal or the train holding a block.
+   log. A reason identifies the manual signal or the train holding a block. The
+   [Problems window](PROBLEMS_AND_WAITING.md) adds search, measured wait duration
+   and map location; Overlays can display where stopped traffic has accumulated.
 5. Open **Traffic**, select a train and **Hold selected train** to stop it exactly
    where it is. **Resume selected train** releases the hold and enables its service.
    Close Traffic and resume simulation; track reservations and signals still apply.

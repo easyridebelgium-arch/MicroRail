@@ -3,6 +3,7 @@ extends PanelContainer
 signal changed
 var routes := false
 var blocks := false
+var congestion := false
 var selected_service := ""
 var selector: OptionButton
 var summary: Label
@@ -19,7 +20,7 @@ func _ready() -> void:
 	var title := Label.new()
 	title.text = "Network inspection"
 	column.add_child(title)
-	for entry in [["Service paths", "routes"], ["Signal blocks", "blocks"]]:
+	for entry in [["Service paths", "routes"], ["Signal blocks", "blocks"], ["Measured waiting", "congestion"]]:
 		var toggle := CheckButton.new()
 		toggle.text = entry[0]
 		toggle.focus_mode = Control.FOCUS_NONE

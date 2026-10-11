@@ -45,8 +45,9 @@ To test:
 7. Add another passenger service using [the passing-loop guide](MULTIPLE_SERVICES.md)
    and check that both services appear in the filter and shared-track reports.
 
-This step does not add traffic forecasts, alternate-route recommendations, speed
-limits, congestion measurements, work zones or batch confirmations. Those require
+The next update adds [measured waiting and searchable problems](PROBLEMS_AND_WAITING.md).
+Traffic forecasts, alternate-route recommendations, speed limits, work zones and
+batch confirmations remain planned. Those require
 additional operations data and remain on the roadmap. Overlay preferences are
 local to the current session; there is no save-format change.
 

@@ -73,7 +73,7 @@ must not claim to predict traffic conflicts without the reservation layer.
 | Construction planning and conflict preview | Draft ghost tracks, stations, bridges, signals and blueprints before committing; show cost and affected services. | Implemented: multi-stroke track/switch/removal drafts, aggregate cost/refund and affected-service previews, atomic reservation-aware application and grouped Undo/Redo. Drafts remain separate from live simulation. Add terrain, ownership and travel-time warnings as those systems arrive; see [construction planning](CONSTRUCTION_PLANNING.md). |
 | Corridor selection and batch tools | Upgrade long segments, double-track, electrify, add signals/platforms or demolish in bulk. | Implemented: connected-corridor selection, spaced automatic/manual signals and whole-corridor signal removal through atomic drafts with grouped Undo/Redo. Track drag-demolition remains available. Track-speed, double-track, electrification and platform batches depend on their underlying systems; see [corridor signals](CORRIDOR_SIGNALS.md). |
 | Track inspection and route overlays | Toggle service paths, block occupancy, reservations, signals, speed limits and congestion; later add gradients, electrification, ownership and condition. | Implemented: collapsible service-path filtering, actual signal-block IDs/authority, hatched reservations, directional affected-service construction reports and measured waiting by conflict cell. Speed limits, occupancy/utilisation measurements and richer planning remain future work. Never substitute decorative colours for operational state. |
-| Search, filtering, pinning and jump-to | Find trains, stations, industries, services and later contracts; filter by type or status, highlight routes and maintain watchlists. | Implemented: searchable current problems and recent incidents, train/service names, severity filters and map location for original and independent trains. Global object search, pinning and watchlists remain planned. |
+| Search, filtering, pinning and jump-to | Find trains, stations, industries, services and later contracts; filter by type or status, highlight routes and maintain watchlists. | Implemented: searchable current problems and recent incidents, train/service names, severity filters and map location for original and independent trains. Implemented: global object search by name/ID/model/route/status, type filters, current-location map jump, selected-service route highlighting and a session watchlist that survives renaming. Persistent watchlists and preset status filters remain later refinements; see [object search](OBJECT_SEARCH.md). |
 | Advisory pathfinding | Recommend a route between stations with cost, travel time and supported conflict warnings without building it. | Reuse route and construction validation. Start with read-only advice; reserve shared pathfinding work for any later rival AI. |
 | Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Implemented: current problem counts and severity-filtered historical incident browsing from the saved event stream. Implemented: saved per-category Off/Notice/Notice + pause preferences for waiting, deadlock and recovery events, with pause applied after a complete fixed tick. Acknowledgement, watchlists and per-train rules remain planned; see [notifications](NOTIFICATIONS.md). Provide non-colour and non-audio cues, and coordinate pause behaviour with no-pause challenges. |
 | Passing loops and multiple platforms | Reduce bottlenecks and let faster services pass slower trains. | Depends on junctions, reservations and platform assignment. |
@@ -202,9 +202,14 @@ instead of adding a separate campaign simulation.
    Independent active passenger services, signal-limited reservation lookahead,
    passing-loop directives, safe withdrawal/storage and saves are now implemented.
    Multiple trains per service and priorities build on that foundation.
-3. Reservation-aware planning, overlays, batch edits, search and alerts. Begin with
-   measured congestion indicators; predictive bottleneck advice waits for demand data.
-4. Consists/templates, vehicle comparison, safe service edits and replacement rules.
+3. Reservation-aware planning, overlays, batch signal edits, blueprints, search and
+   alert preferences are implemented, including measured waiting. Persistent
+   watchlists and predictive bottleneck advice remain refinements; predictions
+   wait for timetable and demand data.
+4. Extend physical occupancy to cover train length and retain switch/block locks
+   until the last vehicle clears. Verify platform fit, physical reversal and
+   load-time overlap checks before enabling consists/templates. Then add vehicle
+   comparison, safe composition edits and replacement rules.
 5. Destinations, timetables, transfers, catchments, satisfaction and freight depth.
    Expand forecasts and company dashboards only as the underlying data becomes useful.
 6. Maintenance, depots, terrain, economy and optional workforce abstraction.
@@ -233,6 +238,8 @@ reservation-aware multi-stroke construction drafts are implemented; see
 signal drafting are now implemented; see [corridor signals](CORRIDOR_SIGNALS.md).
 Reusable track blueprints, a searchable local browser and versioned JSON sharing
 are implemented; see [track blueprints](TRACK_BLUEPRINTS.md).
-Next: global object search, map location and pinned watchlists.
+Global object search, current map location, route highlighting and session
+watchlists are implemented; see [object search](OBJECT_SEARCH.md).
+Next: consists and safe train-length occupancy, before multiple trains per service.
 Predictive traffic advice waits for timetable/demand data; multiple trains per
 service follow the independent-service model. See [reservation behaviour and checks](RESERVATIONS.md).

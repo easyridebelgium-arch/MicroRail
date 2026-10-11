@@ -22,6 +22,7 @@ var corridor_mode: OptionButton
 var plan_toggle: CheckButton
 var plan_summary: Label
 var plan_controls: VBoxContainer
+var route_toggle: CheckButton
 var routes := false
 var blocks := false
 var congestion := false
@@ -46,6 +47,7 @@ func _ready() -> void:
 		toggle.text = entry[0]
 		toggle.focus_mode = Control.FOCUS_NONE
 		var field: String = entry[1]
+		if field == "routes": route_toggle = toggle
 		toggle.toggled.connect(func(enabled: bool) -> void:
 			set(field, enabled)
 			changed.emit())
@@ -189,3 +191,9 @@ func refresh_blueprints(designs: Array) -> void:
 func selected_blueprint() -> String:
 	var index := blueprint_choice.selected
 	return blueprint_names[index] if index >= 0 and index < blueprint_names.size() else ""
+
+func show_service(key: String) -> void:
+	selected_service = key
+	route_toggle.button_pressed = true
+	var index := _keys.find(key)
+	if index >= 0: selector.select(index)

@@ -32,6 +32,10 @@ var traffic_wait_samples: Dictionary = {}
 var problems_dialog: ConfirmationDialog
 var problems_button: Button
 
+const ObjectBrowser = preload("res://scripts/object_browser.gd")
+var object_browser: ConfirmationDialog
+var object_pins: Dictionary = {}
+
 const TrackBlueprints = preload("res://scripts/core/track_blueprints.gd")
 const BLUEPRINT_PATH := "user://track_blueprints.json"
 var blueprint_file_dialog: FileDialog
@@ -329,6 +333,7 @@ func _ready() -> void:
 	_setup_inspection()
 	_load_blueprints()
 	_setup_problems()
+	_setup_object_browser()
 	_setup_traffic_dialog()
 	_setup_signal_tool()
 	_setup_speed_control()
@@ -1622,6 +1627,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	event_log.restore_state(data["sim"]["events"])
 	notifications.reset()
 	construction_plan.clear()
+	object_pins.clear()
 	corridor_pick = 0
 	corridor_cells.clear()
 	planning_mode = false
@@ -3526,7 +3532,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
+	return (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()
@@ -4639,3 +4645,57 @@ func _export_blueprint(path: String) -> bool:
 		return false
 	_show_notice("Select a saved blueprint to export.")
 	return false
+
+func _setup_object_browser() -> void:
+	object_browser = ObjectBrowser.new()
+	object_browser.configure(self)
+	$Interface.add_child(object_browser)
+	var find_button := Button.new()
+	find_button.text = "Find"
+	find_button.focus_mode = Control.FOCUS_NONE
+	find_button.tooltip_text = "Search objects, locate trains and facilities, and pin a session watchlist. Opens paused."
+	find_button.pressed.connect(func() -> void:
+		paused = true
+		is_dragging = false
+		is_panning = false
+		corridor_pick = 0
+		demolition_cells.clear()
+		build_plan.clear()
+		_update_toolbar()
+		object_browser.open_dialog())
+	$Interface/HeaderBox/Toolbar.add_child(find_button)
+
+func object_rows() -> Array:
+	var result: Array = []
+	var trains: Array = fleet.trains.duplicate()
+	trains.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.id) < int(b.id))
+	for train in trains:
+		var service: String = str(train.service)
+		var service_name: String = str(services[service].name) if services.has(service) else "Stored off-map"
+		var status: String = fleet_train_status(int(train.id))
+		var title := "#%d %s" % [int(train.id), str(train.name)]
+		result.append({"key": "train:%d" % int(train.id), "kind": "Train", "id": int(train.id), "service": service, "title": title, "details": "%s\n%s — %s\n%s\nCapacity %d | Speed %.0f px/s\nStored trains have no map position." % [title, str(Fleet.MODELS[train.model].name), service_name, status, Fleet.capacity(train), Fleet.speed(train)], "cell": Vector2i(-1, -1)})
+	for service in service_keys():
+		var train: Dictionary = Fleet.assigned(fleet, service)
+		var id := int(train.get("id", -1))
+		var stops: PackedStringArray = []
+		for stop in services[service].stops:
+			stops.append(str(ServiceRoutes.STATIONS[stop].name) if ServiceRoutes.STATIONS.has(stop) else "Forest" if stop == "forest" else "Cargo Terminal")
+		var title: String = str(services[service].name)
+		result.append({"key": "service:" + service, "kind": "Service", "id": id, "service": service, "title": title, "details": "%s\n%s: %s\nAssigned train #%d\n%s" % [title, str(services[service].get("mode", "shuttle")).capitalize(), " → ".join(stops), id, fleet_train_status(id)], "cell": Vector2i(-1, -1)})
+	for key in ServiceRoutes.STATIONS:
+		var station: Dictionary = ServiceRoutes.STATIONS[key]
+		result.append({"key": "station:" + key, "kind": "Station", "id": -1, "service": "", "title": station.name, "details": "%s\n%d passengers waiting\nMap cell %d,%d" % [station.name, _waiting(key), station.cell.x, station.cell.y], "cell": station.cell})
+	result.append({"key": "industry:forest", "kind": "Industry", "id": -1, "service": "", "title": "Forest", "details": "Forest — produces logs\n%d logs in stock\nMap cell %d,%d" % [forest_stock, FOREST_SITE.x, FOREST_SITE.y], "cell": FOREST_SITE})
+	result.append({"key": "industry:terminal", "kind": "Industry", "id": -1, "service": "", "title": "Cargo Terminal", "details": "Cargo Terminal — accepts logs\n%d logs delivered\nMap cell %d,%d" % [logs_delivered, CARGO_TERMINAL.x, CARGO_TERMINAL.y], "cell": CARGO_TERMINAL})
+	return result
+
+func locate_object(row: Dictionary) -> bool:
+	if not locate_problem(row): return false
+	var service: String = str(row.get("service", ""))
+	if services.has(service):
+		inspection_panel.show_service(service)
+		inspection_button.button_pressed = true
+		_update_inspection()
+	queue_redraw()
+	return true

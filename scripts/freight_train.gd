@@ -2,6 +2,8 @@ extends Node2D
 
 signal delivered(amount: int)
 signal operating_expense(amount: int)
+signal departed(stop: String, cargo: int)
+signal arrived(stop: String, cargo: int)
 const Router = preload("res://scripts/rail_router.gd")
 const Palette = preload("res://scripts/core/palette.gd")
 
@@ -68,16 +70,18 @@ func advance(delta: float, available_logs: int) -> int:
 		return 0
 
 	var loaded: int = 0
+	var route_length: float = route_path.get_baked_length()
+	var at_forest: bool = to_terminal and distance_along_route <= 0.001
+	var at_terminal: bool = not to_terminal and absf(distance_along_route - route_length) < 0.001
 
 	# Load at the forest before departing.
-	if to_terminal and distance_along_route <= 0.001:
+	if at_forest:
 		loaded = mini(get_capacity() - cargo, available_logs)
 		cargo += loaded
 
 		if cargo < get_minimum_load():
 			return loaded
 
-	var route_length: float = route_path.get_baked_length()
 	var target: float = route_length if to_terminal else 0.0
 
 	distance_along_route = move_toward(
@@ -88,6 +92,7 @@ func advance(delta: float, available_logs: int) -> int:
 
 	if absf(distance_along_route - target) < 0.001:
 		distance_along_route = target
+		arrived.emit("terminal" if to_terminal else "forest", cargo)
 
 		if to_terminal:
 			var delivered_amount: int = cargo
@@ -98,6 +103,8 @@ func advance(delta: float, available_logs: int) -> int:
 
 		to_terminal = not to_terminal
 		dwell = STATION_WAIT
+	elif at_forest or at_terminal:
+		departed.emit("forest" if at_forest else "terminal", cargo)
 
 	_update_transform()
 	return loaded

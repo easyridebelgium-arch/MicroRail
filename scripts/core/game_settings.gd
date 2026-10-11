@@ -34,6 +34,8 @@ static var compact_header: bool = false
 
 ## {action name: [key codes]} as saved. Empty means "use the defaults".
 static var key_bindings: Dictionary = {}
+## {action name: [mouse button indices]} as saved.
+static var mouse_bindings: Dictionary = {}
 
 
 static func load_settings() -> void:
@@ -53,6 +55,8 @@ static func load_settings() -> void:
 
 	var saved_bindings: Variant = config.get_value("input", "bindings", {})
 	key_bindings = saved_bindings if saved_bindings is Dictionary else {}
+	var saved_mouse: Variant = config.get_value("input", "mouse_bindings", {})
+	mouse_bindings = saved_mouse if saved_mouse is Dictionary else {}
 
 
 ## Returns true when the file was written.
@@ -64,6 +68,7 @@ static func save_settings() -> bool:
 	config.set_value("display", "reduced_motion", reduced_motion)
 	config.set_value("display", "compact_header", compact_header)
 	config.set_value("input", "bindings", key_bindings)
+	config.set_value("input", "mouse_bindings", mouse_bindings)
 
 	return config.save(SETTINGS_PATH) == OK
 

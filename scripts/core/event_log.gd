@@ -19,6 +19,8 @@ const ROUTE_CHANGED: String = "route_changed"
 const OBJECTIVE_COMPLETED: String = "objective_completed"
 const UPGRADE_BOUGHT: String = "upgrade_bought"
 const SERVICE_TOGGLED: String = "service_toggled"
+const CONSTRUCTION_UNDONE: String = "construction_undone"
+const CONSTRUCTION_REDONE: String = "construction_redone"
 
 const MAX_EVENTS: int = 2000
 const MAX_SAVED_EVENTS: int = 200
@@ -100,6 +102,39 @@ static func describe(event: Dictionary) -> String:
 		event["type"],
 		JSON.stringify(event["data"])
 	]
+
+
+## Short line for the in-game event log. Colour is not used as the only cue.
+static func summary(event: Dictionary) -> String:
+	var data: Dictionary = event.get("data", {})
+	var kind: String = str(event.get("type", ""))
+	var who: String = str(event.get("subject", ""))
+
+	match kind:
+		TRAIN_DEPARTED:
+			return "%s departed %s" % [who, data.get("stop", "")]
+		TRAIN_ARRIVED:
+			return "%s arrived at %s" % [who, data.get("stop", "")]
+		CARGO_DELIVERED:
+			return "Delivered %s logs" % str(int(data.get("logs", 0)))
+		TRACK_BUILT:
+			return "Built %s tiles" % str(int(data.get("new_tiles", data.get("tiles", 0))))
+		TRACK_DEMOLISHED:
+			return "Removed %s tiles" % str(int(data.get("tiles", 0)))
+		ROUTE_CHANGED:
+			return "Passenger route updated"
+		OBJECTIVE_COMPLETED:
+			return "Objective completed"
+		UPGRADE_BOUGHT:
+			return "%s bought a %s upgrade" % [who, str(data.get("kind", ""))]
+		SERVICE_TOGGLED:
+			return "%s service %s" % [who, "enabled" if bool(data.get("enabled", false)) else "withdrawn"]
+		CONSTRUCTION_UNDONE:
+			return "Construction undone"
+		CONSTRUCTION_REDONE:
+			return "Construction redone"
+		_:
+			return "%s %s" % [who, kind]
 
 
 func save_state() -> Dictionary:

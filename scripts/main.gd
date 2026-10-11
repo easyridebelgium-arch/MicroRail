@@ -713,7 +713,7 @@ func _finish_track_drag(end_cell: Vector2i) -> void:
 		return
 	var cells: Array = []
 	for cell in changes:
-		cells.append([cell.x, cell.y, bool(changes[cell])])
+		cells.append([cell.x, cell.y, changes[cell]])
 	_submit_command("build", {"cells": cells, "new_count": int(build_plan["new_count"])})
 
 
@@ -748,7 +748,7 @@ func _execute_build(data: Dictionary) -> void:
 	var changes: Dictionary = {}
 
 	for entry in data["cells"]:
-		changes[Vector2i(int(entry[0]), int(entry[1]))] = bool(entry[2])
+		changes[Vector2i(int(entry[0]), int(entry[1]))] = entry[2]
 
 	var new_count: int = int(data["new_count"])
 	var cost: int = new_count * TRACK_BUILD_COST

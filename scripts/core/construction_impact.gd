@@ -10,7 +10,7 @@ func analyze(tracks: Dictionary, changes: Dictionary, trains: Array, owners: Dic
 	var changed: Dictionary = {}
 	var blocked: Dictionary = {}
 	for cell in changes:
-		if tracks.get(cell) == changes[cell] and tracks.has(cell): continue
+		if tracks.has(cell) and typeof(tracks[cell]) == typeof(changes[cell]) and tracks[cell] == changes[cell]: continue
 		changed[cell] = changes[cell]
 		if owners.has(cell): blocked[cell] = owners[cell]
 		if changes[cell] == null: proposed.erase(cell)

@@ -29,6 +29,7 @@ func _initialize() -> void:
 	tracks.erase(Vector2i(18, 8))
 	check(impact.analyze(tracks, {Vector2i(18, 8): false}, [train], {}, 32).affected[0].effect == "Restores current leg", "repair should recognize the retained missing path")
 	tracks[Vector2i(18, 8)] = false
+	check(impact.analyze(tracks, {Vector2i(18, 8): "rail_3_7"}, [train], {}, 32).affected[0].effect.begins_with("Breaks current"), "string geometry preview must compare safely against bool geometry")
 	check(impact.analyze(tracks, {Vector2i(18, 8): true}, [train], {}, 32).affected[0].effect.begins_with("Breaks current"), "incompatible track ports break travel even without demolition")
 	check(impact.analyze(tracks, {Vector2i(18, 8): false}, [train], {}, 32).affected.is_empty(), "unchanged track must not count as an edit")
 	check(impact.analyze(tracks, {Vector2i(18, 9): false}, [train], {}, 32).affected.is_empty(), "unrelated track must not imply a route change")

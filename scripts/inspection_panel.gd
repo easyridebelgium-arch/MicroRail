@@ -1,6 +1,12 @@
 extends PanelContainer
 ## Nonmodal, scrollable tools. Displaying inspection never advances simulation.
 signal changed
+signal planning_changed(enabled: bool)
+signal apply_plan
+signal discard_plan
+var plan_toggle: CheckButton
+var plan_summary: Label
+var plan_controls: VBoxContainer
 var routes := false
 var blocks := false
 var congestion := false
@@ -29,6 +35,25 @@ func _ready() -> void:
 			set(field, enabled)
 			changed.emit())
 		column.add_child(toggle)
+	plan_toggle = CheckButton.new()
+	plan_toggle.text = "Draft construction"
+	plan_toggle.focus_mode = Control.FOCUS_NONE
+	plan_toggle.toggled.connect(func(enabled: bool) -> void: planning_changed.emit(enabled))
+	column.add_child(plan_toggle)
+	plan_controls = VBoxContainer.new()
+	column.add_child(plan_controls)
+	plan_controls.hide()
+	plan_summary = Label.new()
+	plan_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	plan_controls.add_child(plan_summary)
+	var actions := HFlowContainer.new()
+	plan_controls.add_child(actions)
+	for entry in [["Apply plan", "apply_plan"], ["Discard plan", "discard_plan"]]:
+		var button := Button.new()
+		button.text = entry[0]
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(emit_signal.bind(entry[1]))
+		actions.add_child(button)
 	selector = OptionButton.new()
 	selector.fit_to_longest_item = false
 	selector.custom_minimum_size.x = 260

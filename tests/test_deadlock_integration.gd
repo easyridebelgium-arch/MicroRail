@@ -72,7 +72,7 @@ func _run() -> void:
 		check(game.event_log.query(Events.DEADLOCK_DETECTED).size() == 1, "confirmed deadlock does not spam events")
 		snapshots.append([game.route_distance, game.freight_train.distance_along_route, game.money, game.sim_clock.tick, game.event_log.save_state()])
 		var before: float = game.route_distance
-		check(game.recall_deadlocked_train(1).contains("Pause"), "running recovery is refused")
+		check(game.reverse_deadlocked_train(1).contains("Pause"), "running recovery is refused")
 		check(game.route_distance == before, "refused recovery preserves position")
 		game._open_traffic_dialog()
 		await process_frame
@@ -86,38 +86,35 @@ func _run() -> void:
 		await process_frame
 		await process_frame
 		check(game.traffic_dialog.size.x <= root.get_visible_rect().size.x and game.traffic_dialog.size.y <= root.get_visible_rect().size.y, "Traffic fits the viewport at 200%")
-		check(game.traffic_dialog.get_ok_button().get_global_rect().end.y <= game.traffic_dialog.size.y, "Recall button remains reachable")
+		check(game.traffic_dialog.get_ok_button().get_global_rect().end.y <= game.traffic_dialog.size.y, "Reverse button remains reachable")
 		Settings.ui_scale = old_scale
 		game._apply_settings()
-		# Block the destination to verify validation is atomic.
-		var freight_path: Curve2D = game.freight_train.route_path
-		var freight_distance: float = game.freight_train.distance_along_route
-		var near_home: Array[Vector2i] = [game.STATION_A, game.STATION_A + Vector2i.RIGHT]
-		game.freight_train.route_path = Router.make_path(near_home, 32)
-		game.freight_train.distance_along_route = 0.0
-		check(game.recall_deadlocked_train(1).contains("refused"), "occupied recall destination is refused")
-		check(game.route_distance == before and game.passengers_on_train == 7 and game.deadlocks.contains(1), "failed recall preserves train, passengers and incident")
-		game.freight_train.route_path = freight_path
-		game.freight_train.distance_along_route = freight_distance
-		var waiting: int = game.waiting_at_a
+		var path: Curve2D = game.route_path
+		var position: Vector2 = game.train_position
 		var money: int = game.money
 		game.traffic_dialog.confirmed.emit()
-		check(game.route_distance == 0 and not game.passenger_service_enabled and game.passengers_on_train == 0, "recall parks and disables passenger service")
-		check(game.waiting_at_a == waiting + 7 and game.money == money, "recall conserves passengers and charges no hidden fee")
-		check(game.deadlocks.cycles.is_empty(), "recall clears the deadlock")
-		check(game.event_log.query(Events.TRAIN_RECOVERED).size() == 1, "recall logged with permanent train ID")
-		var other_distance: float = game.freight_train.distance_along_route
+		check(game.route_distance == before and game.train_position == position and game.route_path == path, "reversal preserves position and path")
+		check(game.passenger_returning and not game.travelling_to_b and game.passengers_on_train == 7, "reversed train keeps riders aboard")
+		check(game.money == money and game.deadlocks.cycles.is_empty(), "reversal clears incident without hidden fee")
+		check(game.event_log.query(Events.TRAIN_REVERSED).size() == 1, "reversal event uses permanent ID")
 		game.traffic_dialog.hide()
 		game.paused = false
-		for step in range(10):
+		var other_distance: float = game.freight_train.distance_along_route
+		for step in range(1200):
 			game.sim_clock.begin_tick()
 			game._simulation_step(1.0 / 60.0)
-		check(game.freight_train.distance_along_route < other_distance, "other train advances when the recalled train clears")
-		check(game.route_distance == 0, "recalled service remains stopped until enabled")
+			var body: Array = game.reservations.footprint(game.route_path, game.route_distance, 32)
+			for cell in game.reservations.footprint(game.freight_train.route_path, game.freight_train.distance_along_route, 32):
+				check(not body.has(cell), "physical recovery respects body occupancy")
+			if game.passenger_held: break
+		check(game.passenger_held and game.route_distance == 0 and game.passengers_on_train == 0, "reversed train physically reaches departure and stops")
+		check(game.waiting_at_a >= 8, "riders returned only after arrival")
+		check(game.event_log.query(Events.TRAIN_RECOVERED).size() == 1, "arrival logs completed recovery")
+		check(game.freight_train.distance_along_route != other_distance, "other train advances as returning train clears")
 		game.queue_free()
 		await process_frame
 	check(snapshots[0] == snapshots[1] and snapshots[1] == snapshots[2], "detection, timing, money and events match at 30/60/120 FPS")
-	# Freight recall keeps cargo on the stopped train and survives save/load.
+	# Freight reverses toward its actual departure terminal, retaining cargo.
 	var game = fixture()
 	await process_frame
 	prepare(game)
@@ -126,24 +123,37 @@ func _run() -> void:
 	var blocked_position: float = game.route_distance
 	game._save_game()
 	game._load_game()
-	check(game.route_distance == blocked_position and game.deadlocks.cycles.is_empty(), "waiting save restores positions without a stale incident")
+	check(game.route_distance == blocked_position and game.deadlocks.cycles.is_empty(), "waiting save restores positions without stale incident")
 	game.paused = false
-	check(not collide(game, 60) and game.deadlocks.cycles == [[1, 2]], "a persistent cycle is safely rediscovered after loading")
+	check(not collide(game, 60) and game.deadlocks.cycles == [[1, 2]], "persistent cycle safely rediscovered after loading")
 	game.paused = true
+	var before: float = game.freight_train.distance_along_route
+	var position: Vector2 = game.freight_train.position
 	var stock: int = game.forest_stock
-	check(game.recall_deadlocked_train(2).contains("recalled"), "freight has a recovery option")
-	check(game.freight_train.cargo == 5 and game.forest_stock == stock and game.logs_delivered == 0, "freight recall neither drops nor delivers cargo")
-	check(not game.freight_train.service_is_active() and game.freight_train.distance_along_route == 0, "recalled freight is stopped at forest")
+	check(game.reverse_deadlocked_train(2).contains("reversed"), "freight has physical reversal")
+	check(game.freight_train.cargo == 5 and game.forest_stock == stock and game.logs_delivered == 0, "reversal neither drops nor delivers cargo")
+	check(game.freight_train.distance_along_route == before and game.freight_train.position == position and game.freight_train.to_terminal, "freight reverses in place toward its departure terminal")
 	game._save_game()
 	game.freight_train.cargo = 0
 	game._load_game()
-	check(game.freight_train.cargo == 5 and not game.freight_train.service_enabled, "existing v18 saves preserve recovery state")
-	check(game.deadlocks.cycles.is_empty(), "load starts with transient deadlock state reset")
+	check(game.freight_train.cargo == 5 and game.freight_train.recovery_returning and game.freight_train.position == position, "save preserves unfinished return and cargo")
+	game.paused = false
+	for step in range(2400):
+		game.sim_clock.begin_tick()
+		game._simulation_step(1.0 / 60.0)
+		if game.freight_train.held: break
+	check(game.freight_train.held and is_equal_approx(game.freight_train.distance_along_route, game.freight_train.route_path.get_baked_length()), "freight physically returns to its departure terminal")
+	check(game.freight_train.cargo == 5 and game.logs_delivered == 0, "completed return retains cargo without payout")
+	game.paused = true
+	game._save_game()
+	game.freight_train.held = false
+	game._load_game()
+	check(game.freight_train.held and game.freight_train.cargo == 5, "save preserves completed recovery hold")
 	game.waiting_at_a = 105
 	game.passenger_timer = 0.0
 	game._generate_passengers(5.0)
-	check(game.waiting_at_a == 105, "new passenger generation never discards returned overflow queues")
-	check(game.recall_deadlocked_train(2).contains("not involved"), "the same incident cannot be recalled twice")
+	check(game.waiting_at_a == 105, "generation preserves overflow queues")
+	check(game.reverse_deadlocked_train(2).contains("not involved"), "incident cannot be reversed twice")
 	game.queue_free()
 	await process_frame
 	print("Deadlock integration: %d checks, %d failures" % [checks, failures])

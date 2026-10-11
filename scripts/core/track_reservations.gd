@@ -5,6 +5,7 @@ const Geometry = preload("res://scripts/track_geometry.gd")
 const LOOKAHEAD_TILES := 3.0
 const SAMPLE_STEP := 1.0
 var owners: Dictionary = {}
+var occupied_owners: Dictionary = {}
 var switches: Dictionary = {}
 var switch_owners: Dictionary = {}
 var _switch_tiles: Dictionary = {}
@@ -25,6 +26,7 @@ func footprint(path: Curve2D, distance: float, tile_size: float) -> Array[Vector
 
 func rebuild(trains: Array, tracks: Dictionary, tile_size: float) -> void:
 	owners.clear()
+	occupied_owners.clear()
 	switches.clear()
 	switch_owners.clear()
 	_switch_tiles.clear()
@@ -44,6 +46,7 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float) -> void:
 				_overlapping[train.id] = true
 				_overlapping[owners[cell]] = true
 			else: owners[cell] = train.id
+	occupied_owners = owners.duplicate()
 	for train in ordered:
 		var length: float = train.path.get_baked_length()
 		var direction := 1.0 if train.forward else -1.0

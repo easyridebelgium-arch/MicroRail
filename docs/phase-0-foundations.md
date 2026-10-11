@@ -33,12 +33,13 @@ copy them over the current scripts.
   120 FPS. Long stalls deliberately drop excess catch-up time; this is not yet
   a full deterministic command/replay system. Rendering, camera, notices and UI
   still use real frame time.
-- **Saves are version 18**, defined only by `SaveMigrations.CURRENT_VERSION`.
+- **Saves are version 19**, defined only by `SaveMigrations.CURRENT_VERSION`.
   Version 14 route saves and both version 15 variants (fleet-only and
-  simulation-only) migrate in memory. The v16→v17 migration adds the command queue; v17→v18 adds switch positions.
+  simulation-only) migrate in memory. The v16→v17 migration adds the command queue; v17→v18 adds switch positions; v18→v19 adds retained runtime paths,
+  physical recovery/dispatch state and signal modes.
   Existing data is preserved; missing systems receive defaults. Pre-fleet saves
   reconstruct starter-train upgrades and their purchase costs. Validation
-  completes before the live game changes. Saving again writes v18 and retains
+  completes before the live game changes. Saving again writes v19 and retains
   the previous save as a backup. Saves older than 14, future versions and
   invalid current-format data are rejected.
 - **Keys go through the InputMap.** Defaults match the old keys (Space, M, G,

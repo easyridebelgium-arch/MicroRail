@@ -86,6 +86,8 @@ const MAX_FOREST_STOCK: int = 100
 const FreightTrain = preload("res://scripts/freight_train.gd")
 const LOG_DELIVERY_PRICE: int = 8
 const SimClock = preload("res://scripts/core/sim_clock.gd")
+const BlockSignals = preload("res://scripts/core/block_signals.gd")
+const RuntimeRoutes = preload("res://scripts/core/runtime_routes.gd")
 const DeadlockMonitor = preload("res://scripts/core/deadlock_monitor.gd")
 const TrafficDialog = preload("res://scripts/traffic_dialog.gd")
 const Reservations = preload("res://scripts/core/track_reservations.gd")
@@ -111,6 +113,14 @@ var switch_states: Dictionary = {}
 var reservations = Reservations.new()
 var deadlocks = DeadlockMonitor.new()
 var movement_blocks: Dictionary = {}
+var passenger_returning: bool = false
+var passenger_return_stop: int = 0
+var passenger_held: bool = false
+var track_signals: Dictionary = {}
+var block_signals = BlockSignals.new()
+var signal_tool_mode: bool = false
+var signal_button: Button
+var reservation_trains: Dictionary = {}
 var traffic_dialog: ConfirmationDialog
 var traffic_button: Button
 var reservation_overlay: bool = false
@@ -271,6 +281,7 @@ func _ready() -> void:
 	_setup_settings_dialog()
 	_setup_reservation_overlay()
 	_setup_traffic_dialog()
+	_setup_signal_tool()
 	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
@@ -374,6 +385,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_inspect_station_at(cell)
 				return
 
+			if signal_tool_mode:
+				_use_signal_tool(cell)
+				return
 			if switch_tool_mode:
 				_use_switch_tool(cell)
 				return
@@ -416,35 +430,39 @@ func _unhandled_input(event: InputEvent) -> void:
 				_finish_demolition(cell)
 
 func _check_route(force_reset: bool = false) -> void:
-	var previous_freight: Array[Vector2i] = freight_route_cells.duplicate()
 	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE))
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
+	for cell in track_signals.keys():
+		if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]): track_signals.erase(cell)
+	var was_connected := route_connected
+	var at_home := route_distance <= 0.001 and passenger_stop_index == 0 and passengers_on_train == 0 and not passenger_returning
+	# Only adopt new geometry at the same physical starting position. Away from
+	# home, retain the entire travelled path and its distance until repaired.
+	if route_cells.is_empty() or at_home:
+		if not new_route.is_empty() and (new_route != route_cells or force_reset):
+			route_cells = new_route
+			route_path = built["path"]
+			stop_distances.assign(built["distances"])
+			route_distance = 0.0
+			passenger_stop_index = 0
+			travelling_to_b = true
+			wait_remaining = 0.0
+			train_needs_boarding = true
+			_record_event(EventLog.ROUTE_CHANGED, "passenger", {"connected": true, "tiles": route_cells.size()})
+	route_connected = RuntimeRoutes.connected(route_cells, tracks)
+	passenger_route_error = "" if route_connected else "Route incomplete — stopped here. Restore the train's existing path to continue."
 	_refresh_freight_route(new_route)
-	_refresh_switch_states(new_route)
-	passenger_route_error = built["error"]
-	if previous_freight != freight_route_cells or force_reset or new_route != route_cells:
-		_reset_traffic_state("Service paths changed")
-	if not force_reset and new_route == route_cells:
-		_rebuild_reservations()
-		return
-	_return_onboard_passengers()
-	_record_event(EventLog.ROUTE_CHANGED, "passenger", {"connected": not new_route.is_empty(), "tiles": new_route.size()})
-	route_cells = new_route
-	route_path = built["path"]
-	stop_distances.assign(built["distances"])
-	route_connected = not route_cells.is_empty()
-	route_distance = 0.0
-	passenger_stop_index = 0
-	travelling_to_b = true
-	wait_remaining = 0.0
-	train_needs_boarding = true
+	_refresh_switch_states(route_cells)
+	if was_connected != route_connected:
+		_reset_traffic_state("Track connection changed")
+		if not route_connected: _show_notice("Passenger train stopped in place: route incomplete. Repair its path to continue.")
 	_update_train_transform()
 	_rebuild_reservations()
 
 
 func _move_train(delta: float) -> void:
-	if not route_connected:
+	if not route_connected or passenger_held:
 		return
 	if wait_remaining > 0.0:
 		wait_remaining = maxf(0.0, wait_remaining - delta)
@@ -458,6 +476,17 @@ func _move_train(delta: float) -> void:
 	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta))
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
+		if passenger_returning:
+			_return_onboard_passengers()
+			passenger_returning = false
+			passenger_held = true
+			passenger_service_enabled = false
+			travelling_to_b = not travelling_to_b
+			train_needs_boarding = true
+			wait_remaining = 0.0
+			_record_event(EventLog.TRAIN_RECOVERED, str(Fleet.assigned(fleet, "passenger")["id"]), {"service": "passenger", "stop": services["passenger"]["stops"][passenger_stop_index], "action": "returned to departure stop"})
+			_update_train_transform()
+			return
 		var unloaded: int = passengers_on_train
 		_unload_passengers()
 		passenger_stop_index = next_stop
@@ -522,6 +551,8 @@ func _update_instructions() -> void:
 	var direction: String = "Draw track: follow the mouse" if draw_track_mode else "Connect track: drag between two points"
 	if inspect_mode:
 		direction = "Inspect: click a station or industry"
+	elif signal_tool_mode:
+		direction = "Signals: click straight track — automatic / stop / remove"
 	elif is_dragging and demolition_mode:
 		direction = "Remove %d tracks — refund £%d" % [demolition_cells.size(), demolition_cells.size() * TRACK_REFUND]
 	elif is_dragging and not build_plan.get("error", "").is_empty():
@@ -534,6 +565,11 @@ func _update_instructions() -> void:
 
 	if notice_remaining > 0.0:
 		status = notice
+	var stranded: PackedStringArray = []
+	if not route_cells.is_empty() and not route_connected: stranded.append("passenger")
+	if freight_train != null and not freight_train.route_cells.is_empty() and not freight_train.route_valid: stranded.append("freight")
+	if not stranded.is_empty():
+		status += " | Route incomplete: %s stopped. Repair track." % "/".join(stranded)
 
 	var preview_cost: int = _get_preview_cost()
 	var affordability: String = ""
@@ -670,6 +706,7 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
 	if reservation_overlay:
 		_draw_reservations()
+	_draw_signals()
 	_draw_train()
 
 
@@ -866,6 +903,8 @@ func _execute_command(command: Dictionary) -> void:
 			_execute_demolish(data)
 		"set_tile":
 			_execute_set_tile(data)
+		"set_signal":
+			_execute_set_signal(data)
 
 
 func _use_switch_tool(cell: Vector2i) -> void:
@@ -1031,6 +1070,8 @@ func _save_game() -> void:
 
 	var data: Dictionary = {
 		"version": SAVE_VERSION,
+		"runtime": _saved_runtime_routes(),
+		"signals": _saved_signals(),
 		"tracks": saved_tracks,
 		"switches": _saved_switches(),
 		"route_distance": route_distance,
@@ -1161,6 +1202,10 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if version_number != float(SAVE_VERSION):
 		return false
 
+	if not RuntimeRoutes.valid_state(data.get("runtime"), data.get("services", {})):
+		return false
+	if not data.get("signals") is Array:
+		return false
 	if not data.get("tracks") is Array:
 		return false
 
@@ -1293,6 +1338,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 		checked_tracks[cell] = entry[2]
 
+	if not _is_valid_signal_list(data["signals"], checked_tracks): return false
 	if not _is_valid_switch_list(data.get("switches"), checked_tracks):
 		return false
 
@@ -1344,7 +1390,9 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 			_show_notice("Save contains track outside buildable ground.")
 			return
 		loaded_tracks[cell] = entry[2]
-	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE))
+	var runtime: Dictionary = data["runtime"]
+	var saved_passenger := RuntimeRoutes.decode(runtime["passenger_cells"])
+	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE)) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE))
 	var loaded_cells: Array[Vector2i] = []
 	loaded_cells.assign(built["cells"])
 	var loaded_path: Curve2D = built["path"]
@@ -1357,7 +1405,11 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 			return
 	else:
 		var distances: Array = built["distances"]
-		var next_stop: int = stop_index + (1 if state["travelling_to_b"] else -1)
+		var returning: bool = runtime["passenger_returning"]
+		if returning and int(runtime["passenger_return_stop"]) != stop_index:
+			_show_notice("Invalid recovery origin.")
+			return
+		var next_stop: int = stop_index + ((-1 if state["travelling_to_b"] else 1) if returning else (1 if state["travelling_to_b"] else -1))
 		if next_stop < 0 or next_stop >= distances.size():
 			_show_notice("Saved train stop direction is invalid.")
 			return
@@ -1369,13 +1421,16 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		if (state["train_needs_boarding"] or float(state["wait_remaining"]) > 0.0) and absf(loaded_distance - distances[stop_index]) > 0.001:
 			_show_notice("Saved train is waiting away from a station.")
 			return
-	var loaded_freight_cells: Array[Vector2i] = _find_freight_route(loaded_tracks, loaded_cells)
+	var loaded_freight_cells: Array[Vector2i] = RuntimeRoutes.decode(runtime["freight_cells"])
+	if loaded_freight_cells.is_empty(): loaded_freight_cells = _find_freight_route(loaded_tracks, loaded_cells)
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
 	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"])):
 		_show_notice("Saved freight train state is invalid.")
 		return
 	# Commit only after validating every service and train.
 	tracks = loaded_tracks
+	track_signals = {}
+	for entry in data["signals"]: track_signals[Vector2i(int(entry[0]), int(entry[1]))] = str(entry[2])
 	switch_states = {}
 	for entry in data["switches"]:
 		switch_states[Vector2i(int(entry[0]), int(entry[1]))] = int(entry[2])
@@ -1387,7 +1442,11 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	route_path = loaded_path
 	stop_distances.assign(built["distances"])
 	passenger_route_error = built["error"]
-	route_connected = not route_cells.is_empty()
+	route_connected = RuntimeRoutes.connected(route_cells, tracks)
+	passenger_route_error = "" if route_connected else "Route incomplete — stopped here. Repair the existing path to continue."
+	passenger_returning = runtime["passenger_returning"]
+	passenger_return_stop = int(runtime["passenger_return_stop"])
+	passenger_held = runtime["passenger_held"]
 	for field in SAVE_FIELDS:
 		match typeof(get(field)):
 			TYPE_INT: set(field, int(state[field]))
@@ -1396,7 +1455,11 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	route_distance = loaded_distance
 	is_dragging = false
 	_update_train_transform()
-	freight_train.set_route(loaded_freight_cells, float(TILE_SIZE))
+	freight_train.route_cells = loaded_freight_cells.duplicate()
+	freight_train.route_path = loaded_freight_path
+	freight_train.route_valid = RuntimeRoutes.connected(loaded_freight_cells, tracks)
+	freight_train.recovery_returning = runtime["freight_returning"]
+	freight_train.held = runtime["freight_held"]
 	freight_train.restore_state(data["freight"])
 	_reset_traffic_state()
 	_rebuild_reservations()
@@ -1425,7 +1488,7 @@ func _is_valid_track_type(value: Variant) -> bool:
 
 
 func _update_train_transform() -> void:
-	if not route_connected:
+	if route_path.point_count < 2:
 		train_position = _cell_center(ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["cell"])
 		train_heading = 0.0
 		return
@@ -1473,6 +1536,7 @@ func _setup_toolbar() -> void:
 func _select_straight_track() -> void:
 	inspect_mode = false
 	switch_tool_mode = false
+	signal_tool_mode = false
 	_close_station_inspector()
 	is_dragging = false
 	draw_track_mode = false
@@ -1483,6 +1547,7 @@ func _select_straight_track() -> void:
 func _select_curved_track() -> void:
 	inspect_mode = false
 	switch_tool_mode = false
+	signal_tool_mode = false
 	_close_station_inspector()
 	is_dragging = false
 	draw_track_mode = true
@@ -1491,6 +1556,7 @@ func _select_curved_track() -> void:
 
 
 func _toggle_switch_tool() -> void:
+	signal_tool_mode = false
 	switch_tool_mode = not switch_tool_mode
 	inspect_mode = false
 	_close_station_inspector()
@@ -1521,13 +1587,15 @@ func _update_toolbar() -> void:
 	inspect_button.set_pressed_no_signal(inspect_mode)
 
 	straight_button.set_pressed_no_signal(
-		not inspect_mode and not switch_tool_mode and not draw_track_mode
+		not inspect_mode and not switch_tool_mode and not signal_tool_mode and not draw_track_mode
 	)
 
 	curve_button.set_pressed_no_signal(
-		not inspect_mode and not switch_tool_mode and draw_track_mode
+		not inspect_mode and not switch_tool_mode and not signal_tool_mode and draw_track_mode
 	)
 
+	if signal_button != null:
+		signal_button.set_pressed_no_signal(signal_tool_mode)
 	if switch_button != null:
 		switch_button.set_pressed_no_signal(switch_tool_mode)
 	pause_button.set_pressed_no_signal(paused)
@@ -1716,6 +1784,7 @@ func _setup_station_inspector() -> void:
 func _toggle_inspect_mode() -> void:
 	inspect_mode = not inspect_mode
 	switch_tool_mode = false
+	signal_tool_mode = false
 	is_dragging = false
 
 	if not inspect_mode:
@@ -2098,6 +2167,9 @@ func _setup_freight_train() -> void:
 	freight_train.position = freight_train.home_position
 	freight_train.delivered.connect(_on_logs_delivered)
 	freight_train.operating_expense.connect(_on_freight_operating_expense)
+	freight_train.arrived.connect(func(stop: String, _cargo: int) -> void:
+		if freight_train.recovery_returning:
+			_record_event(EventLog.TRAIN_RECOVERED, str(Fleet.assigned(fleet, "freight")["id"]), {"service": "freight", "stop": stop, "action": "returned to departure stop"}))
 
 	freight_train.movement_guard = _freight_reserved_movement
 	add_child(freight_train)
@@ -2114,13 +2186,15 @@ func _refresh_freight_route(passenger_cells: Array[Vector2i]) -> void:
 	if freight_train == null:
 		return
 
-	var cells: Array[Vector2i] = _find_freight_route(
-		tracks,
-		passenger_cells
-	)
-
-	freight_route_cells = cells
-	freight_train.set_route(cells, float(TILE_SIZE))
+	var cells: Array[Vector2i] = _find_freight_route(tracks, passenger_cells)
+	var at_home := freight_train.distance_along_route <= 0.001 and not freight_train.recovery_returning
+	if freight_train.route_cells.is_empty() or at_home:
+		if not cells.is_empty(): freight_train.set_route(cells, float(TILE_SIZE))
+	freight_route_cells = freight_train.route_cells.duplicate()
+	var was_valid: bool = freight_train.route_valid
+	freight_train.route_valid = RuntimeRoutes.connected(freight_route_cells, tracks)
+	if was_valid and not freight_train.route_valid:
+		_show_notice("Freight train stopped in place: route incomplete. Repair its path to continue.")
 
 
 # Drop removed switches; reservation owners set the positions of active ones.
@@ -2384,10 +2458,12 @@ func _update_history_controls() -> void:
 		undo_button.tooltip_text = "Undo the latest paused construction action."
 		redo_button.tooltip_text = "Repeat the latest undone construction action."
 func _passenger_service_is_active() -> bool:
+	if passenger_held:
+		return false
 	if not route_connected:
 		return false
 
-	if passenger_service_enabled:
+	if passenger_returning or passenger_service_enabled:
 		return true
 
 	# A withdrawn train completes its round trip before stopping.
@@ -2403,11 +2479,15 @@ func _passenger_service_status() -> String:
 	var title: String = services["passenger"]["name"]
 	if not route_connected:
 		return title + ": " + passenger_route_error
+	if passenger_held:
+		return title + ": held by dispatcher at current position"
+	if reservation_waits.has("passenger"):
+		return title + ": " + reservation_waits["passenger"]
+	if passenger_returning:
+		return title + ": reversing to " + ServiceRoutes.STATIONS[services["passenger"]["stops"][passenger_return_stop]]["name"]
 	var home: String = ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["name"]
 	if not passenger_service_enabled:
 		return title + (": withdrawing to " if _passenger_service_is_active() else ": stopped at ") + home
-	if reservation_waits.has("passenger"):
-		return title + ": " + reservation_waits["passenger"]
 	if wait_remaining > 0.0:
 		return "%s: departing %s in %.1f seconds" % [title, ServiceRoutes.STATIONS[services["passenger"]["stops"][passenger_stop_index]]["name"], wait_remaining]
 	return title + ": travelling to " + ServiceRoutes.STATIONS[services["passenger"]["stops"][_next_passenger_stop()]]["name"]
@@ -2426,6 +2506,7 @@ func _toggle_selected_service() -> void:
 		_record_event(EventLog.SERVICE_TOGGLED, "freight", {"enabled": freight_train.service_enabled})
 
 		if freight_train.service_enabled:
+			freight_train.held = false
 			_show_notice("Freight service enabled.")
 		else:
 			_show_notice("Freight service will stop at the forest.")
@@ -2434,6 +2515,7 @@ func _toggle_selected_service() -> void:
 		_record_event(EventLog.SERVICE_TOGGLED, "passenger", {"enabled": passenger_service_enabled})
 
 		if passenger_service_enabled:
+			passenger_held = false
 			_show_notice("Passenger service enabled.")
 		else:
 			_show_notice("Passenger service will stop at its first route stop.")
@@ -3121,6 +3203,7 @@ func _station_key(cell: Vector2i) -> String:
 	return "a"
 
 func _next_passenger_stop() -> int:
+	if passenger_returning: return passenger_return_stop
 	return passenger_stop_index + (1 if travelling_to_b else -1)
 
 func _return_onboard_passengers() -> void:
@@ -3157,7 +3240,17 @@ func apply_service_routes(configuration: Dictionary) -> String:
 		return "Pause before changing routes."
 	var changed: bool = configuration["passenger"]["stops"] != services["passenger"]["stops"]
 	if changed:
-		_return_onboard_passengers()
+		var new_home: Vector2 = _cell_center(ServiceRoutes.STATIONS[configuration["passenger"]["stops"][0]]["cell"])
+		if passengers_on_train > 0 or passenger_returning or train_position.distance_to(new_home) > 0.1:
+			return "Finish the trip or reverse back first. Stop order can only change with an empty train at the new first stop."
+		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE))["cells"].is_empty():
+			return "Complete the new route before changing the stop order."
+		# Reparameterise a path only when its origin is this exact physical spot.
+		route_cells.clear()
+		route_path = Curve2D.new()
+		route_distance = 0.0
+		passenger_stop_index = 0
+		passenger_return_stop = 0
 	services = configuration.duplicate(true)
 	if changed:
 		_check_route(true)
@@ -3269,7 +3362,9 @@ func assign_fleet_train(id: int, service: String) -> String:
 		wait_remaining = 0.0
 		train_needs_boarding = true
 		passenger_service_enabled = true
+		passenger_held = false
 	else:
+		freight_train.held = false
 		freight_train.dwell = 0.0
 		freight_train.service_enabled = true
 	_update_instructions()
@@ -3302,9 +3397,11 @@ func toggle_fleet_service(id: int) -> String:
 	if service == "passenger":
 		passenger_service_enabled = not passenger_service_enabled
 		enabled = passenger_service_enabled
+		if enabled: passenger_held = false
 	else:
 		freight_train.service_enabled = not freight_train.service_enabled
 		enabled = freight_train.service_enabled
+		if enabled: freight_train.held = false
 	_update_station_inspector()
 	return "Service enabled. Close and resume to run." if enabled else "Withdrawal requested. Close and resume: the train will finish its round trip and stop at its first station."
 
@@ -3333,10 +3430,14 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 	var passenger := Fleet.assigned(fleet, "passenger")
 	var freight := Fleet.assigned(fleet, "freight")
 	var trains: Array = [
-		{"id": int(passenger["id"]), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_connected else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0},
+		{"id": int(passenger["id"]), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0},
 		{"id": int(freight["id"]), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.service_is_active() and freight_train.dwell <= 0.0 and (not freight_train.to_terminal or freight_train.distance_along_route > 0.001 or freight_train.cargo + forest_stock >= freight_train.get_minimum_load())}
 	]
+	reservation_trains.clear()
+	for train in trains: reservation_trains[int(train.id)] = train
 	reservations.rebuild(trains, tracks, float(TILE_SIZE))
+	block_signals.configure(tracks, track_signals)
+	block_signals.update(trains, reservations.occupied_owners, float(TILE_SIZE))
 	switch_states.merge(reservations.switches, true)
 
 func _freight_reserved_movement(path: Curve2D, current: float, proposed: float) -> float:
@@ -3345,8 +3446,11 @@ func _freight_reserved_movement(path: Curve2D, current: float, proposed: float) 
 func _reserved_movement(service: String, path: Curve2D, current: float, proposed: float) -> float:
 	var id := int(Fleet.assigned(fleet, service)["id"])
 	var allowed: float = reservations.limit(id, path, current, proposed, float(TILE_SIZE))
+	var signal_check: Dictionary = block_signals.limit(reservation_trains[id], allowed, float(TILE_SIZE))
+	var signal_conflict: Dictionary = signal_check["conflict"]
+	allowed = float(signal_check["distance"])
 	if absf(allowed - proposed) > 0.001:
-		var conflict: Dictionary = reservations.waits.get(id, {})
+		var conflict: Dictionary = signal_conflict if not signal_conflict.is_empty() else reservations.waits.get(id, {})
 		var cell: Vector2i = conflict.get("cell", Vector2i(-1, -1))
 		var owner := int(conflict.get("owner", -1))
 		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001 and owner > 0:
@@ -3354,7 +3458,7 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 		var other := Fleet.find(fleet, owner)
 		var name: String = str(other.get("name", "another train"))
 		var place := "switch" if TrackGeometry.is_switch(tracks.get(cell)) else "track"
-		var reason := "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]
+		var reason := str(conflict.get("reason", "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]))
 		if reservation_waits.get(service, "") != reason:
 			_record_event(EventLog.TRAIN_WAITING, str(id), {"reason": reason, "blocked_by": owner, "x": cell.x, "y": cell.y})
 		reservation_waits[service] = reason
@@ -3401,8 +3505,8 @@ func _reset_traffic_state(reason: String = "") -> void:
 func _update_deadlocks() -> void:
 	deadlocks.update(movement_blocks, sim_clock.tick)
 	for cycle in deadlocks.new_cycles:
-		_record_event(EventLog.DEADLOCK_DETECTED, "network", {"trains": cycle.duplicate(), "reason": "Trains are waiting on each other; open Traffic for recovery."})
-		_show_notice("Deadlock detected. Open Traffic to inspect and recall a train safely.")
+		_record_event(EventLog.DEADLOCK_DETECTED, "network", {"trains": cycle.duplicate(), "reason": "Trains are waiting on each other; open Traffic for reversal."})
+		_show_notice("Deadlock detected. Open Traffic to inspect and reverse a train safely.")
 	for cycle in deadlocks.cleared_cycles:
 		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle.duplicate()})
 	if traffic_button != null:
@@ -3424,52 +3528,35 @@ func traffic_summary() -> String:
 		lines.append("#%d %s: %s" % [int(train["id"]), train["name"], reservation_waits.get(service, "Not held by another train")])
 	return "\n\n".join(lines)
 
-func recall_deadlocked_train(id: int) -> String:
-	if not paused:
-		return "Pause before recalling a train."
-	if not deadlocks.contains(id):
-		return "This train is not involved in a confirmed deadlock."
+func reverse_deadlocked_train(id: int) -> String:
+	if not paused: return "Pause before reversing a train."
+	if not deadlocks.contains(id): return "This train is not involved in a confirmed deadlock."
 	var train := Fleet.find(fleet, id)
 	var service: String = str(train.get("service", ""))
-	if not service in ["passenger", "freight"]:
-		return "Select an assigned passenger or freight train."
-	var home: Vector2 = _cell_center(ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["cell"]) if service == "passenger" else freight_train.home_position
-	var path: Curve2D = route_path if service == "passenger" else freight_train.route_path
-	path = _reservation_path(path, home)
-	_rebuild_reservations()
-	# Validate the entire destination footprint before changing cargo, money,
-	# positions or service state. There is no "force" option.
-	for cell in reservations.footprint(path, 0.0, float(TILE_SIZE)):
-		var owner := int(reservations.owners.get(cell, id))
-		if owner != id:
-			return "Recall refused: the first stop is occupied or locked by train #%d. Try recalling the other train." % owner
-	var returned := 0
 	if service == "passenger":
-		returned = passengers_on_train
-		_return_onboard_passengers()
-		route_distance = 0.0
-		passenger_stop_index = 0
-		travelling_to_b = true
+		if passenger_returning: return "This train is already returning to its departure stop."
+		passenger_return_stop = passenger_stop_index
+		passenger_returning = true
+		passenger_held = false
+		travelling_to_b = not travelling_to_b
 		wait_remaining = 0.0
-		train_needs_boarding = true
-		passenger_service_enabled = false
 		_update_train_transform()
-	else:
-		freight_train.distance_along_route = 0.0
-		freight_train.to_terminal = true
+	elif service == "freight":
+		if freight_train.recovery_returning: return "This train is already returning to its departure stop."
+		freight_train.recovery_returning = true
+		freight_train.held = false
+		freight_train.to_terminal = not freight_train.to_terminal
 		freight_train.dwell = 0.0
-		freight_train.service_enabled = false
 		freight_train._update_transform()
+	else: return "Select an assigned passenger or freight train."
 	var old_cycles: Array = deadlocks.cycles.duplicate(true)
 	_reset_traffic_state()
 	_rebuild_reservations()
-	_record_event(EventLog.TRAIN_RECOVERED, str(id), {"service": service, "passengers_returned": returned, "cargo_retained": freight_train.cargo if service == "freight" else 0})
+	_record_event(EventLog.TRAIN_REVERSED, str(id), {"service": service, "action": "return to departure stop"})
 	for cycle in old_cycles:
-		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle, "recalled": id})
-	_update_toolbar()
-	_update_station_inspector()
+		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle, "reversed": id})
 	queue_redraw()
-	return "#%d %s recalled to its first stop; service stopped. Close and resume to clear traffic. Enable it later in Fleet." % [id, train["name"]]
+	return "#%d %s reversed in place. Resume: it returns along its existing route under reservations, then waits at its departure stop." % [id, train["name"]]
 
 func _setup_traffic_dialog() -> void:
 	traffic_dialog = TrafficDialog.new()
@@ -3478,7 +3565,7 @@ func _setup_traffic_dialog() -> void:
 	traffic_button = Button.new()
 	traffic_button.text = "Traffic"
 	traffic_button.focus_mode = Control.FOCUS_NONE
-	traffic_button.tooltip_text = "Inspect blocked trains and safely recall a train in a confirmed deadlock"
+	traffic_button.tooltip_text = "Inspect blocked trains and reverse a train in a confirmed deadlock"
 	traffic_button.pressed.connect(_open_traffic_dialog)
 	$Interface/HeaderBox/Toolbar.add_child(traffic_button)
 
@@ -3492,3 +3579,85 @@ func _open_traffic_dialog() -> void:
 	_rebuild_reservations()
 	_update_toolbar()
 	traffic_dialog.open_dialog()
+
+
+func _saved_runtime_routes() -> Dictionary:
+	return {"passenger_cells": RuntimeRoutes.encode(route_cells), "freight_cells": RuntimeRoutes.encode(freight_train.route_cells), "passenger_returning": passenger_returning, "passenger_return_stop": passenger_return_stop, "passenger_held": passenger_held, "freight_returning": freight_train.recovery_returning, "freight_held": freight_train.held}
+
+
+func _saved_signals() -> Array:
+	var result: Array = []
+	for cell in track_signals: result.append([cell.x, cell.y, track_signals[cell]])
+	return result
+
+func _is_valid_signal_list(value: Array, checked_tracks: Dictionary) -> bool:
+	if value.size() > MAP_WIDTH * MAP_HEIGHT: return false
+	var seen: Dictionary = {}
+	for entry in value:
+		if not entry is Array or entry.size() != 3: return false
+		if not RuntimeRoutes.valid_cells([[entry[0], entry[1]]]): return false
+		var cell := Vector2i(int(entry[0]), int(entry[1]))
+		if seen.has(cell) or not checked_tracks.has(cell) or _is_station_space(cell) or cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]: return false
+		if not TrackGeometry.is_straight(checked_tracks[cell]) or entry[2] not in ["auto", "stop"]: return false
+		seen[cell] = true
+	return true
+
+func _setup_signal_tool() -> void:
+	signal_button = Button.new()
+	signal_button.text = "Signals"
+	signal_button.toggle_mode = true
+	signal_button.focus_mode = Control.FOCUS_NONE
+	signal_button.tooltip_text = "Click straight track: automatic block signal → manual stop → remove. Signals apply in both directions."
+	signal_button.pressed.connect(func() -> void:
+		signal_tool_mode = not signal_tool_mode
+		switch_tool_mode = false
+		inspect_mode = false
+		is_dragging = false
+		_close_station_inspector()
+		_update_toolbar())
+	$Interface/HeaderBox/Toolbar.add_child(signal_button)
+
+func _use_signal_tool(cell: Vector2i) -> void:
+	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
+		_show_notice("Place a signal on straight track outside station platforms.")
+		return
+	var old: String = str(track_signals.get(cell, ""))
+	var mode := "auto" if old == "" else ("stop" if old == "auto" else "")
+	_submit_command("set_signal", {"x": cell.x, "y": cell.y, "mode": mode})
+
+func _execute_set_signal(data: Dictionary) -> void:
+	if not RuntimeRoutes.valid_cells([[data.get("x"), data.get("y")]]) or not data.get("mode") is String: return
+	var cell := Vector2i(int(data["x"]), int(data["y"]))
+	var mode: String = str(data["mode"])
+	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL] or mode not in ["", "auto", "stop"]: return
+	if mode.is_empty(): track_signals.erase(cell)
+	else: track_signals[cell] = mode
+	_rebuild_reservations()
+	_record_event(EventLog.SIGNAL_CHANGED, "player", {"x": cell.x, "y": cell.y, "mode": mode})
+	_show_notice("Signal %s at %d,%d." % ["removed" if mode.is_empty() else mode, cell.x, cell.y])
+	queue_redraw()
+
+func _draw_signals() -> void:
+	for cell in track_signals:
+		var center := _cell_center(cell) + Vector2(0, -12)
+		var stop: bool = track_signals[cell] == "stop"
+		var color := Color(1, 0.35, 0.25) if stop else Color(0.9, 0.95, 1)
+		draw_rect(Rect2(center - Vector2(6, 6), Vector2(12, 12)), Color(0.05, 0.08, 0.1))
+		if stop: draw_rect(Rect2(center - Vector2(6, 6), Vector2(12, 12)), color, false, 2)
+		else: draw_circle(center, 6, color, false, 1.5)
+		draw_string(ThemeDB.fallback_font, center + Vector2(-4, 4), "S" if stop else "A", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
+
+func set_dispatch_hold(id: int, hold: bool) -> String:
+	if not paused: return "Pause before changing dispatch instructions."
+	var train := Fleet.find(fleet, id)
+	if train.get("service", "") == "passenger":
+		passenger_held = hold
+		passenger_service_enabled = not hold
+	elif train.get("service", "") == "freight":
+		freight_train.held = hold
+		freight_train.service_enabled = not hold
+	else: return "Choose an assigned train."
+	_reset_traffic_state("Dispatch instruction changed")
+	_rebuild_reservations()
+	_record_event(EventLog.DISPATCH_CHANGED, str(id), {"hold": hold})
+	return "Train held at its current position." if hold else "Train released. Resume to run under reservations and signals."

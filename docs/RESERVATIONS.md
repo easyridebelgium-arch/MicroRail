@@ -30,13 +30,13 @@ shortest port-valid path; passenger tiles and platforms are no longer excluded.
 
 ## Saves and limits
 
-The schema remains **v18**. Reservations are transient and are reconstructed from
+The current schema is **v19** (retained paths, physical recovery and signals). Reservations are transient and are reconstructed from
 restored fleet IDs, paths, positions and direction before any train moves.
 
 Opposing trains on a single track can wait indefinitely without player action.
-[Deadlock detection and safe emergency recall](DEADLOCKS.md) now identify sustained
-mutual waits and let the player clear them. Signals and automatic rerouting remain
-subsequent work. A passing loop helps only when the
+[Deadlock detection and physical reversal](DEADLOCKS.md) now identify sustained
+mutual waits and let the player clear them. [Automatic block signals and manual holds](SIGNALS.md) are available. Automatic
+rerouting remains subsequent work. A passing loop helps only when the
 planned services actually use separate paths; this version does not automatically
 reroute a held train into an alternate loop. Lower IDs win simultaneous requests;
 priority classes and fairness policies come later. There is still one running

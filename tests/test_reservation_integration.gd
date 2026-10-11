@@ -12,46 +12,55 @@ func _initialize() -> void:
 	_run.call_deferred()
 func _run() -> void:
 	var states: Array = []
-	for fps in [30, 60, 120]:
-		var game = load("res://scenes/main/main.tscn").instantiate()
-		root.add_child(game)
-		await process_frame
-		game.set_process(false)
-		game.sim_clock.reset()
-		game.event_log.clear()
-		var horizontal: Array[Vector2i] = []
-		var vertical: Array[Vector2i] = []
-		for x in range(4, 21): horizontal.append(Vector2i(x, 8))
-		for y in range(17): vertical.append(Vector2i(12, y))
-		game.route_cells = horizontal
-		game.route_path = Router.make_path(horizontal, 32)
-		game.route_connected = true
-		game.route_distance = 0.0
-		game.stop_distances.assign([0.0, 512.0])
-		game.waiting_at_a = 10
-		game._update_train_transform()
-		game.freight_train.set_route(vertical, 32)
-		game.freight_train.base_speed = 80.0
-		game.freight_route_cells = vertical
-		game.forest_stock = 80
-		var collision := false
-		for frame in range(fps * 10):
-			for step in game.sim_clock.advance(1.0 / fps):
-				game.sim_clock.begin_tick()
-				game._simulation_step(1.0 / 60.0)
-				var passenger_tiles: Array[Vector2i] = game.reservations.footprint(game.route_path, game.route_distance, 32)
-				for cell in game.reservations.footprint(game.freight_train.route_path, game.freight_train.distance_along_route, 32):
-					collision = collision or passenger_tiles.has(cell)
-		check(not collision, "real passenger/freight hooks prevent overlap at %d FPS" % fps)
-		check(game.passengers_delivered > 0 and game.logs_delivered > 0, "both services deliver after waiting")
-		var waits: Array = game.event_log.query(Events.TRAIN_WAITING)
-		check(not waits.is_empty(), "blocked movement records an event")
-		check(waits.size() < 10, "waiting events are not repeated each tick")
-		check((str(waits[0].data.reason) if not waits.is_empty() else "").contains("Waiting for"), "waiting includes the blocker and location")
-		states.append([game.route_distance, game.freight_train.distance_along_route, game.money, game.event_log.save_state()])
-		game.queue_free()
-		await process_frame
-	check(states[0] == states[1] and states[1] == states[2], "real fixed-step train positions, money and events match at all FPS")
+	for with_signals in [false, true]:
+		states.clear()
+		for fps in [30, 60, 120]:
+			var game = load("res://scenes/main/main.tscn").instantiate()
+			root.add_child(game)
+			await process_frame
+			game.set_process(false)
+			game.sim_clock.reset()
+			game.event_log.clear()
+			var horizontal: Array[Vector2i] = []
+			var vertical: Array[Vector2i] = []
+			for x in range(4, 21): horizontal.append(Vector2i(x, 8))
+			for y in range(17): vertical.append(Vector2i(12, y))
+			if with_signals:
+				for cell in horizontal: game.tracks[cell] = false
+				for cell in vertical: game.tracks[cell] = true
+				game.tracks[Vector2i(12, 8)] = "cross_0_2"
+				game.track_signals = {Vector2i(11, 8): "auto", Vector2i(13, 8): "auto", Vector2i(12, 7): "auto", Vector2i(12, 9): "auto"}
+			game.route_cells = horizontal
+			game.route_path = Router.make_path(horizontal, 32)
+			game.route_connected = true
+			game.route_distance = 0.0
+			game.stop_distances.assign([0.0, 512.0])
+			game.waiting_at_a = 10
+			game._update_train_transform()
+			game.freight_train.set_route(vertical, 32)
+			game.freight_train.route_valid = true
+			game.freight_train.base_speed = 80.0
+			game.freight_route_cells = vertical
+			game.forest_stock = 80
+			var collision := false
+			for frame in range(fps * 10):
+				for step in game.sim_clock.advance(1.0 / fps):
+					game.sim_clock.begin_tick()
+					game._simulation_step(1.0 / 60.0)
+					var passenger_tiles: Array[Vector2i] = game.reservations.footprint(game.route_path, game.route_distance, 32)
+					for cell in game.reservations.footprint(game.freight_train.route_path, game.freight_train.distance_along_route, 32):
+						collision = collision or passenger_tiles.has(cell)
+			check(not collision, "real passenger/freight hooks prevent overlap at %d FPS" % fps)
+			check(game.passengers_delivered > 0 and game.logs_delivered > 0, "both services deliver after waiting")
+			var waits: Array = game.event_log.query(Events.TRAIN_WAITING)
+			check(not waits.is_empty(), "blocked movement records an event")
+			check(waits.size() < 10, "waiting events are not repeated each tick")
+			var reason: String = str(waits[0].data.reason) if not waits.is_empty() else ""
+			check(reason.contains("Signal" if with_signals else "Waiting for"), "waiting includes the blocker and location")
+			states.append([game.route_distance, game.freight_train.distance_along_route, game.money, game.event_log.save_state()])
+			game.queue_free()
+			await process_frame
+		check(states[0] == states[1] and states[1] == states[2], "real fixed-step train positions, money and events match at all FPS")
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -67,7 +76,7 @@ func _run() -> void:
 	var ownership: Dictionary = game.reservations.owners.duplicate()
 	game._save_game()
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SAVE_PATH))
-	check(int(saved["version"]) == 18 and not saved.has("reservations"), "reservations need no new save schema")
+	check(int(saved["version"]) == game.SAVE_VERSION and not saved.has("reservations"), "reservations remain transient in the current schema")
 	game.reservations.owners.clear()
 	game.route_distance = 0.0
 	game._load_game()

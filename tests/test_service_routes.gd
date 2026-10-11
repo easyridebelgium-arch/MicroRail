@@ -111,9 +111,13 @@ func _run() -> void:
 	# Reorder with reversal at an intermediate station (A → C → B).
 	var reordered: Dictionary = renamed.duplicate(true)
 	reordered["passenger"]["stops"] = ["a", "c", "b"]
+	check(game.apply_service_routes(reordered).contains("Finish"), "moving route edits are refused without teleporting or discarding riders")
+	game.passenger_service_enabled = false
+	for step in range(500):
+		if game._passenger_service_is_active(): _advance_passenger(game, 0.1)
+	game.passenger_service_enabled = true
 	game.apply_service_routes(reordered)
-	check(game.waiting_at_a == 10 and game.passengers_on_train == 0, "Reordering must return passengers without loss or duplication")
-	check(game.route_distance == 0.0 and game.passenger_stop_index == 0, "Reordering resets to the first stop")
+	check(game.route_distance == 0.0 and game.passenger_stop_index == 0 and game.services == reordered, "stop order can change after the empty train actually returns")
 	for step in range(150):
 		_advance_passenger(game, 0.1)
 		if game.passenger_stop_index == 1:
@@ -142,8 +146,8 @@ func _run() -> void:
 	game.passengers_on_train = 4
 	game.tracks.erase(Vector2i(30, 8))
 	game._check_route()
-	check(not game.route_connected and game.waiting_at_c == 11 and game.passengers_on_train == 0, "Broken later leg must stop the service and preserve passengers")
-	check("Missing track" in game._passenger_service_status(), "Disconnected route must explain the missing leg")
+	check(not game.route_connected and game.waiting_at_c == 7 and game.passengers_on_train == 4 and game.train_position == position_before, "Broken later leg must stop in place with passengers still aboard")
+	check("Route incomplete" in game._passenger_service_status(), "Disconnected route must explain the missing leg")
 	game.tracks[Vector2i(30, 8)] = false
 	game._check_route()
 	check(game.route_connected, "Repairing a later leg must restore the complete service")
@@ -157,7 +161,14 @@ func _run() -> void:
 	# Withdrawing a service parks at its configured first station.
 	var reversed_route: Dictionary = defaults.duplicate(true)
 	reversed_route["passenger"]["stops"] = ["c", "b", "a"]
+	game.passengers_on_train = 0
+	game.passenger_service_enabled = true
+	for step in range(500):
+		if game.train_position.distance_to(game._cell_center(game.STATION_C)) < 0.1 and game.train_needs_boarding: break
+		_advance_passenger(game, 0.1)
+	game.passenger_held = true
 	game.apply_service_routes(reversed_route)
+	game.passenger_held = false
 	game.passenger_service_enabled = true
 	_advance_passenger(game, 0.2)
 	game.passenger_service_enabled = false

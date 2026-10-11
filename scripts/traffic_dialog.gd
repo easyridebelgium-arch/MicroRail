@@ -1,5 +1,5 @@
 extends ConfirmationDialog
-## Opening this window pauses the game. Recall is explicit and revalidated by
+## Opening this window pauses the game. Reversal is explicit and revalidated by
 ## main.gd; the button never bypasses reservations or grants movement.
 var game: Node
 var train_choice: OptionButton
@@ -9,7 +9,7 @@ var result: Label
 func configure(owner_game: Node) -> void:
 	game = owner_game
 	title = "Traffic and recovery"
-	ok_button_text = "Recall selected train"
+	ok_button_text = "Reverse selected train"
 	get_cancel_button().text = "Close"
 	dialog_hide_on_ok = false
 	exclusive = true
@@ -30,12 +30,21 @@ func configure(owner_game: Node) -> void:
 	train_choice.item_selected.connect(func(_index: int) -> void: refresh())
 	var explanation := Label.new()
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	explanation.text = "Emergency recall is free in this prototype. It returns a train involved in a confirmed deadlock to its first stop and disables its service. Passengers return to their departure queue; freight cargo stays aboard. The destination must be clear. Close this window, resume to clear traffic, then enable the service in Fleet when ready. Recall does not repair your layout or choose a passing loop."
+	explanation.text = "Reverse a train in a confirmed deadlock without changing its position or path. Resume to let it travel back to its departure stop under reservations. It then waits there; passengers return to that queue and freight cargo stays aboard. It can still wait for blocked track or a red signal. Enable the service in Fleet when ready. Reversal does not repair the layout or choose a passing loop."
 	box.add_child(explanation)
+	var dispatch := HFlowContainer.new()
+	box.add_child(dispatch)
+	for hold in [true, false]:
+		var button := Button.new()
+		button.text = "Hold selected train" if hold else "Resume selected train"
+		button.pressed.connect(func() -> void:
+			result.text = game.set_dispatch_hold(int(train_choice.get_selected_metadata()), hold)
+			refresh())
+		dispatch.add_child(button)
 	result = Label.new()
 	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(result)
-	confirmed.connect(_recall)
+	confirmed.connect(_reverse)
 
 func open_dialog() -> void:
 	train_choice.clear()
@@ -52,6 +61,6 @@ func refresh() -> void:
 	if train_choice.item_count > 0:
 		get_ok_button().disabled = not game.deadlocks.contains(int(train_choice.get_selected_metadata()))
 
-func _recall() -> void:
-	result.text = game.recall_deadlocked_train(int(train_choice.get_selected_metadata()))
+func _reverse() -> void:
+	result.text = game.reverse_deadlocked_train(int(train_choice.get_selected_metadata()))
 	refresh()

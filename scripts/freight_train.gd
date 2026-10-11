@@ -45,8 +45,13 @@ var operating_timer: float = 0.0
 var capacity_level: int = 0
 var speed_level: int = 0
 var service_enabled: bool = true
+var route_valid: bool = true
+var recovery_returning: bool = false
+var held: bool = false
 
 func set_route(cells: Array[Vector2i], tile_size: float) -> void:
+	if cells != route_cells and not route_cells.is_empty() and distance_along_route > 0.001:
+		return
 	if cells == route_cells:
 		return
 
@@ -77,7 +82,7 @@ func advance(delta: float, available_logs: int) -> int:
 	var at_terminal: bool = not to_terminal and absf(distance_along_route - route_length) < 0.001
 
 	# Load at the forest before departing.
-	if at_forest:
+	if at_forest and not recovery_returning:
 		loaded = mini(get_capacity() - cargo, available_logs)
 		cargo += loaded
 
@@ -100,6 +105,14 @@ func advance(delta: float, available_logs: int) -> int:
 		distance_along_route = target
 		arrived.emit("terminal" if to_terminal else "forest", cargo)
 
+		if recovery_returning:
+			recovery_returning = false
+			held = true
+			service_enabled = false
+			to_terminal = not to_terminal
+			dwell = 0.0
+			_update_transform()
+			return loaded
 		if to_terminal:
 			var delivered_amount: int = cargo
 			cargo = 0
@@ -154,6 +167,10 @@ func _draw() -> void:
 
 
 func status_text() -> String:
+	if not route_valid and not route_cells.is_empty(): return "Route incomplete — stopped here. Repair the existing path to continue."
+	if held: return "Held by dispatcher at current position"
+	if not reservation_wait.is_empty(): return reservation_wait
+	if recovery_returning: return "Reversing to " + ("terminal" if to_terminal else "forest")
 	if route_cells.is_empty():
 		return "Needs a connected freight route"
 	if not service_enabled:
@@ -162,8 +179,6 @@ func status_text() -> String:
 
 		return "Freight service stopped at forest"
 
-	if not reservation_wait.is_empty():
-		return reservation_wait
 	if dwell > 0.0:
 		return "Stopped at loading track"
 
@@ -324,10 +339,12 @@ func get_capacity_upgrade_price() -> int:
 func get_speed_upgrade_price() -> int:
 	return BASE_SPEED_UPGRADE_PRICE * (speed_level + 1)
 func service_is_active() -> bool:
+	if not route_valid or held:
+		return false
 	if route_cells.is_empty():
 		return false
 
-	if service_enabled:
+	if recovery_returning or service_enabled:
 		return true
 
 	var parked_at_forest: bool = (

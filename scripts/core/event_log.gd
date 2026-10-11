@@ -13,6 +13,9 @@ signal event_recorded(event: Dictionary)
 const TRAIN_DEPARTED: String = "train_departed"
 const DEADLOCK_DETECTED: String = "deadlock_detected"
 const DEADLOCK_CLEARED: String = "deadlock_cleared"
+const SIGNAL_CHANGED: String = "signal_changed"
+const DISPATCH_CHANGED: String = "dispatch_changed"
+const TRAIN_REVERSED: String = "train_reversed"
 const TRAIN_RECOVERED: String = "train_recovered"
 const TRAIN_WAITING: String = "train_waiting"
 const TRAIN_ARRIVED: String = "train_arrived"
@@ -120,8 +123,14 @@ static func summary(event: Dictionary) -> String:
 			return "Deadlock detected: open Traffic for recovery"
 		DEADLOCK_CLEARED:
 			return "Deadlock cleared"
+		SIGNAL_CHANGED:
+			return "Signal %s at %s,%s" % [data.get("mode", ""), data.get("x", 0), data.get("y", 0)]
+		DISPATCH_CHANGED:
+			return "Train #%s %s" % [who, "held" if data.get("hold", false) else "released"]
+		TRAIN_REVERSED:
+			return "Train #%s reversed toward its departure stop" % who
 		TRAIN_RECOVERED:
-			return "Train #%s recalled; service stopped" % who
+			return "Train #%s returned to its departure stop" % who
 		TRAIN_WAITING:
 			return "Train #%s: %s" % [who, data.get("reason", "Waiting for track")]
 		TRAIN_DEPARTED:

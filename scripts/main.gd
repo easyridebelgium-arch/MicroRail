@@ -4687,6 +4687,31 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	queue_redraw()
 	return "%s started at %s. Choose it in Routes to edit stops, mode and waypoints." % [configuration.name, ServiceRoutes.STATIONS[home].name]
 
+## Starts a stored train as a copy of an existing passenger service: same stops,
+## mode, waypoints and platforms, its own name. It starts at the source's first
+## stop on platform 1; if the copy cannot be applied the default service stays.
+func duplicate_passenger_service(id: int, source: String) -> String:
+	var original: Dictionary = services.get(source, {})
+	if original.is_empty() or not ServiceRoutes.is_passenger_key(source): return "Choose a passenger service to copy."
+	var message := start_passenger_service(id, str(original.stops[0]))
+	if not message.contains("started"): return message
+	var key: String = str(Fleet.find(fleet, id).service)
+	var copy: Dictionary = original.duplicate(true)
+	copy["name"] = services[key].name
+	var first: String = str(copy.stops[0])
+	var platforms: Dictionary = copy.get("platforms", {})
+	platforms.erase(first)
+	copy["platforms"] = platforms
+	var marks: Dictionary = copy.get("auto", {})
+	marks.erase(first)
+	if marks.is_empty(): copy.erase("auto")
+	else: copy["auto"] = marks
+	var configuration: Dictionary = services.duplicate(true)
+	configuration[key] = copy
+	var result := apply_service_routes(configuration)
+	if not result.begins_with("Routes applied"): return "%s The route could not be copied: %s Edit it in Routes." % [message, result]
+	return "%s started as a copy of %s." % [services[key].name, original.name]
+
 func remove_passenger_service(id: int) -> String:
 	if not paused: return "Pause before removing a service."
 	var train := Fleet.find(fleet, id)

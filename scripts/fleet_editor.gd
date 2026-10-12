@@ -17,6 +17,7 @@ var status: Label
 var assignment_choice: OptionButton
 var start_station: OptionButton
 var start_button: Button
+var start_copy: OptionButton
 var store_button: Button
 var capacity_button: Button
 var speed_button: Button
@@ -88,6 +89,11 @@ func configure(owner_game: Node) -> void:
 		start_station.add_item("Start at " + game.ServiceRoutes.STATIONS[key].name)
 		start_station.set_item_metadata(start_station.item_count - 1, key)
 	start_row.add_child(start_station)
+	start_copy = OptionButton.new()
+	start_copy.tooltip_text = "Start with the default route, or copy an existing passenger service's stops, mode, waypoints and platforms. A copy starts at that service's first stop."
+	start_copy.clip_text = true
+	start_copy.custom_minimum_size.x = 170
+	start_row.add_child(start_copy)
 	start_button = _button(start_row, "Start new passenger service", _start_service)
 	store_button = _button(start_row, "Store & remove route", _store_service)
 	var upgrades := HFlowContainer.new()
@@ -164,6 +170,15 @@ func _select_train(index: int) -> void:
 	assign_button.text = "Replace route's train"
 	start_button.disabled = service != "" or model.kind != "passenger"
 	start_station.disabled = start_button.disabled
+	var chosen_copy: String = str(start_copy.get_selected_metadata()) if start_copy.item_count > 0 else ""
+	start_copy.clear()
+	start_copy.add_item("Default route")
+	start_copy.set_item_metadata(0, "")
+	for key in game.additional_service_keys() + ["passenger"]:
+		start_copy.add_item("Copy of " + str(game.services[key].name))
+		start_copy.set_item_metadata(start_copy.item_count - 1, key)
+		if key == chosen_copy: start_copy.select(start_copy.item_count - 1)
+	start_copy.disabled = start_button.disabled
 	store_button.disabled = not game.passenger_services.has(service)
 	for kind in ["capacity", "speed"]:
 		var button: Button = capacity_button if kind == "capacity" else speed_button
@@ -217,7 +232,9 @@ func _toggle_service() -> void:
 	refresh()
 
 func _start_service() -> void:
-	status.text = game.start_passenger_service(selected_id, start_station.get_selected_metadata())
+	var source: String = str(start_copy.get_selected_metadata()) if start_copy.item_count > 0 else ""
+	if source != "": status.text = game.duplicate_passenger_service(selected_id, source)
+	else: status.text = game.start_passenger_service(selected_id, start_station.get_selected_metadata())
 	refresh()
 
 func _store_service() -> void:

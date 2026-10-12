@@ -156,6 +156,13 @@ func _run() -> void:
 	editor.stop_list.select(2)
 	editor.up_button.pressed.emit()
 	check(editor.draft["passenger"]["stops"] == ["a", "b", "c"], "Up must reorder the selected stop")
+	editor.move_stop_to(0, 2)
+	check(editor.draft["passenger"]["stops"] == ["b", "c", "a"] and editor.stop_list.get_selected_items() == PackedInt32Array([2]), "Dragging a stop to a new position reorders the draft")
+	editor.move_stop_to(2, 0)
+	check(editor.draft["passenger"]["stops"] == ["a", "b", "c"], "Dragging a stop back restores the order")
+	editor.move_stop_to(1, 9)
+	check(editor.draft["passenger"]["stops"] == ["a", "b", "c"], "Dropping outside the list changes nothing")
+	check(editor._stop_can_drop(Vector2.ZERO, {"stop_index": 1}) and not editor._stop_can_drop(Vector2.ZERO, "x"), "Only stop drags are accepted")
 	editor.hide()
 	check(game.services == reordered, "Closing without Apply must leave the live route unchanged")
 	# Withdrawing a service parks at its configured first station.

@@ -99,6 +99,8 @@ func configure(owner_game: Node) -> void:
 	platform_choice.item_selected.connect(_select_platform)
 	editing_controls.add_child(platform_choice)
 	stop_list.item_selected.connect(_show_platform)
+	stop_list.tooltip_text = "Drag a stop to reorder it, or use Up/Down."
+	stop_list.set_drag_forwarding(_stop_drag_data, _stop_can_drop, _stop_drop)
 	var waypoint_heading := Label.new()
 	waypoint_heading.text = "Pass-through waypoints — no loading or station wait"
 	box.add_child(waypoint_heading)
@@ -297,6 +299,32 @@ func _move_stop(direction: int) -> void:
 	stops[index] = stops[target]
 	stops[target] = stop
 	_refresh_stops(target)
+
+## Moves the stop at `from` so it sits at `to`, exactly like repeated Up/Down.
+func move_stop_to(from: int, to: int) -> void:
+	var stops: Array = draft[_key()]["stops"]
+	if from < 0 or from >= stops.size() or to < 0 or to >= stops.size() or from == to: return
+	var stop: String = stops[from]
+	stops.remove_at(from)
+	stops.insert(to, stop)
+	_refresh_stops(to)
+
+func _stop_drag_data(at: Vector2) -> Variant:
+	var index := stop_list.get_item_at_position(at, true)
+	if index < 0: return null
+	var preview := Label.new()
+	preview.text = stop_list.get_item_text(index)
+	stop_list.set_drag_preview(preview)
+	return {"stop_index": index}
+
+func _stop_can_drop(_at: Vector2, data: Variant) -> bool:
+	return data is Dictionary and data.has("stop_index")
+
+func _stop_drop(at: Vector2, data: Variant) -> void:
+	if not _stop_can_drop(at, data): return
+	var stops: Array = draft[_key()]["stops"]
+	var target := stop_list.get_item_at_position(at, true)
+	move_stop_to(int(data["stop_index"]), stops.size() - 1 if target < 0 else target)
 
 func _apply() -> void:
 	_capture_name(_key())

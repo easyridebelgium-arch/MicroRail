@@ -21,7 +21,12 @@ for a stranded train. Freight remains its fixed Forest–Terminal service.
 Stop/Up/Down and mode changes keep waypoints associated with matching station pairs.
 When a leg disappears, its directives are removed from the draft and a warning names
 the affected leg. Re-add the intended waypoints to the new legs before applying,
-or discard the draft. Drag reordering and automatic service duplication are later work.
+or discard the draft. Stops can be dragged to reorder them in the Routes list (`RouteEditor.move_stop_to`, same
+result as Up/Down). Fleet can also start a stored passenger train as a copy of an existing
+service ("Copy of …" next to Start new passenger service, `Main.duplicate_passenger_service`):
+it starts at the source's first stop on platform 1 with its own name and the source's
+stops, mode, waypoints, platforms and Auto marks; if the copy cannot be applied the default
+service remains and Routes can fix it. Tests: `tests/test_service_duplication.gd`.
 
 ## Validation
 

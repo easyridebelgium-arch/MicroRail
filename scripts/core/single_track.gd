@@ -75,3 +75,10 @@ static func conflict(mine: Dictionary, claims: Dictionary, ignore: int) -> int:
 		for cell in mine:
 			if theirs.has(cell) and theirs[cell] == -mine[cell]: return int(id)
 	return -1
+
+## Cells where `mine` and `theirs` are travelled head-on.
+static func overlap(mine: Dictionary, theirs: Dictionary) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for cell in mine:
+		if theirs.has(cell) and theirs[cell] == -mine[cell]: result.append(cell)
+	return result

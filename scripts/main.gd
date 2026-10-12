@@ -4220,7 +4220,21 @@ func _section_check(id: int, service: String, path: Curve2D, current: float, pro
 	var at_stop := false
 	for stop in _leg_stops(service, path):
 		if absf(float(stop) - current) < SingleTrack.ARRIVAL_TOLERANCE: at_stop = true
-	var blocker := SingleTrack.conflict(corridor, section_claims, id) if at_stop else -1
+	# A claimant that is stalled outside the shared stretch has not entered it;
+	# it cannot block this train from using the stretch first.
+	var active: Dictionary = {}
+	for other in section_claims.keys():
+		var other_train: Dictionary = reservation_trains.get(other, {})
+		var theirs: Dictionary = section_claims[other]
+		var shared := SingleTrack.overlap(corridor, theirs.corridor)
+		var stalled: bool = not other_train.is_empty() and reservation_waits.has(str(Fleet.find(fleet, int(other)).get("service", "")))
+		var inside := false
+		if stalled:
+			for cell in reservations.footprint(other_train.path, other_train.distance, float(TILE_SIZE), float(other_train.length)):
+				if shared.has(cell): inside = true
+		if not shared.is_empty() and stalled and not inside: continue
+		active[other] = theirs
+	var blocker := SingleTrack.conflict(corridor, active, id) if at_stop else -1
 	var target_cell := Vector2i(floori(path.sample_baked(target).x / TILE_SIZE), floori(path.sample_baked(target).y / TILE_SIZE))
 	if blocker < 0 and at_stop:
 		# Never follow another train into the same platform: it would have to

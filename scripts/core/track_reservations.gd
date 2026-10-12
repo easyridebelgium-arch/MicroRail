@@ -6,6 +6,7 @@ const Geometry = preload("res://scripts/track_geometry.gd")
 const LOOKAHEAD_TILES := 3.0
 const SAMPLE_STEP := 1.0
 const VEHICLE_LENGTH := 28.0
+const CORNER_TOLERANCE := 4.0
 const BODY_STEP := 4.0
 var requested: Dictionary = {}
 var owners: Dictionary = {}
@@ -39,6 +40,10 @@ func _vehicle_cells(path: Curve2D, distance: float, offset: float, tile_size: fl
 	var tangent: Vector2 = pose.x
 	# Conservative rotated rectangle enclosing both current vehicle sprites.
 	var extent := Vector2(absf(tangent.x) * 14 + absf(tangent.y) * 8, absf(tangent.y) * 14 + absf(tangent.x) * 8) + Vector2.ONE * 0.5
+	# On a diagonal the bounding box only reaches the next tile with a corner of
+	# the sprite (a few pixels). Parallel tracks are a tile apart, so ignore it;
+	# otherwise a train on a siding branch claims the main line beside it.
+	extent -= Vector2.ONE * (minf(absf(tangent.x), absf(tangent.y)) * CORNER_TOLERANCE)
 	var low := Vector2i(((point - extent) / tile_size).floor())
 	var high := Vector2i(((point + extent) / tile_size).floor())
 	var cells: Array[Vector2i] = []

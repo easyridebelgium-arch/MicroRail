@@ -26,7 +26,7 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation verified all 62 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
+complete. The most recent validation verified all 63 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
 desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
 tool reset, click/hold/drag removal, saved curved-junction layouts and safe route-copy drafts, in Godot 4.6.3
 (the platform update was previously tested on 4.7.stable).

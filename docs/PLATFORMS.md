@@ -112,6 +112,13 @@ lookahead, so it does not block the siding the other train needs. Wait text:
 `tests/test_single_track_holds.gd` runs the A–B plus A–B–C layout with Auto platforms for
 four simulated minutes. Claims are transient (not saved).
 
+A claimant that is stalled (waiting for a signal or tile) outside the shared stretch has
+not entered it and does not hold other trains back; otherwise a train waiting at a
+signal and a train waiting at a station could block each other. Reservation footprints
+on a diagonal ignore the few pixels where a sprite corner reaches the next tile
+(`CORNER_TOLERANCE`), so a train leaving a siding no longer claims the main line beside
+it. `tests/test_signalled_sidings.gd` runs the same layout with auto signals.
+
 Limit: both services still use one platform at their first stop (the platform the train
 stands on), so two services sharing one platform at both ends take turns.
 

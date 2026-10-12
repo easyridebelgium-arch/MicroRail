@@ -240,6 +240,6 @@ Reusable track blueprints, a searchable local browser and versioned JSON sharing
 are implemented; see [track blueprints](TRACK_BLUEPRINTS.md).
 Global object search, current map location, route highlighting and session
 watchlists are implemented; see [object search](OBJECT_SEARCH.md).
-Train-length-aware occupancy (body footprints, switch and block locks held until the tail clears, platform-fit footprints) is implemented but not yet run in Godot; see `tests/test_train_length.gd`. Next: consist composition on top of it, before multiple trains per service.
+Train-length-aware occupancy (body footprints, switch and block locks held until the tail clears, platform-fit footprints) is implemented and verified headlessly in Godot 4.7; see `tests/test_train_length.gd`. Next: consist composition on top of it, before multiple trains per service.
 Predictive traffic advice waits for timetable/demand data; multiple trains per
 service follow the independent-service model. See [reservation behaviour and checks](RESERVATIONS.md).

@@ -5106,7 +5106,7 @@ func _draw_passenger_consist(service: String, path: Curve2D, distance: float, po
 		_draw_passenger_vehicle(position_at, heading, int(train.id))
 		return
 	for index in range(offsets.size()):
-		var pose := Consists.pose(path, distance + offsets[index])
+		var pose := Consists.body_pose(path, distance, offsets[index])
 		var angle: float = pose.angle + (0.0 if forward else PI)
 		if index == 0:
 			_draw_passenger_vehicle(pose.position, angle, int(train.id))
@@ -5188,7 +5188,7 @@ func _begin_direct_inspection(cell: Vector2i, point: Vector2) -> void:
 		var entry := Fleet.find(fleet, train.id)
 		for offset in Consists.offsets(entry):
 			var pose: Dictionary
-			if train.path.point_count >= 2: pose = Consists.pose(train.path, train.distance + offset)
+			if train.path.point_count >= 2: pose = Consists.body_pose(train.path, train.distance, offset)
 			else:
 				var position_at: Vector2 = train_position if train.key == "passenger" else freight_train.position if train.key == "freight" else passenger_services[train.key].position
 				pose = {"position": position_at, "angle": 0.0}

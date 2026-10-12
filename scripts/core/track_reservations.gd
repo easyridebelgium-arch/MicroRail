@@ -29,12 +29,12 @@ func footprint(path: Curve2D, distance: float, tile_size: float, length: float =
 	var cells: Array[Vector2i] = []
 	for i in range(-steps, steps + 1):
 		var offset := extra * float(i) / float(steps) if steps > 0 else 0.0
-		for cell in _vehicle_cells(path, distance + offset, tile_size, closed):
+		for cell in _vehicle_cells(path, distance, offset, tile_size, closed):
 			if not cells.has(cell): cells.append(cell)
 	return cells
 
-func _vehicle_cells(path: Curve2D, distance: float, tile_size: float, closed: bool = false) -> Array[Vector2i]:
-	var pose := RouteBody.pose(path, distance, closed)
+func _vehicle_cells(path: Curve2D, distance: float, offset: float, tile_size: float, closed: bool = false) -> Array[Vector2i]:
+	var pose := RouteBody.body_pose(path, distance, offset, closed)
 	var point: Vector2 = pose.origin
 	var tangent: Vector2 = pose.x
 	# Conservative rotated rectangle enclosing both current vehicle sprites.

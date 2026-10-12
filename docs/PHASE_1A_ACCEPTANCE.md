@@ -30,7 +30,7 @@ fixed-tick FPS comparisons do not establish cross-version replay compatibility.
 
 The next expansion of this checklist follows Phase 1B: continuous long-body routing
 across planned intermediate reversals/repeated paths, usable platform lengths, multiple platforms and
-safe multiple trains per service. Service priorities and directional signals get
+safe multiple trains per service (planned-reversal body routing is now implemented). Service priorities and directional signals get
 explicit new criteria when implemented.
 
 Three-stop carriage Shuttles are now exercised by `test_multi_stop_consists.gd`:

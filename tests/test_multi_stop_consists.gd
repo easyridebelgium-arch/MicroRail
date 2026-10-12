@@ -41,12 +41,12 @@ func _run() -> void:
 		candidate.wagons = []
 		for wagon in range(count): candidate.wagons.append("coach")
 		check(game._consist_service_fit(candidate, configuration.passenger).is_empty(), "every supported carriage count fits the extended three-stop route")
-	# Reject an intermediate reversal: A-C-B retraces the B-C cells.
+	# A-C-B reverses at C and retraces the B-C cells. This planned reversal is
+	# supported (see test_planned_reversals.gd); applying it is covered there.
 	var invalid: Dictionary = configuration.duplicate(true)
 	invalid.passenger.stops = ["a", "c", "b"]
 	var before: Dictionary = game.services.duplicate(true)
-	var money: int = game.money
-	check(game.apply_service_routes(invalid).contains("revisit") and game.services == before and game.money == money, "intermediate reversal is rejected atomically")
+	check(game._consist_service_fit(game.Fleet.find(game.fleet, 1), invalid.passenger).is_empty(), "a planned reversal at C fits a one-coach train")
 	invalid = configuration.duplicate(true)
 	invalid.passenger.mode = "loop"
 	check(game.apply_service_routes(invalid).contains("Shuttle") and game.services == before, "long Loop remains gated")
@@ -89,7 +89,7 @@ func _run() -> void:
 	game.set_dispatch_hold(1, false)
 	advance_until(game, func() -> bool: return game.passenger_stop_index == 0)
 	check(game.travelling_to_b and game.route_distance == 0, "released recovery completes the return to A")
-	# Loader must also reject a retained folded route before committing any state.
+	# A saved planned reversal (A-C-B) now loads: bodies are routed through the fold.
 	game._save_game()
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SAVE_PATH))
 	saved.services.passenger.stops = ["a", "c", "b"]
@@ -100,7 +100,7 @@ func _run() -> void:
 	file.close()
 	before = game.services.duplicate(true)
 	game._load_game("user://folded_consist.json")
-	check(game.services == before and game.notice.contains("revisit"), "saved intermediate reversal cannot bypass the retained-body guard")
+	check(game.services.passenger.stops == ["a", "c", "b"] and not game.route_cells.is_empty(), "a saved intermediate reversal loads with its folded route")
 	# Independent services use the same continuous body, dwell and saved-leg rules.
 	game.passenger_held = true
 	var purchased: Dictionary = game.buy_fleet_train("passenger_fast")

@@ -41,6 +41,8 @@ static func route_shape_error(path: Curve2D, cells: Array, body: float, mode: St
 	var closed := mode == "loop"
 	if closed and (not RouteBody.is_closed(path) or path.get_baked_length() <= body):
 		return "Long Loop consists need a continuous circuit through the first stop, with no reversal at the join and room for the full train. Use Shuttle or revise the closing leg."
+	var marks := RouteBody.folds(path)
+	if not closed and not marks.is_empty(): return _fold_error(path, cells, body, marks)
 	var seen: Dictionary = {}
 	for index in range(cells.size()):
 		var cell: Vector2i = cells[index]
@@ -48,6 +50,31 @@ static func route_shape_error(path: Curve2D, cells: Array, body: float, mode: St
 		if seen.has(cell): return "Long consists need a route that does not revisit track tiles, except the closing first stop of a continuous Loop. Repeated-path body routing comes later."
 		seen[cell] = true
 	return ""
+
+## Planned reversals (A -> C -> B): every leg must be a simple run of track, the
+## retraced cells may be shared, and legs must be long enough that the body never
+## spans two reversals at once.
+static func _fold_error(path: Curve2D, cells: Array, body: float, marks: Array) -> String:
+	var folded: Array[int] = []
+	for index in range(1, cells.size() - 1):
+		if cells[index - 1] == cells[index + 1]: folded.append(index)
+	if folded.size() != marks.size():
+		return "Long consists can only reverse by retracing straight out of a stop. This route doubles back in another way."
+	var start := 0
+	for boundary in folded + [cells.size() - 1]:
+		var seen: Dictionary = {}
+		for index in range(start, int(boundary) + 1):
+			if seen.has(cells[index]): return "Long consists need each leg between planned reversals to avoid revisiting track tiles. Repeated-path body routing beyond simple reversals comes later."
+			seen[cells[index]] = true
+		start = int(boundary)
+	for index in range(1, marks.size()):
+		if float(marks[index].distance) - float(marks[index - 1].distance) < body + 32.0:
+			return "A planned reversal needs at least one train length of track before the next reversal. Shorten the train or lengthen the leg."
+	return ""
+
+static func body_pose(path: Curve2D, distance: float, offset: float) -> Dictionary:
+	var result := RouteBody.body_pose(path, distance, offset)
+	return {"position": result.origin, "angle": result.x.angle()}
 
 static func pose(path: Curve2D, distance: float) -> Dictionary:
 	var result := RouteBody.pose(path, distance)

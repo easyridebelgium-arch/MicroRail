@@ -57,9 +57,10 @@ for overlaps.
 ## Current boundary
 
 The only repeated route cell permitted for a carriage Loop is the closing first
-stop. Planned reversals at intermediate stations, figure-eight/repeated-track
-circuits and shunting still need occurrence/history-aware body routing and remain
-rejected for carriage services. Single-vehicle routes retain their existing rules.
+stop. Planned reversals at intermediate stations are now supported for Shuttle
+routes ([planned reversals](PLANNED_REVERSALS.md)); a Loop must still be a
+continuous circuit. Figure-eight/repeated-track circuits and shunting need further
+body routing and remain rejected for carriage services. Single-vehicle routes retain their existing rules.
 This is progress within Phase 1B, not completion of its platform or reversal work.
 
 `test_loop_body.gd` covers periodic vehicle poses, curve-crossing tails, switch

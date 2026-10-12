@@ -72,7 +72,7 @@ pause. Complete the track to C, keep straight signal-free stopping clearance at
 A/B/C (one coach on a straight A–C line needs track from 3,8 through 37,8), and use
 Routes to select Shuttle and order stops A, B, C. Apply, enable the service in Fleet
 or resume it in Traffic, close the windows and resume simulation. Existing
-waypoints remain supported when the full itinerary does not revisit any tile.
+waypoints remain supported unless a leg revisits its own tiles.
 Capacity and fares still use the existing simple passenger queues; passenger
 origin/destination demands come in Phase 2A.
 
@@ -81,9 +81,10 @@ closing first stop as their only repeated tile. The full body and every vehicle
 wrap around the retained curve without jumping. See [Loop consists](LOOP_CONSISTS.md)
 for construction, route and closing-leg waypoint instructions.
 
-Routes such as a folded **A–C–B** still retrace tiles and remain rejected for
-carriage trains. Planned intermediate reversals and other repeated-track routes
-need occurrence/history-aware body routing before being enabled. Formation templates, independent
+Routes with a planned reversal at an intermediate stop, such as **A–C–B**, are
+supported for carriage trains; see [planned reversals](PLANNED_REVERSALS.md). Other
+repeated-track routes (figure-eights, revisits without a reversal) remain refused
+until they have their own body routing. Formation templates, independent
 wagon inventory, classes, tankers/boxcars and cargo-specific loading are later
 features. Formal platform extensions, traction/power and yard operations are also
 later; the current checker only verifies straight track and signal-free stopping

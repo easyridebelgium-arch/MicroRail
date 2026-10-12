@@ -89,7 +89,7 @@ func advance(game: Node, delta: float) -> void:
 		game._record_event(game.EventLog.TRAIN_DEPARTED, id, {"service": key, "stop": origin, "passengers": passengers})
 	var destination := next_stop()
 	var target := target_distance()
-	distance = game._reserved_movement(key, path, distance, move_toward(distance, target, FleetData.speed(train) * delta))
+	distance = game._reserved_movement(key, path, distance, move_toward(distance, target, FleetData.speed(train) * delta), target)
 	if absf(distance - target) < 0.001:
 		distance = target
 		if returning:

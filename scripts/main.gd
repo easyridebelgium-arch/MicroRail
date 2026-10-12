@@ -24,6 +24,7 @@ const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const Platforms = preload("res://scripts/core/platforms.gd")
+const SingleTrack = preload("res://scripts/core/single_track.gd")
 var notifications = NotificationPolicy.new()
 
 const TrafficMetrics = preload("res://scripts/core/traffic_metrics.gd")
@@ -182,6 +183,10 @@ var signal_tool_mode: bool = false
 var speed_selector: OptionButton
 var signal_button: Button
 var reservation_trains: Dictionary = {}
+## Train id -> {"corridor", "target"}: plain track claimed on the current leg.
+var section_claims: Dictionary = {}
+## Train ids currently held at a stop by a single-track claim; they reserve no lookahead.
+var section_held: Dictionary = {}
 var traffic_dialog: ConfirmationDialog
 var traffic_button: Button
 var reservation_overlay: bool = false
@@ -594,7 +599,7 @@ func _move_train(delta: float) -> void:
 		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
 	var next_stop: int = _next_passenger_stop()
 	var target_distance: float = _passenger_target_distance()
-	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta))
+	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta), target_distance)
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
 		if passenger_returning:
@@ -4050,12 +4055,12 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 	var passenger := Fleet.assigned(fleet, "passenger")
 	var freight := Fleet.assigned(fleet, "freight")
 	var trains: Array = [
-		{"id": int(passenger["id"]), "length": _fleet_length(passenger), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0},
+		{"id": int(passenger["id"]), "length": _fleet_length(passenger), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0 and not section_held.has(int(passenger["id"]))},
 		{"id": int(freight["id"]), "length": _fleet_length(freight), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.service_is_active() and freight_train.dwell <= 0.0 and (not freight_train.to_terminal or freight_train.distance_along_route > 0.001 or freight_train.cargo + forest_stock >= freight_train.get_minimum_load())}
 	]
 	for key in additional_service_keys():
 		var running = passenger_services[key]
-		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0})
+		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0 and not section_held.has(int(Fleet.assigned(fleet, key).id))})
 	reservation_trains.clear()
 	for train in trains: reservation_trains[int(train.id)] = train
 	reservations.rebuild(trains, tracks, float(TILE_SIZE))
@@ -4080,10 +4085,81 @@ func _fleet_length(entry: Dictionary) -> float:
 func _freight_reserved_movement(path: Curve2D, current: float, proposed: float) -> float:
 	return _reserved_movement("freight", path, current, proposed)
 
-func _reserved_movement(service: String, path: Curve2D, current: float, proposed: float) -> float:
+func _leg_stops(service: String, path: Curve2D) -> Array:
+	if service == "passenger": return stop_distances
+	if passenger_services.has(service): return passenger_services[service].distances
+	return [0.0, path.get_baked_length()]
+
+## Cell of the stop a service's train is heading for next (-1,-1 if unknown).
+func _service_target_cell(service: String) -> Vector2i:
+	var curve: Curve2D
+	var target := 0.0
+	if service == "passenger":
+		curve = route_path
+		target = _passenger_target_distance() if not stop_distances.is_empty() else 0.0
+	elif passenger_services.has(service):
+		curve = passenger_services[service].path
+		target = passenger_services[service].target_distance()
+	else:
+		return Vector2i(-1, -1)
+	if curve == null or curve.point_count < 2: return Vector2i(-1, -1)
+	var point := curve.sample_baked(clampf(target, 0.0, curve.get_baked_length()))
+	return Vector2i(floori(point.x / TILE_SIZE), floori(point.y / TILE_SIZE))
+
+## Single-track hold (see SingleTrack). Returns {"distance": allowed, "conflict": {}}.
+func _section_check(id: int, service: String, path: Curve2D, current: float, proposed: float, allowed: float, target: float) -> Dictionary:
+	var result := {"distance": allowed, "conflict": {}}
+	if absf(proposed - current) < 0.001: return result
+	if is_nan(target): target = path.get_baked_length() if proposed > current else 0.0
+	for other in section_claims.keys():
+		var claim: Dictionary = section_claims[other]
+		var train: Dictionary = reservation_trains.get(other, {})
+		if train.is_empty() or absf(float(train.distance) - float(claim.target)) < SingleTrack.ARRIVAL_TOLERANCE: section_claims.erase(other)
+	if section_claims.has(id) and absf(float(section_claims[id].target) - target) < 0.001 and (target - current) * (proposed - current) > -0.001:
+		return result
+	var corridor := SingleTrack.corridor(path, current, target, tracks, float(TILE_SIZE))
+	var at_stop := false
+	for stop in _leg_stops(service, path):
+		if absf(float(stop) - current) < SingleTrack.ARRIVAL_TOLERANCE: at_stop = true
+	var blocker := SingleTrack.conflict(corridor, section_claims, id) if at_stop else -1
+	var target_cell := Vector2i(floori(path.sample_baked(target).x / TILE_SIZE), floori(path.sample_baked(target).y / TILE_SIZE))
+	if blocker < 0 and at_stop:
+		# Never follow another train into the same platform: it would have to
+		# leave through the section this train is arriving along.
+		for other in section_claims.keys():
+			if int(other) == id: continue
+			var theirs: Dictionary = section_claims[other]
+			var other_train: Dictionary = reservation_trains.get(other, {})
+			if other_train.is_empty(): continue
+			var their_end := other_train.path.sample_baked(float(theirs.target)) as Vector2
+			if Vector2i(floori(their_end.x / TILE_SIZE), floori(their_end.y / TILE_SIZE)) == target_cell:
+				blocker = int(other)
+				break
+		var holder := int(reservations.occupied_owners.get(target_cell, -1))
+		var current_cell := Vector2i(floori(path.sample_baked(current).x / TILE_SIZE), floori(path.sample_baked(current).y / TILE_SIZE))
+		# Two trains swapping ends pass each other on the way; only a holder
+		# that is not heading for this train's own platform blocks it.
+		if blocker < 0 and holder > 0 and holder != id and not corridor.is_empty() and _service_target_cell(str(Fleet.find(fleet, holder).get("service", ""))) != current_cell: blocker = holder
+	if blocker > 0:
+		section_held[id] = true
+		result["distance"] = current
+		var cell := Vector2i(floori(path.sample_baked(current).x / TILE_SIZE), floori(path.sample_baked(current).y / TILE_SIZE))
+		var place := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE))
+		var name := str(Fleet.find(fleet, blocker).get("name", "another train"))
+		result["conflict"] = {"owner": blocker, "cell": cell, "reason": "Waiting for %s to clear the single-track section%s" % [name, " (%s)" % place if not place.is_empty() else ""]}
+	else:
+		section_held.erase(id)
+		if absf(allowed - current) > 0.001: section_claims[id] = {"corridor": corridor, "target": target}
+	return result
+
+func _reserved_movement(service: String, path: Curve2D, current: float, proposed: float, target: float = NAN) -> float:
 	var id := int(Fleet.assigned(fleet, service)["id"])
 	var signal_check: Dictionary = block_signals.limit(reservation_trains[id], proposed, float(TILE_SIZE))
 	var allowed: float = reservations.limit(id, path, current, float(signal_check["distance"]), float(TILE_SIZE), Reservations.train_length(reservation_trains[id]))
+	var section := _section_check(id, service, path, current, proposed, allowed, target)
+	if absf(float(section["distance"]) - allowed) > 0.001:
+		allowed = float(section["distance"])
+		signal_check = {"distance": allowed, "conflict": section["conflict"]}
 	var signal_conflict: Dictionary = signal_check["conflict"]
 	if absf(allowed - proposed) > 0.001:
 		var conflict: Dictionary = signal_conflict if not signal_conflict.is_empty() else reservations.waits.get(id, {})
@@ -4139,6 +4215,8 @@ func _reset_traffic_state(reason: String = "") -> void:
 	deadlocks.reset()
 	movement_conflicts.clear()
 	movement_blocks.clear()
+	section_claims.clear()
+	section_held.clear()
 	reservation_waits.clear()
 	if freight_train != null:
 		freight_train.reservation_wait = ""

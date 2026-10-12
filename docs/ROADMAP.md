@@ -26,7 +26,7 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation verified all 60 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
+complete. The most recent validation verified all 61 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
 desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
 tool reset, click/hold/drag removal, saved curved-junction layouts and safe route-copy drafts, in Godot 4.6.3
 (the platform update was previously tested on 4.7.stable).
@@ -48,7 +48,7 @@ used to choose an arrival automatically. Services can be given a fixed platform 
 platform is fixed). Routes now copies another passenger service’s instructions into the selected service’s
 editable draft, preserving its name and train and validating the existing safe edit point
 on Apply; see [route copying](ROUTE_COPY.md). Vanished waypoint legs produce an explicit
-draft warning. Full service duplication and drag reordering remain unfinished. Automatic platform choice (`Platforms.choose`, `Main._resolve_auto_platforms`, `tests/test_auto_platforms.gd`)
+draft warning. Full service duplication and drag reordering remain unfinished. Single-track holds stop head-on lockups between stops (`SingleTrack`, `tests/test_single_track_holds.gd`; see [platforms](PLATFORMS.md)). Automatic platform choice (`Platforms.choose`, `Main._resolve_auto_platforms`, `tests/test_auto_platforms.gd`)
 is implemented; wait messages and the station panel name platforms. Continue
 Phase 1B with service duplication/drag reordering. Carriage trains can now reverse at intermediate stops
 (`RouteBody.folds`/`body_pose`, `Consists.route_shape_error`, `tests/test_fold_bodies.gd`,

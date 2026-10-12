@@ -83,6 +83,25 @@ platform 1 with a note. Stored services always hold a concrete number. Wait
 messages name the platform ("Waiting for X at Station B platform 2 (track 20,9)") and
 the station panel lists which services use each platform.
 
+## Single-track holds
+
+Auto platforms only choose platforms; they do not stop two trains entering the same
+one-track stretch from opposite ends. `scripts/core/single_track.gd` and
+`Main._section_check` add that rule: a train leaving a stop claims the plain
+(non-switch) tiles to its next stop, with its direction. Only sections bounded by
+switches at both ends count; dead-end approaches and passing loops are left to the
+normal reservations, so opposing services can still meet in a loop. It waits at the stop while an
+opposing claim overlaps, while another train's claim ends on the same platform tile, or
+while another train stands on its destination platform tile (unless that train is
+heading for this train's own platform, i.e. they swap ends). A held train reserves no
+lookahead, so it does not block the siding the other train needs. Wait text:
+"Waiting for X to clear the single-track section (Station B platform 1)".
+`tests/test_single_track_holds.gd` runs the A–B plus A–B–C layout with Auto platforms for
+four simulated minutes. Claims are transient (not saved).
+
+Limit: both services still use one platform at their first stop (the platform the train
+stands on), so two services sharing one platform at both ends take turns.
+
 ## Not yet implemented
 
 - Switching platform at arrival time while the train is moving; Auto is resolved when

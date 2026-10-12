@@ -42,6 +42,19 @@ static func is_passenger_key(key: Variant) -> bool:
 static func kind(key: String) -> String:
 	return "passenger" if is_passenger_key(key) else key
 
+## Copy operating instructions only. Identity, train assignment and runtime
+## remain with the target; nested waypoint arrays must never alias the source.
+static func copy_route(source: Dictionary, target: Dictionary) -> Dictionary:
+	var result := target.duplicate(true)
+	for field in ["stops", "mode", "waypoints", "platforms"]:
+		result.erase(field)
+	var instructions := source.duplicate(true)
+	result["stops"] = instructions.stops
+	result["mode"] = instructions.get("mode", "shuttle")
+	result["waypoints"] = instructions.get("waypoints", {})
+	result["platforms"] = instructions.get("platforms", {})
+	return result
+
 static func defaults() -> Dictionary:
 	return {
 		"passenger": {"name": "Passenger Shuttle", "stops": ["a", "b"], "waypoints": {}, "mode": "shuttle"},

@@ -22,6 +22,11 @@ var waypoint_x: SpinBox
 var waypoint_y: SpinBox
 var waypoint_add: Button
 var selected_service_key: String = "passenger"
+var copy_controls: HFlowContainer
+var copy_source: OptionButton
+var copy_button: Button
+var directive_warning: Label
+var removed_waypoint_legs: Dictionary = {}
 
 func configure(owner_game: Node) -> void:
 	game = owner_game
@@ -46,6 +51,20 @@ func configure(owner_game: Node) -> void:
 	service_choice.clip_text = true
 	box.add_child(service_choice)
 	service_choice.item_selected.connect(_select_service)
+	copy_controls = HFlowContainer.new()
+	box.add_child(copy_controls)
+	var copy_label := Label.new()
+	copy_label.text = "Copy route from"
+	copy_controls.add_child(copy_label)
+	copy_source = OptionButton.new()
+	copy_source.custom_minimum_size.x = 180
+	copy_source.clip_text = true
+	copy_controls.add_child(copy_source)
+	copy_button = Button.new()
+	copy_button.text = "Copy to draft"
+	copy_button.tooltip_text = "Copy stops, mode, waypoints and platforms. Keeps this service's name and train; Apply checks safety."
+	copy_button.pressed.connect(_copy_route)
+	copy_controls.add_child(copy_button)
 	name_field = LineEdit.new()
 	name_field.max_length = 40
 	name_field.placeholder_text = "Route name"
@@ -116,6 +135,9 @@ func configure(owner_game: Node) -> void:
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.custom_minimum_size.y = 60
 	box.add_child(status)
+	directive_warning = Label.new()
+	directive_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(directive_warning)
 	confirmed.connect(_apply)
 
 func _button(title_text: String, callback: Callable) -> Button:
@@ -127,6 +149,8 @@ func _button(title_text: String, callback: Callable) -> Button:
 
 func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 	draft = game.services.duplicate(true)
+	removed_waypoint_legs.clear()
+	directive_warning.text = ""
 	service_choice.clear()
 	for key in game.service_keys():
 		var train: Dictionary = game.Fleet.assigned(game.fleet, key)
@@ -153,12 +177,35 @@ func _select_service(index: int) -> void:
 	_show_service()
 
 func _show_service() -> void:
+	directive_warning.text = str(removed_waypoint_legs.get(_key(), ""))
 	name_field.text = draft[_key()]["name"]
 	editing_controls.visible = Services.is_passenger_key(_key())
 	route_mode.visible = Services.is_passenger_key(_key())
 	route_mode.select(1 if draft[_key()].get("mode", "shuttle") == "loop" else 0)
+	_refresh_copy_sources()
 	_refresh_stops()
 	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if Services.is_passenger_key(_key()) else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
+
+func _refresh_copy_sources() -> void:
+	copy_controls.visible = Services.is_passenger_key(_key())
+	copy_source.clear()
+	for key in game.service_keys():
+		if key == _key() or not Services.is_passenger_key(key): continue
+		copy_source.add_item(draft[key].name)
+		copy_source.set_item_metadata(copy_source.item_count - 1, key)
+	copy_button.disabled = copy_source.item_count == 0
+	copy_source.disabled = copy_button.disabled
+	copy_source.tooltip_text = "Start another passenger service in Fleet to copy routes between services." if copy_button.disabled else "Copies the source's current draft instructions."
+
+func _copy_route() -> void:
+	if not Services.is_passenger_key(_key()) or copy_source.item_count == 0: return
+	var source: String = copy_source.get_selected_metadata()
+	if source == _key() or not Services.is_passenger_key(source) or not draft.has(source): return
+	_capture_name(_key())
+	draft[_key()] = Services.copy_route(draft[source], draft[_key()])
+	removed_waypoint_legs.erase(_key())
+	_show_service()
+	status.text = "Copied %s into this draft. Review the stop sequence, platforms and waypoints, then Apply. The target train must be empty at the first stop; no trains are bought or moved." % draft[source].name
 
 func _refresh_stops(selected: int = -1) -> void:
 	stop_list.clear()
@@ -260,8 +307,14 @@ func _refresh_legs() -> void:
 		waypoint_leg.set_item_metadata(index, key)
 		if key == old: waypoint_leg.select(index)
 	var directives: Dictionary = draft[_key()].get("waypoints", {}).duplicate(true)
+	var removed: PackedStringArray = []
 	for key in directives.keys():
-		if not valid_keys.has(key): directives.erase(key)
+		if not valid_keys.has(key):
+			if not directives[key].is_empty(): removed.append(str(key).replace(">", " → ").to_upper())
+			directives.erase(key)
+	if not removed.is_empty():
+		directive_warning.text = "Waypoints removed from draft for vanished legs: %s. Re-add them to the intended legs before Apply, or close and reopen to discard edits." % ", ".join(removed)
+		removed_waypoint_legs[_key()] = directive_warning.text
 	draft[_key()]["waypoints"] = directives
 	_refresh_waypoints()
 

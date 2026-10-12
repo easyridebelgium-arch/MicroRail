@@ -1,0 +1,31 @@
+# Copy a passenger route
+
+1. Pause and open **Routes**. Select the service whose route you want to change.
+2. In **Copy route from**, choose another passenger service and press **Copy to draft**.
+3. Review the stop sequence, Shuttle/Loop mode, per-leg waypoints and platform choices.
+   The target keeps its own name and assigned train; you can rename it separately.
+4. Press **Apply**. Route changes require the target train to be empty and physically
+   at the proposed first stop. Its starting platform cannot change underneath it.
+   Connectivity and consist clearance checks still apply. A refused edit changes nothing.
+
+The source train can be running. Copying reads instructions only; it does not copy
+positions, passengers, upgrades, coaches, holds or withdrawal state. Nested waypoint
+edits are independent. Close and reopen Routes to discard an unapplied draft.
+
+To expand the fleet, first buy a stored passenger train in **Fleet**, then start a new
+passenger service on a clear starting platform. Select that new service in Routes
+and copy a route whose first stop matches its physical location. Copying does not
+purchase a train or create an additional service, and it is not a reroute command
+for a stranded train. Freight remains its fixed Forest–Terminal service.
+
+Stop/Up/Down and mode changes keep waypoints associated with matching station pairs.
+When a leg disappears, its directives are removed from the draft and a warning names
+the affected leg. Re-add the intended waypoints to the new legs before applying,
+or discard the draft. Drag reordering and automatic service duplication are later work.
+
+## Validation
+
+`tests/test_route_copy.gd` covers deep-copy isolation, live source/target preservation,
+draft discard, validated application, refusal on a moving target, save/load,
+vanished-leg warnings, freight exclusion and reachable Apply at 200% UI scale.
+The copy stores ordinary service instructions, so no save schema change is needed.

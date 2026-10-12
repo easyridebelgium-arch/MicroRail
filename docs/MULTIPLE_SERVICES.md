@@ -34,6 +34,12 @@ start the second train at A and edit its stops to A, C before resuming. Direct t
 A–C service through your bypass waypoint to pass B without stopping. Loop mode
 lets you add B third and close directly back to A.
 
+To reuse another passenger route, select the target in **Routes**, choose a source
+under **Copy route from**, then **Copy to draft** and review before **Apply**.
+The source can be running; the target must be empty at the proposed first stop.
+Its own name/train are retained, and nothing is purchased or spawned by copying.
+See [route copying](ROUTE_COPY.md).
+
 ## A repeatable passing-loop example
 
 Track reservations prevent overlap, but a passing loop alone does not guarantee

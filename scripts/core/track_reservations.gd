@@ -89,8 +89,9 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 		var body := train_length(train)
 		var half := (body - VEHICLE_LENGTH) * 0.5
 		# A long body spans several route cells, so switches under the nose or
-		# tail are locked too; only longer bodies pay for the coarser stepping.
-		var step := SAMPLE_STEP if half <= 0.0 else SAMPLE_STEP * 2.0
+		# tail are locked too. Match movement resolution: a coarser claim scan
+		# can miss brief clearance cells beside bends and strand an unblocked train.
+		var step := SAMPLE_STEP
 		while true:
 			var required := footprint(train.path, distance, tile_size, body)
 			var settings: Dictionary = {}
@@ -129,7 +130,15 @@ func limit(id: int, path: Curve2D, current: float, proposed: float, tile_size: f
 	while absf(allowed - proposed) > 0.001:
 		var next := move_toward(allowed, proposed, SAMPLE_STEP)
 		for cell in footprint(path, next, tile_size, length):
-			if int(owners.get(cell, -1)) != id or (_switch_tiles.has(cell) and int(switch_owners.get(cell, -1)) != id):
+			var tile_owner := int(owners.get(cell, -1))
+			var switch_owner := int(switch_owners.get(cell, -1))
+			if tile_owner != id:
+				waits[id] = {"cell": cell, "owner": tile_owner, "kind": "track_reservation"}
+				if tile_owner < 0: waits[id]["reason"] = "Waiting for track authority at %d,%d" % [cell.x, cell.y]
+				return allowed
+			if _switch_tiles.has(cell) and switch_owner != id:
+				waits[id] = {"cell": cell, "owner": switch_owner, "kind": "switch_lock"}
+				if switch_owner < 0: waits[id]["reason"] = "Waiting for switch authority at %d,%d" % [cell.x, cell.y]
 				return allowed
 		allowed = next
 	return allowed

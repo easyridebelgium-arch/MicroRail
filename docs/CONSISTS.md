@@ -47,7 +47,15 @@ train in place; repairing it lets the service resume. Occupied body tiles remain
 protected from track removal.
 
 The nose requests signal authority once, and switches/blocks remain protected
-until the tail clears. Save loading checks complete bodies for overlap even with
+until the tail clears. Long-train requests use the same one-pixel scan resolution
+as movement validation. Two-pixel lookahead previously skipped brief clearance
+cells beside diagonal bends, stranding a coach train near switch 31,8 without a
+real competitor. The whole-body protection remains conservative. Movement denials
+now record the actual tile and owner (or missing authority), rather than falling
+back to an unnamed train at -1,-1. Reservations rebuild normally on resume/load;
+existing saves need no migration for this fix.
+
+Save loading checks complete bodies for overlap even with
 only the original passenger/freight pair. Composition is stored in save version
 **23**; version 22 upgrades to single-vehicle trains through the existing migration
 system. Unknown or incompatible stock is rejected before loading.
@@ -64,3 +72,7 @@ Tests: `test_train_length.gd`, `test_consists.gd` and
 `test_consist_integration.gd` cover body protection, bounded stock validation,
 pricing, service clearance, physical delivery/return, save/load, actual overlap
 rejection, 200% UI scale and repeatable long-train movement at 30/60/120 FPS.
+
+`test_long_diagonal_reservations.gd` reproduces diagonal/switch stalls at each
+supported carriage count in both directions, using a signal and the same two-pass
+authority allocation as the game. It also checks precise movement-denial records.

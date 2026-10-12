@@ -73,10 +73,20 @@ formal rule agrees with it for every consist size and every combination of
 extension tiles behind the start and beyond the end of a route (172 checks).
 `tests/test_platform_ui.gd` checks the panel text.
 
+## Automatic choice
+
+The Routes editor offers "Auto" per stop. On Apply, each Auto stop (except the first,
+which stays on the platform the train stands on) takes the first platform that is not
+used by another service's stop, fits the assigned train and can be routed to
+(`Platforms.choose`); otherwise a shared platform that fits and routes, otherwise
+platform 1 with a note. Stored services always hold a concrete number. Wait
+messages name the platform ("Waiting for X at Station B platform 2 (track 20,9)") and
+the station panel lists which services use each platform.
+
 ## Not yet implemented
 
-- Choosing a free platform at arrival time (`Platforms.assign`) instead of a fixed
-  choice, with arrival/departure reservations that wait for a platform to clear.
+- Switching platform at arrival time while the train is moving; Auto is resolved when
+  routes are applied.
 - Platform choice for the first stop, and for freight terminals.
 - A build tool or overlay for sidings; today they are ordinary track.
 - Vertical or diagonal platforms (the existing rule only accepts horizontal track).

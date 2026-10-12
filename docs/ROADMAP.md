@@ -11,23 +11,22 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | --- | --- | --- |
 | Phase 0 — Foundations | Implemented; requirements remain active for every update. | Continue deterministic, save and accessibility checks. Full input replay/controller support are later extensions. |
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
-| Phase 1B — Service operations | Partially complete. | Figure-eight/other repeated-path body routing (planned reversals at stops are done), automatic platform choice and platform-aware reservations (lengths, numbering, assignment rule and fixed per-stop sidings exist), service duplication/drag reordering and multiple trains per service. |
+| Phase 1B — Service operations | Partially complete. | Figure-eight/other repeated-path body routing (planned reversals at stops are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist), service duplication/drag reordering and multiple trains per service. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. Unified waiting inspection is implemented. |
 | Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Next implementation:** choose a free platform at arrival time with `Platforms.assign` and make
-arrival/departure reservations platform-aware (Phase 1B). Planned reversals at intermediate stops
-now route the full carriage body (see [planned reversals](PLANNED_REVERSALS.md)), which removes
-the dependency noted earlier. Automatic platform changes must preserve the physical body and its
-existing route behind the train (including the extension past a reversal stop); they must not
-replace an occupied path.
+**Next implementation:** service duplication and drag reordering in Routes (Phase 1B), then
+figure-eight/other repeated-path body routing and multiple trains per service. Automatic platform
+choice is done at Apply time (the editor's "Auto" option; see [platforms](PLATFORMS.md)); choosing
+a different platform at arrival time, while the train is moving, remains optional later work and
+must preserve the physical body and its route behind the train.
 Services can already be assigned a fixed platform per stop in Routes (trains drive onto switch-connected sidings). Platform lengths, stable numbered platforms (1 = stop track,
 2 = siding below, 3 = siding above) and the assignment rule are implemented and shown in the station panel;
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation verified all 59 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
+complete. The most recent validation verified all 60 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
 desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
 tool reset, click/hold/drag removal, saved curved-junction layouts and safe route-copy drafts, in Godot 4.6.3
 (the platform update was previously tested on 4.7.stable).
@@ -49,9 +48,9 @@ used to choose an arrival automatically. Services can be given a fixed platform 
 platform is fixed). Routes now copies another passenger service’s instructions into the selected service’s
 editable draft, preserving its name and train and validating the existing safe edit point
 on Apply; see [route copying](ROUTE_COPY.md). Vanished waypoint legs produce an explicit
-draft warning. Full service duplication and drag reordering remain unfinished. Continue
-Phase 1B with automatic platform selection and platform-aware arrival/departure
-reservations. Carriage trains can now reverse at intermediate stops
+draft warning. Full service duplication and drag reordering remain unfinished. Automatic platform choice (`Platforms.choose`, `Main._resolve_auto_platforms`, `tests/test_auto_platforms.gd`)
+is implemented; wait messages and the station panel name platforms. Continue
+Phase 1B with service duplication/drag reordering. Carriage trains can now reverse at intermediate stops
 (`RouteBody.folds`/`body_pose`, `Consists.route_shape_error`, `tests/test_fold_bodies.gd`,
 `tests/test_planned_reversals.gd`, `tests/test_reversal_signals.gd`); platform selection must keep
 the tail's route and the extension past a reversal stop intact. Figure-eight circuits and other

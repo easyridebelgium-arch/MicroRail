@@ -3678,7 +3678,11 @@ func _platform_text(cell: Vector2i) -> String:
 	if platforms.is_empty(): return Platforms.describe(Platforms.measure(tracks, track_signals, cell, float(TILE_SIZE)), float(TILE_SIZE))
 	for platform in platforms:
 		var holder := int(reservations.occupied_owners.get(platform.cell, -1))
-		lines.append("Platform %d: %s%s" % [int(platform.number), Platforms.describe(platform, float(TILE_SIZE)).trim_prefix("Platform: "), " — occupied by train #%d" % holder if holder > 0 else ""])
+		var users: PackedStringArray = []
+		for service_key in passenger_services.keys():
+			if not services.get(service_key, {}).get("stops", []).has(key): continue
+			if int(services[service_key].get("platforms", {}).get(key, 1)) == int(platform.number): users.append(str(services[service_key].get("name", service_key)))
+		lines.append("Platform %d: %s%s%s" % [int(platform.number), Platforms.describe(platform, float(TILE_SIZE)).trim_prefix("Platform: "), " — occupied by train #%d" % holder if holder > 0 else "", " — used by %s" % ", ".join(users) if not users.is_empty() else ""])
 	return "\n".join(lines)
 
 func _station_key(cell: Vector2i) -> String:
@@ -3736,7 +3740,66 @@ func _first_platform_changed(proposed: Dictionary, current: Dictionary) -> bool:
 	if proposed.stops[0] != current.stops[0]: return false
 	return ServiceRoutes.stop_cell(proposed.get("platforms", {}), proposed.stops[0]) != ServiceRoutes.stop_cell(current.get("platforms", {}), current.stops[0])
 
+## Replaces "Auto" (0) platform choices in a draft with concrete numbers.
+## Returns {"configuration", "notes": PackedStringArray}. Stored services never
+## hold 0. The first stop is pinned to the current platform (the train is
+## standing there); other stops take a free, fitting, routable platform.
+func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
+	var notes: PackedStringArray = []
+	var resolved: Dictionary = configuration.duplicate(true)
+	var keys: Array = []
+	for key in resolved:
+		if ServiceRoutes.is_passenger_key(key) and resolved[key] is Dictionary: keys.append(key)
+	keys.sort()
+	var busy: Dictionary = {}
+	for key in keys:
+		var chosen: Variant = resolved[key].get("platforms", {})
+		if not chosen is Dictionary: continue
+		for stop in chosen:
+			if int(chosen[stop]) != 0: busy["%s/%d" % [stop, int(chosen[stop])]] = true
+		for stop in resolved[key].get("stops", []):
+			if stop is String and not chosen.has(stop): busy["%s/1" % stop] = true
+	for key in keys:
+		var service: Dictionary = resolved[key]
+		var platforms: Dictionary = service.get("platforms", {})
+		if not platforms is Dictionary: continue
+		for stop in platforms.keys():
+			if int(platforms[stop]) != 0: continue
+			if not ServiceRoutes.STATIONS.has(stop) or not service.get("stops", []).has(stop):
+				platforms.erase(stop)
+				continue
+			var current: int = int(services.get(key, {}).get("platforms", {}).get(stop, 1))
+			if service.stops[0] == stop:
+				if current == 1: platforms.erase(stop)
+				else: platforms[stop] = current
+				continue
+			var body := Fleet.length(Fleet.assigned(fleet, key)) if Fleet.assigned(fleet, key).has("id") else Reservations.VEHICLE_LENGTH
+			var options := Platforms.for_station(tracks, track_signals, stop, ServiceRoutes.STATIONS[stop]["cell"], float(TILE_SIZE))
+			var probe := func(number: int) -> bool:
+				var trial: Dictionary = platforms.duplicate()
+				trial[stop] = number
+				for other in trial.keys():
+					if int(trial[other]) == 0: trial[other] = 1
+				return not ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), trial)["cells"].is_empty()
+			var number := Platforms.choose(options, body, float(TILE_SIZE), busy, probe)
+			if number == 0:
+				number = 1
+				notes.append("%s: no free platform fits at %s; using platform 1." % [service.get("name", key), ServiceRoutes.STATIONS[stop]["name"]])
+			busy["%s/%d" % [stop, number]] = true
+			if number == 1: platforms.erase(stop)
+			else: platforms[stop] = number
+		service["platforms"] = platforms
+	return {"configuration": resolved, "notes": notes}
+
 func apply_service_routes(configuration: Dictionary) -> String:
+	var auto_resolved := _resolve_auto_platforms(configuration)
+	configuration = auto_resolved["configuration"]
+	var result := _apply_resolved_routes(configuration)
+	if result.begins_with("Routes applied") and not auto_resolved["notes"].is_empty():
+		result += " " + " ".join(auto_resolved["notes"])
+	return result
+
+func _apply_resolved_routes(configuration: Dictionary) -> String:
 	if not ServiceRoutes.is_valid(configuration):
 		return "Use a name of 1–40 characters and at least two different passenger stops."
 	if not paused:
@@ -4033,7 +4096,8 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 		var other := Fleet.find(fleet, owner)
 		var name: String = str(other.get("name", "another train"))
 		var place := "switch" if TrackGeometry.is_switch(tracks.get(cell)) else "track"
-		var reason := str(conflict.get("reason", "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]))
+		var platform_label := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE))
+		var reason := str(conflict.get("reason", "Waiting for %s at %s (%s %d,%d)" % [name, platform_label, place, cell.x, cell.y] if not platform_label.is_empty() else "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]))
 		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001:
 			traffic_wait_samples[id] = {"reason": reason, "cell": cell}
 		if reservation_waits.get(service, "") != reason:

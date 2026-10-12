@@ -93,7 +93,8 @@ func configure(owner_game: Node) -> void:
 	down_button = _button("Down", _move_stop.bind(1))
 	platform_choice = OptionButton.new()
 	for number in [1, 2, 3]: platform_choice.add_item("Platform %d" % number)
-	platform_choice.tooltip_text = "Platform used at the selected stop. Platforms 2 and 3 are sidings beside the station tile; build and connect them first."
+	platform_choice.add_item("Auto")
+	platform_choice.tooltip_text = "Platform used at the selected stop. Platforms 2 and 3 are sidings beside the station tile; build and connect them first. Auto picks a free platform that fits the train when you Apply."
 	platform_choice.disabled = true
 	platform_choice.item_selected.connect(_select_platform)
 	editing_controls.add_child(platform_choice)
@@ -219,7 +220,7 @@ func _refresh_stops(selected: int = -1) -> void:
 		var key: String = stops[index]
 		var stop_name: String = Services.STATIONS[key]["name"] if Services.STATIONS.has(key) else ("Forest — load logs" if key == "forest" else "Terminal — unload logs")
 		var chosen: int = int(draft[_key()].get("platforms", {}).get(key, 1))
-		stop_list.add_item("%d. %s%s" % [index + 1, stop_name, "" if chosen == 1 else " — platform %d" % chosen])
+		stop_list.add_item("%d. %s%s" % [index + 1, stop_name, "" if chosen == 1 else (" — auto platform" if chosen == 0 else " — platform %d" % chosen)])
 	if selected >= 0 and selected < stops.size():
 		stop_list.select(selected)
 	_show_platform(selected)
@@ -238,7 +239,8 @@ func _show_platform(index: int) -> void:
 	var stops: Array = draft[_key()]["stops"]
 	platform_choice.disabled = index < 0 or index >= stops.size()
 	if platform_choice.disabled: return
-	platform_choice.select(int(draft[_key()].get("platforms", {}).get(stops[index], 1)) - 1)
+	var chosen: int = int(draft[_key()].get("platforms", {}).get(stops[index], 1))
+	platform_choice.select(3 if chosen == 0 else chosen - 1)
 
 func _select_platform(choice: int) -> void:
 	var selected: PackedInt32Array = stop_list.get_selected_items()
@@ -246,6 +248,7 @@ func _select_platform(choice: int) -> void:
 	var stop: String = draft[_key()]["stops"][selected[0]]
 	var platforms: Dictionary = draft[_key()].get("platforms", {})
 	if choice == 0: platforms.erase(stop)
+	elif choice == 3: platforms[stop] = 0
 	else: platforms[stop] = choice + 1
 	draft[_key()]["platforms"] = platforms
 	_refresh_stops(selected[0])

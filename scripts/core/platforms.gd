@@ -6,6 +6,10 @@ extends RefCounted
 const Consists = preload("res://scripts/core/consists.gd")
 const Geometry = preload("res://scripts/track_geometry.gd")
 const Reservations = preload("res://scripts/core/track_reservations.gd")
+const Services = preload("res://scripts/service_routes.gd")
+## Tiles either side of a stop tile that still count as "at the platform" when
+## naming where a train waits; a long straight line must not label the whole row.
+const PLATFORM_REACH := 2
 
 ## Returns {cell, left, right, tiles, length}. `left`/`right` count whole tiles
 ## beyond the stop tile on each side; a stop on non-straight track has none.
@@ -81,6 +85,29 @@ static func assign(platforms: Array, body: float, tile_size: float, busy: Dictio
 	for platform in platforms:
 		if busy.has(platform.id): continue
 		if fits(platform, body, tile_size): return str(platform.id)
+	return ""
+
+## Choose a platform number for a service stop ("Auto"). Preference order:
+## a platform that fits the train, can be routed to and is not used by another
+## service; failing that, a shared one that fits and routes. `routable` is a
+## Callable(number: int) -> bool. Returns 0 when nothing suitable exists.
+static func choose(platforms: Array, body: float, tile_size: float, busy: Dictionary, routable: Callable) -> int:
+	for allow_shared in [false, true]:
+		for platform in platforms:
+			if busy.has(platform.id) and not allow_shared: continue
+			if not fits(platform, body, tile_size): continue
+			if routable.call(int(platform.number)): return int(platform.number)
+	return 0
+
+## "Station B platform 2" when `cell` lies on a station platform (within
+## PLATFORM_REACH tiles of its stop tile), otherwise "".
+static func label_for_cell(tracks: Dictionary, signs: Dictionary, cell: Vector2i, tile_size: float) -> String:
+	for key in Services.STATIONS:
+		var stop: Vector2i = Services.STATIONS[key]["cell"]
+		if absi(cell.x - stop.x) > PLATFORM_REACH or absi(cell.y - stop.y) > 1: continue
+		for platform in for_station(tracks, signs, key, stop, tile_size):
+			if cell.y == platform.cell.y and cell.x >= platform.cell.x - mini(int(platform.left), PLATFORM_REACH) and cell.x <= platform.cell.x + mini(int(platform.right), PLATFORM_REACH):
+				return "%s platform %d" % [Services.STATIONS[key]["name"], int(platform.number)]
 	return ""
 
 static func _usable(tracks: Dictionary, signs: Dictionary, cell: Vector2i) -> bool:

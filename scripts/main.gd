@@ -25,6 +25,7 @@ const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const Platforms = preload("res://scripts/core/platforms.gd")
 const SingleTrack = preload("res://scripts/core/single_track.gd")
+const Headway = preload("res://scripts/core/headway.gd")
 var notifications = NotificationPolicy.new()
 
 const TrafficMetrics = preload("res://scripts/core/traffic_metrics.gd")
@@ -185,6 +186,8 @@ var signal_button: Button
 var reservation_trains: Dictionary = {}
 ## Train id -> {"corridor", "target"}: plain track claimed on the current leg.
 var section_claims: Dictionary = {}
+## Group (source service key) -> recent first-stop departure ticks. Not saved.
+var headway_log: Dictionary = {}
 ## Train ids currently held at a stop by a single-track claim; they reserve no lookahead.
 var section_held: Dictionary = {}
 var traffic_dialog: ConfirmationDialog
@@ -593,7 +596,9 @@ func _move_train(delta: float) -> void:
 	if wait_remaining > 0.0:
 		wait_remaining = maxf(0.0, wait_remaining - delta)
 		return
+	if train_needs_boarding and passenger_stop_index == 0 and _headway_hold("passenger"): return
 	if train_needs_boarding:
+		if passenger_stop_index == 0: _record_departure("passenger")
 		_board_passengers()
 		train_needs_boarding = false
 		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
@@ -4189,6 +4194,56 @@ func _maybe_reroute_platform(service: String) -> void:
 		_rebuild_reservations()
 		_record_event(EventLog.ROUTE_CHANGED, str(id), {"service": service, "action": "platform", "stop": stop, "platform": number, "was": planned})
 		return
+
+func _headway_group(service: String) -> String:
+	return str(services.get(service, {}).get("link", service))
+
+func _headway_target(service: String) -> int:
+	return int(services.get(_headway_group(service), {}).get("headway", 0))
+
+## True (and the reason is set) while this service must wait at its first stop.
+func _headway_hold(service: String) -> bool:
+	var group := _headway_group(service)
+	var log: Array = headway_log.get(group, [])
+	var remaining := Headway.remaining_ticks(int(log.back()) if not log.is_empty() else -1, _headway_target(service), sim_clock.tick)
+	if remaining <= 0:
+		if str(reservation_waits.get(service, "")).begins_with("Holding for headway"): reservation_waits.erase(service)
+		return false
+	reservation_waits[service] = "Holding for headway: %d s until the next departure" % ceili(float(remaining) / Headway.TICKS_PER_SECOND)
+	return true
+
+func _record_departure(service: String) -> void:
+	var group := _headway_group(service)
+	headway_log[group] = Headway.record(headway_log.get(group, []), sim_clock.tick)
+
+## Group members: the source and every service linked to it.
+func headway_group_members(group: String) -> Array:
+	var members: Array = [group]
+	for key in services:
+		if key != group and services[key].get("link", "") == group: members.append(key)
+	return members
+
+## Plain-text headway report for a source service.
+func headway_report(group: String) -> String:
+	var target := int(services.get(group, {}).get("headway", 0))
+	var members := headway_group_members(group)
+	var stats := Headway.stats(headway_log.get(group, []))
+	var lines: PackedStringArray = []
+	if target <= 0: lines.append("Headway: off")
+	else: lines.append("Headway target: %d s" % target)
+	if int(stats.count) >= 2: lines.append("Actual: last %.0f s, average %.0f s over %d departures" % [stats.last, stats.average, stats.count])
+	if target > 0:
+		var route_length := 0.0
+		var distances: Array = stop_distances if group == "passenger" else passenger_services[group].distances if passenger_services.has(group) else []
+		if not distances.is_empty(): route_length = float(distances.back())
+		var slowest := INF
+		for key in members:
+			var speed := Fleet.speed(Fleet.assigned(fleet, key)) if not Fleet.assigned(fleet, key).is_empty() else 0.0
+			slowest = minf(slowest, speed)
+		var trip := Headway.round_trip(route_length, slowest, services[group].stops.size(), services[group].get("mode", "shuttle") == "loop", STATION_WAIT)
+		var reason := Headway.infeasible_reason(target, trip, members.size())
+		if not reason.is_empty(): lines.append(reason)
+	return "\n".join(lines)
 
 ## Cell of the stop a service's train is heading for next (-1,-1 if unknown).
 func _service_target_cell(service: String) -> Vector2i:

@@ -80,7 +80,9 @@ func advance(game: Node, delta: float) -> void:
 	if dwell > 0:
 		dwell = maxf(0, dwell - delta)
 		return
+	if boarding and stop_index == 0 and game._headway_hold(key): return
 	if boarding:
+		if stop_index == 0: game._record_departure(key)
 		var origin: String = configuration.stops[stop_index]
 		var count: int = mini(game._waiting(origin), FleetData.capacity(train) - passengers)
 		game._set_waiting(origin, game._waiting(origin) - count)

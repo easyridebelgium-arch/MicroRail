@@ -23,6 +23,9 @@ var waypoint_y: SpinBox
 var waypoint_add: Button
 var selected_service_key: String = "passenger"
 var copy_controls: HFlowContainer
+var headway_controls: HFlowContainer
+var headway_spin: SpinBox
+var headway_label: Label
 var link_controls: HFlowContainer
 var link_label: Label
 var unlink_button: Button
@@ -86,6 +89,24 @@ func configure(owner_game: Node) -> void:
 	route_mode.add_item("Loop — last stop returns directly to first")
 	box.add_child(route_mode)
 	route_mode.item_selected.connect(_select_mode)
+	headway_controls = HFlowContainer.new()
+	box.add_child(headway_controls)
+	var headway_title := Label.new()
+	headway_title.text = "Target headway"
+	headway_controls.add_child(headway_title)
+	headway_spin = SpinBox.new()
+	headway_spin.min_value = 0
+	headway_spin.max_value = 3600
+	headway_spin.step = 5
+	headway_spin.suffix = "s"
+	headway_spin.custom_minimum_size.x = 110
+	headway_spin.tooltip_text = "Minimum seconds between departures from the first stop, shared by every train linked to this route. 0 turns it off."
+	headway_spin.value_changed.connect(_set_headway)
+	headway_controls.add_child(headway_spin)
+	headway_label = Label.new()
+	headway_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	headway_label.custom_minimum_size.x = 540
+	box.add_child(headway_label)
 	heading = Label.new()
 	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(heading)
@@ -196,6 +217,11 @@ func _select_service(index: int) -> void:
 	selected_service_key = service_choice.get_item_metadata(index)
 	_show_service()
 
+func _set_headway(value: float) -> void:
+	if not draft.has(_key()) or not Services.is_passenger_key(_key()): return
+	if int(value) <= 0: draft[_key()].erase("headway")
+	else: draft[_key()]["headway"] = int(value)
+
 func _unlink() -> void:
 	draft[_key()].erase("link")
 	_show_service()
@@ -205,6 +231,12 @@ func _show_service() -> void:
 	draft = Services.propagate(draft)
 	var linked: bool = draft[_key()].has("link") and Services.is_passenger_key(_key())
 	link_controls.visible = linked
+	var has_headway: bool = Services.is_passenger_key(_key()) and not linked
+	headway_controls.visible = has_headway
+	headway_label.visible = has_headway
+	if has_headway:
+		headway_spin.set_value_no_signal(float(draft[_key()].get("headway", 0)))
+		headway_label.text = game.headway_report(_key())
 	if linked: link_label.text = "Linked to %s — its stops, mode, waypoints and platforms follow that route." % draft[str(draft[_key()]["link"])].name
 	directive_warning.text = str(removed_waypoint_legs.get(_key(), ""))
 	name_field.text = draft[_key()]["name"]

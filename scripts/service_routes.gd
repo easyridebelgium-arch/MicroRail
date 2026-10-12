@@ -41,6 +41,12 @@ static func valid_auto(service: Dictionary) -> bool:
 		if not key is String or not service.stops.has(key) or not STATIONS.has(key) or marks[key] != true: return false
 	return true
 
+## Target seconds between departures from the first stop (0 = off); kept on
+## the source service of a linked group.
+static func valid_headway(service: Dictionary) -> bool:
+	var value: Variant = service.get("headway", 0)
+	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and value >= 0 and value <= 3600
+
 static func is_passenger_key(key: Variant) -> bool:
 	if not key is String: return false
 	if key == "passenger": return true
@@ -129,7 +135,7 @@ static func is_valid(value: Variant) -> bool:
 			for stop in stops:
 				if not stop is String or not STATIONS.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key): return false
+		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key) or not valid_headway(service): return false
 	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}) -> Dictionary:
@@ -202,6 +208,8 @@ static func from_save(value: Dictionary) -> Dictionary:
 		var normalized_platforms: Dictionary = {}
 		for stop in chosen: normalized_platforms[stop] = int(chosen[stop])
 		result[service]["platforms"] = normalized_platforms
+		if int(result[service].get("headway", 0)) <= 0: result[service].erase("headway")
+		else: result[service]["headway"] = int(result[service]["headway"])
 		var marks: Dictionary = {}
 		for stop in result[service].get("auto", {}): marks[stop] = true
 		if marks.is_empty(): result[service].erase("auto")

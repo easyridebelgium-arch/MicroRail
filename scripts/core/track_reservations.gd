@@ -6,6 +6,7 @@ const LOOKAHEAD_TILES := 3.0
 const SAMPLE_STEP := 1.0
 const VEHICLE_LENGTH := 28.0
 const BODY_STEP := 4.0
+var requested: Dictionary = {}
 var owners: Dictionary = {}
 var occupied_owners: Dictionary = {}
 var switches: Dictionary = {}
@@ -52,6 +53,7 @@ static func train_length(train: Dictionary) -> float:
 	return maxf(VEHICLE_LENGTH, float(train.get("length", VEHICLE_LENGTH)))
 
 func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: Dictionary = {}) -> void:
+	requested.clear()
 	owners.clear()
 	occupied_owners.clear()
 	switches.clear()
@@ -75,6 +77,7 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 			else: owners[cell] = train.id
 	occupied_owners = owners.duplicate()
 	for train in ordered:
+		requested[int(train.id)] = []
 		var length: float = train.path.get_baked_length()
 		var direction := 1.0 if train.forward else -1.0
 		var end: float = clampf(train.distance + direction * tile_size * LOOKAHEAD_TILES, 0, length) if train.moving else train.distance
@@ -105,6 +108,8 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 				if state < 0:
 					state = Geometry.state_for(tracks[cell], train.cells[i + 1] - cell, train.cells[i - 1] - cell)
 				if state >= 0: settings[cell] = state
+			for cell in required:
+				if not requested[int(train.id)].has(cell): requested[int(train.id)].append(cell)
 			var blocked := false
 			for cell in required:
 				if owners.has(cell) and owners[cell] != train.id:

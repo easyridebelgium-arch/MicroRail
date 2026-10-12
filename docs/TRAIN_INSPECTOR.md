@@ -1,0 +1,55 @@
+# Why is this train waiting?
+
+Use **Inspect** (default `I`) and click a train or carriage tile on the map. Train
+selection takes precedence over the platform beneath it; click the station building
+above the track for station controls. Alternatively select a train/service in
+**Find**, or a current/historical entry in **Problems**, then **Inspect train now**.
+Historical entries open that train's **current** state, not a replay of the incident.
+Stored trains are also inspectable through Find.
+
+Opening the inspector pauses and cancels active mouse gestures, leaving staged
+construction intact. It preserves the last movement allocation rather than rebuilding
+it with paused trains. Closing or navigating leaves the simulation paused.
+
+## Read the evidence
+
+- **State and reason:** traffic wait, approaching restriction, confirmed deadlock,
+  dispatcher hold, incomplete route/clearance, normal station dwell, boarding,
+  freight loading, withdrawn service, stored train, or ready/moving.
+- **Physical body now:** the tiles covered by the complete current train.
+- **Last allocation tick:** granted tiles, attempted tile requests (including the
+  first refused request) and locked switches with their selected through/branch state.
+  This is bounded lookahead, not a reservation of the entire service route.
+- **Signal blocks:** physical occupants at allocation, authority holders and whether
+  this train requested that block. An authority holder need not physically occupy it.
+  `Bxx` labels are transient block IDs and may change when track/signals are edited.
+- **Blocking identity:** permanent train ID, custom name and service when known.
+  Manual stops do not invent a competing train. Deadlocks list the full involved cycle.
+- **Traffic waiting:** simulation seconds from actual zero-movement attempts.
+  Dwell, loading and holds are excluded. Counters reset on load; saved incidents remain
+  historical evidence. Grant occupancy is sampled before that tick's movement, so it
+  is labelled separately from the current physical body.
+
+If authority changes while paused (for example removing a manual stop), an old
+waiting episode is labelled **Awaiting movement sample** until the next movement
+attempt. Its previous cause is not presented as a freshly confirmed obstruction.
+
+## Act on the actual cause
+
+**Locate conflict cell** points at the signal, conflicting tile or identifiable
+missing/incompatible track ahead. **Locate blocking train** follows the named active
+blocker. **Show route and authority** enables and synchronizes route/block/reservation
+controls. **Traffic controls** selects the inspected train for existing validated
+hold/recovery actions; **Fleet controls** selects it for existing fleet management.
+
+Recommendations follow evidence: a manual stop needs a deliberate signal change;
+loading needs production or a departure-rule adjustment; incomplete routes need track
+or stopping-clearance repair; a block wait needs its authority and route inspected.
+The inspector does not claim every wait needs a passing loop or forecast throughput.
+It does not release reservations, reverse trains or modify track itself.
+
+No save-format change or global SignalBus is introduced. Requests and causes are
+transient diagnostic records from the existing authoritative decision code.
+`test_train_inspector.gd` covers navigation, allocation preservation, cause separation,
+missing-track location, stale-wait handling, full cycle identities, authority versus
+occupancy and control accessibility at 200% UI scale.

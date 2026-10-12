@@ -12,16 +12,16 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 0 — Foundations | Implemented; requirements remain active for every update. | Continue deterministic, save and accessibility checks. Full input replay/controller support are later extensions. |
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Continuous consist body routing, formal platform lengths, multiple platforms/basic assignment, service cloning and multiple trains per service. |
-| Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Unified waiting inspector, evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. |
+| Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. Unified waiting inspection is implemented. |
 | Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Next implementation:** the unified why-waiting inspector (Phase 1C). Then finish
-continuous consist routing and platform foundations (Phase 1B). Completed Phase 1C
+**Next implementation:** continuous consist routing and platform foundations
+(Phase 1B). The unified why-waiting inspector (Phase 1C) is now implemented; see
+[train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent gameplay regression run passed 40 headless suites in
-Godot 4.6.3 (the project declares 4.7); this is a recorded result, not a new test run
-for this documentation revision.
+complete. The most recent gameplay regression run passed 41 headless suites in
+Godot 4.6.3 (the project declares 4.7); see the regression checks and acceptance coverage below.
 
 ## Current foundation
 
@@ -141,12 +141,12 @@ platform lengths and safe assignment precede multiple platforms/trains per servi
 Implemented: reservation-aware atomic drafts, cost/refund/service-impact previews,
 Undo/Redo, corridor signal batches, track blueprints/JSON sharing, route/block/wait
 overlays, searchable Problems/Find, session pins and configurable incident pause.
-Next combine waiting explanations into a train inspector, and extend the existing
-alert centre instead of creating another competing source of operational state.
+The unified train inspector is implemented. Extend the existing alert centre
+instead of creating another competing source of operational state.
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Unified why-waiting train inspector | Selecting a stalled train immediately explains its state and provides a useful next action. | Needs refinement in Phase 1C: show physical occupancy, granted/requested authority, reserved blocks, continuous wait duration and blocking permanent train ID/service. Distinguish loading, intentional holds, missing routes, signal waits and deadlocks. Derive recommendations from the actual cause: release a manual stop, inspect a named block, repair clearance, or consider a passing place only when layout evidence supports it. Existing Problems/Traffic/Overlays already provide parts of this information. |
+| Unified why-waiting train inspector | Selecting a stalled train immediately explains its state and provides a useful next action. | Implemented in Phase 1C: paused train inspection from map/Problems/Find, physical occupancy, granted/attempted tile requests, block requests/authority, locked switches, measured wait duration and blocking permanent train ID/service. Distinguish loading, intentional holds, missing routes, signal waits and deadlocks. Derive recommendations from the actual cause: release a manual stop, inspect a named block, repair clearance, or consider a passing place only when layout evidence supports it. Actions navigate to conflict/blocker, synchronized overlays and the existing validated Traffic/Fleet controls. Stale waits are labelled after allocation changes; see [train inspector](TRAIN_INSPECTOR.md). |
 | Construction planning and conflict preview | Draft ghost tracks, stations, bridges, signals and blueprints before committing; show cost and affected services. | Implemented: multi-stroke track/switch/removal drafts, aggregate cost/refund and affected-service previews, atomic reservation-aware application and grouped Undo/Redo. Extend aggregate quotes to itemised track/switch/signal/platform costs as those systems exist. Add evidence-based structural warnings for shared single-track sections without passing places. These identify layout risks, not guaranteed future congestion. Demand/timetable forecasts remain in Phase 2A; terrain/ownership checks follow their systems. See [construction planning](CONSTRUCTION_PLANNING.md). |
 | Corridor selection and batch tools | Upgrade long segments, double-track, electrify, add signals/platforms or demolish in bulk. | Implemented: connected-corridor selection, spaced automatic/manual signals and whole-corridor signal removal through atomic drafts with grouped Undo/Redo. Track drag-demolition remains available. Track-speed, double-track, electrification and platform batches depend on their underlying systems; see [corridor signals](CORRIDOR_SIGNALS.md). |
 | Track inspection and route overlays | Toggle service paths, block occupancy, reservations, signals, speed limits and congestion; later add gradients, electrification, ownership and condition. | Implemented: collapsible service-path filtering, actual signal-block IDs/authority, hatched reservations, directional affected-service construction reports and measured waiting by conflict cell. Speed limits, occupancy/utilisation measurements and richer planning remain future work. Never substitute decorative colours for operational state. |
@@ -156,6 +156,9 @@ alert centre instead of creating another competing source of operational state.
 | Route performance panel and company dashboard | Compare income, running costs, occupancy, waiting passengers and delays. Expand into historical graphs of profit, ridership, occupancy and punctuality per route and across the company. | Measured continuous/recent/total traffic waiting already exists. Add bounded history for deliveries per simulation-time interval, occupancy, profit and incident episodes. Separate loading/dwell, deliberate holds and traffic waits; state denominators and whether loading resets each measure. Punctuality requires schedules, and forecasts require demand/operating history. |
 
 ### Phase 1 exit criteria
+
+See [Phase 1A acceptance coverage](PHASE_1A_ACCEPTANCE.md) for the proposed safety
+checklist, current regression evidence and explicitly unsupported cases.
 
 - Supported running, parked and loading trains never share occupied body tiles;
   ownership and physical occupancy are distinguishable in diagnostics.
@@ -333,7 +336,7 @@ instead of adding a separate campaign simulation.
 
 ## Agreed next implementation order
 
-1. **Unified why-waiting inspector (1C):** current occupancy, requested/granted
+1. **Unified why-waiting inspector (1C, implemented):** current occupancy, requested/granted
    authority, named blocker, measured waiting and evidence-based actions. Build on
    existing Problems/Traffic/Overlays; keep routine waits distinct from incidents.
 2. **Continuous consist body routing (1B):** retain physical vehicle positions

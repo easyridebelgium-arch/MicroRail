@@ -6,6 +6,7 @@ var kind: OptionButton
 var pinned_only: CheckButton
 var items: ItemList
 var details: Label
+var inspect_button: Button
 var pin_button: Button
 var count_label: Label
 var rows: Array = []
@@ -51,6 +52,10 @@ func configure(owner_game: Node) -> void:
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(details)
+	inspect_button = Button.new()
+	inspect_button.text = "Inspect train now"
+	inspect_button.pressed.connect(inspect)
+	box.add_child(inspect_button)
 	confirmed.connect(locate)
 
 func open_dialog() -> void:
@@ -84,10 +89,12 @@ func describe() -> void:
 	pin_button.disabled = selection.is_empty()
 	get_ok_button().disabled = selection.is_empty()
 	if selection.is_empty():
+		inspect_button.disabled = true
 		details.text = "No matching objects. Change the search or filters."
 		pin_button.text = "Pin selected"
 		return
 	var row: Dictionary = rows[selection[0]]
+	inspect_button.disabled = game.Fleet.find(game.fleet, int(row.id)).is_empty()
 	pin_button.text = "Unpin selected" if game.object_pins.has(row.key) else "Pin selected"
 	details.text = row.details
 	get_ok_button().disabled = not game.can_locate_problem(row)
@@ -102,3 +109,11 @@ func toggle_pin() -> void:
 func locate() -> void:
 	var selection := items.get_selected_items()
 	if not selection.is_empty() and game.locate_object(rows[selection[0]]): hide()
+
+func inspect() -> void:
+	var selection := items.get_selected_items()
+	if selection.is_empty(): return
+	var id := int(rows[selection[0]].id)
+	if game.Fleet.find(game.fleet, id).is_empty(): return
+	hide()
+	game.inspect_train(id)

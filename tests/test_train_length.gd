@@ -87,5 +87,11 @@ func _initialize() -> void:
 	manager.update([very_long], occupied(table, [very_long]), 32)
 	var distant_block: int = manager.cell_blocks[Vector2i(9, 0)]
 	check(not manager.block_owners.get(distant_block, {}).has(2), "long nose lookahead must not grab a block beyond the actual three-tile body request")
+	var junction_train := train(1, main, 160.0, 96.0, false)
+	table.rebuild([junction_train], tracks, 32)
+	var junction_owners: Dictionary = table.owners.duplicate()
+	junction_train.forward = false
+	table.rebuild([junction_train], tracks, 32)
+	check(table.owners == junction_owners and table.switch_owners.get(Vector2i(5, 0)) == 1 and table.switches.get(Vector2i(5, 0)) == 0, "reversing a parked long train inside a switch preserves its body and selected movement lock")
 	print("Train length tests: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)

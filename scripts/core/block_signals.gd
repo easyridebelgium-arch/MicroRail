@@ -3,6 +3,7 @@ extends RefCounted
 ## is seeded from real body occupancy, then requested in permanent ID order.
 const Geometry = preload("res://scripts/track_geometry.gd")
 const Reservations = preload("res://scripts/core/track_reservations.gd")
+var requested_blocks: Dictionary = {}
 var signs: Dictionary = {}
 var cell_blocks: Dictionary = {}
 var block_owners: Dictionary = {}
@@ -35,6 +36,7 @@ func configure(tracks: Dictionary, signals: Dictionary) -> void:
 		id += 1
 
 func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
+	requested_blocks.clear()
 	block_owners.clear()
 	_spans.clear()
 	if signs.is_empty(): return
@@ -46,6 +48,7 @@ func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
 	var ordered := trains.duplicate()
 	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.id) < int(b.id))
 	for train in ordered:
+		requested_blocks[int(train.id)] = []
 		var spans := _helper._route_spans(train.path, train.cells, tile_size)
 		_spans[train.id] = spans
 		if not train.moving: continue
@@ -62,6 +65,7 @@ func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
 				requested[cell] = true
 				if signs[cell] == "stop": break
 				var block := _downstream(train.cells, index, direction)
+				if block >= 0 and not requested_blocks[int(train.id)].has(block): requested_blocks[int(train.id)].append(block)
 				var owners: Dictionary = block_owners.get(block, {})
 				if not _other_owner(owners, train.id).is_empty(): break
 				if block >= 0:
@@ -84,6 +88,8 @@ func limit(train: Dictionary, proposed: float, tile_size: float) -> Dictionary:
 			if not signs.has(cell) or start_body.has(cell): continue
 			var reason := ""
 			var owner := -1
+			var blocked_block := -1
+			var cause := "manual_signal"
 			if signs[cell] == "stop":
 				reason = "Manual stop signal at %d,%d" % [cell.x, cell.y]
 			else:
@@ -92,14 +98,17 @@ func limit(train: Dictionary, proposed: float, tile_size: float) -> Dictionary:
 					if train.cells[i] == cell: occurrence = i
 				if occurrence < 0: continue
 				var block := _downstream(train.cells, occurrence, direction)
+				blocked_block = block
+				cause = "block_authority"
 				var owners: Dictionary = block_owners.get(block, {})
 				var others := _other_owner(owners, train.id)
 				if not others.is_empty():
+					cause = "block_busy"
 					owner = int(others[0])
 					reason = "Signal at %d,%d: block held by train #%d" % [cell.x, cell.y, owner]
 				elif block >= 0 and not owners.has(int(train.id)):
 					reason = "Signal at %d,%d: waiting for block authority" % [cell.x, cell.y]
-			if not reason.is_empty(): return {"distance": allowed, "conflict": {"cell": cell, "owner": owner, "reason": reason}}
+			if not reason.is_empty(): return {"distance": allowed, "conflict": {"cell": cell, "owner": owner, "reason": reason, "kind": cause, "block": blocked_block}}
 		allowed = next
 	return {"distance": allowed, "conflict": {}}
 

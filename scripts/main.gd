@@ -157,6 +157,13 @@ var tracks: Dictionary = {}
 var switch_states: Dictionary = {}
 var reservations = Reservations.new()
 var deadlocks = DeadlockMonitor.new()
+var movement_conflicts: Dictionary = {}
+var authority_revision := 0
+var authority_tick := 0
+var reservation_button: Button
+const TrainInspector = preload("res://scripts/train_inspector.gd")
+const TrainDiagnostics = preload("res://scripts/core/train_diagnostics.gd")
+var train_inspector: AcceptDialog
 var movement_blocks: Dictionary = {}
 var passenger_travel = DirectionalRoutes.new()
 var freight_travel = DirectionalRoutes.new()
@@ -333,6 +340,7 @@ func _ready() -> void:
 	_setup_reservation_overlay()
 	_setup_inspection()
 	_load_blueprints()
+	_setup_train_inspector()
 	_setup_problems()
 	_setup_object_browser()
 	_setup_traffic_dialog()
@@ -380,6 +388,7 @@ func _simulation_step(step_seconds: float) -> void:
 	_produce_logs(step_seconds)
 	_refresh_directional_routes()
 	_rebuild_reservations(true)
+	movement_conflicts.clear()
 	movement_blocks.clear()
 	traffic_wait_samples.clear()
 	forest_stock -= freight_train.advance(step_seconds, forest_stock)
@@ -464,7 +473,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 			if inspect_mode:
-				_inspect_station_at(cell)
+				if not _inspect_train_at(cell): _inspect_station_at(cell)
 				return
 
 			if waypoint_tool_mode:
@@ -639,7 +648,7 @@ func _can_build_at(cell: Vector2i) -> bool:
 func _update_instructions() -> void:
 	var direction: String = "Draw track: follow the mouse" if draw_track_mode else "Connect track: drag between two points"
 	if inspect_mode:
-		direction = "Inspect: click a station or industry"
+		direction = "Inspect: click a train, station or industry"
 	elif waypoint_tool_mode:
 		direction = "Waypoints: click track, then choose service/leg in Routes"
 	elif signal_tool_mode:
@@ -1639,6 +1648,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	event_log.restore_state(data["sim"]["events"])
 	notifications.reset()
 	construction_plan.clear()
+	if train_inspector != null: train_inspector.hide()
 	object_pins.clear()
 	corridor_pick = 0
 	corridor_cells.clear()
@@ -3097,7 +3107,7 @@ func _setup_toolbar_icons() -> void:
 
 	straight_button.tooltip_text = "Connect track — drag between two points; automatic diagonal and platform approaches"
 	curve_button.tooltip_text = "Draw track — hold left mouse and change direction; bends are automatic"
-	inspect_button.tooltip_text = "Inspect stations and industries — I"
+	inspect_button.tooltip_text = "Inspect trains, stations and industries — I"
 	save_button.tooltip_text = "Save game"
 	load_button.tooltip_text = "Load latest save"
 	folder_button.tooltip_text = "Open save folder"
@@ -3168,7 +3178,7 @@ func _facility_markers() -> Array[Dictionary]:
 
 
 func _refresh_shortcut_tooltips() -> void:
-	inspect_button.tooltip_text = "Inspect stations and industries — %s" % InputActions.key_label(InputActions.TOGGLE_INSPECT)
+	inspect_button.tooltip_text = "Inspect trains, stations and industries — %s" % InputActions.key_label(InputActions.TOGGLE_INSPECT)
 	map_button.tooltip_text = "Show or hide the network map — %s" % InputActions.key_label(InputActions.TOGGLE_MAP)
 	goals_button.tooltip_text = "Show or hide scenario objectives — %s" % InputActions.key_label(InputActions.TOGGLE_GOALS)
 	if speed_selector != null:
@@ -3562,7 +3572,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
+	return (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()
@@ -3753,6 +3763,8 @@ func _reservation_path(path: Curve2D, home: Vector2) -> Curve2D:
 func _rebuild_reservations(allow_movement: bool = false) -> void:
 	if freight_train == null:
 		return
+	authority_revision += 1
+	authority_tick = sim_clock.tick
 	var passenger := Fleet.assigned(fleet, "passenger")
 	var freight := Fleet.assigned(fleet, "freight")
 	var trains: Array = [
@@ -3793,6 +3805,8 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 	var signal_conflict: Dictionary = signal_check["conflict"]
 	if absf(allowed - proposed) > 0.001:
 		var conflict: Dictionary = signal_conflict if not signal_conflict.is_empty() else reservations.waits.get(id, {})
+		movement_conflicts[id] = conflict.duplicate(true)
+		movement_conflicts[id]["revision"] = authority_revision
 		var cell: Vector2i = conflict.get("cell", Vector2i(-1, -1))
 		var owner := int(conflict.get("owner", -1))
 		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001 and owner > 0:
@@ -3813,6 +3827,7 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 
 func _setup_reservation_overlay() -> void:
 	var button := Button.new()
+	reservation_button = button
 	button.text = "Reservations"
 	button.toggle_mode = true
 	button.focus_mode = Control.FOCUS_NONE
@@ -3839,6 +3854,7 @@ func _reset_traffic_state(reason: String = "") -> void:
 		for cycle in deadlocks.cycles:
 			_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle.duplicate(), "reason": reason})
 	deadlocks.reset()
+	movement_conflicts.clear()
 	movement_blocks.clear()
 	reservation_waits.clear()
 	if freight_train != null:
@@ -4836,3 +4852,59 @@ func _draw_passenger_consist(service: String, path: Curve2D, distance: float, po
 			draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Color.WHITE, false, 1.0)
 			for x in [-8, -2, 4]: draw_rect(Rect2(Vector2(x, -4), Vector2(4, 8)), Color(0.65, 0.85, 0.95))
 			draw_set_transform(Vector2.ZERO, 0.0)
+
+func _setup_train_inspector() -> void:
+	train_inspector = TrainInspector.new()
+	train_inspector.configure(self)
+	$Interface.add_child(train_inspector)
+
+func inspect_train(id: int) -> bool:
+	if Fleet.find(fleet, id).is_empty(): return false
+	paused = true
+	is_dragging = false
+	is_panning = false
+	corridor_pick = 0
+	build_plan.clear()
+	demolition_cells.clear()
+	demolition_blocked.clear()
+	_close_station_inspector()
+	# Preserve the last allocation; a paused rebuild would replace lookahead grants.
+	_update_toolbar()
+	train_inspector.open_train(id)
+	return true
+
+func _inspect_train_at(cell: Vector2i) -> bool:
+	for train in inspection_trains():
+		var path: Curve2D = _reservation_path(train.path, _cell_center(ServiceRoutes.STATIONS[services[train.key].stops[0]].cell) if train.key != "freight" else freight_train.position)
+		if reservations.footprint(path, train.distance, float(TILE_SIZE), Fleet.length(Fleet.find(fleet, train.id))).has(cell): return inspect_train(train.id)
+	return false
+
+func train_diagnostics(id: int) -> Dictionary:
+	return TrainDiagnostics.snapshot(self, id)
+
+func train_inspector_action(action: String, data: Dictionary) -> void:
+	train_inspector.hide()
+	var id := int(data.get("id", -1))
+	if action == "blocker":
+		locate_problem({"id": int(data.get("blocker", -1)), "cell": Vector2i(-1, -1)})
+	elif action == "conflict":
+		var cell: Vector2i = data.get("cell", Vector2i(-1, -1))
+		if _is_inside_map(cell):
+			camera.position = _cell_center(cell)
+			camera.force_update_scroll()
+	elif action == "route":
+		var train := Fleet.find(fleet, id)
+		if not train.is_empty() and services.has(str(train.service)):
+			inspection_panel.show_authority(train.service)
+			reservation_button.button_pressed = true
+			inspection_button.button_pressed = true
+			locate_problem({"id": id, "cell": Vector2i(-1, -1)})
+	elif action == "traffic":
+		_open_traffic_dialog()
+		for index in range(traffic_dialog.train_choice.item_count):
+			if int(traffic_dialog.train_choice.get_item_metadata(index)) == id: traffic_dialog.train_choice.select(index)
+		traffic_dialog.refresh()
+	elif action == "fleet":
+		fleet_editor.selected_id = id
+		_open_fleet_editor()
+	queue_redraw()

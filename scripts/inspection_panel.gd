@@ -22,6 +22,7 @@ var corridor_mode: OptionButton
 var plan_toggle: CheckButton
 var plan_summary: Label
 var plan_controls: VBoxContainer
+var block_toggle: CheckButton
 var route_toggle: CheckButton
 var routes := false
 var blocks := false
@@ -48,6 +49,7 @@ func _ready() -> void:
 		toggle.focus_mode = Control.FOCUS_NONE
 		var field: String = entry[1]
 		if field == "routes": route_toggle = toggle
+		if field == "blocks": block_toggle = toggle
 		toggle.toggled.connect(func(enabled: bool) -> void:
 			set(field, enabled)
 			changed.emit())
@@ -197,3 +199,7 @@ func show_service(key: String) -> void:
 	route_toggle.button_pressed = true
 	var index := _keys.find(key)
 	if index >= 0: selector.select(index)
+
+func show_authority(key: String) -> void:
+	show_service(key)
+	block_toggle.button_pressed = true

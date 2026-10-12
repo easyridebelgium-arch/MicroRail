@@ -5,6 +5,7 @@ var search: LineEdit
 var source: OptionButton
 var severity: OptionButton
 var items: ItemList
+var inspect_button: Button
 var details: Label
 var count_label: Label
 var _rows: Array = []
@@ -47,6 +48,10 @@ func configure(owner_game: Node) -> void:
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(details)
+	inspect_button = Button.new()
+	inspect_button.text = "Inspect train now"
+	inspect_button.pressed.connect(_inspect)
+	box.add_child(inspect_button)
 	confirmed.connect(_locate)
 
 func open_dialog() -> void:
@@ -76,9 +81,11 @@ func _describe_selected() -> void:
 	var selection := items.get_selected_items()
 	if selection.is_empty():
 		details.text = "No matching problems." if source.selected == 0 else "No matching historical incidents. History is not a list of active problems."
+		inspect_button.disabled = true
 		get_ok_button().disabled = true
 		return
 	var row: Dictionary = _rows[selection[0]]
+	inspect_button.disabled = game.Fleet.find(game.fleet, int(row.id)).is_empty()
 	details.text = row.details
 	get_ok_button().disabled = not game.can_locate_problem(row)
 
@@ -86,3 +93,11 @@ func _locate() -> void:
 	var selection := items.get_selected_items()
 	if selection.is_empty(): return
 	if game.locate_problem(_rows[selection[0]]): hide()
+
+func _inspect() -> void:
+	var selection := items.get_selected_items()
+	if selection.is_empty(): return
+	var id := int(_rows[selection[0]].id)
+	if game.Fleet.find(game.fleet, id).is_empty(): return
+	hide()
+	game.inspect_train(id)

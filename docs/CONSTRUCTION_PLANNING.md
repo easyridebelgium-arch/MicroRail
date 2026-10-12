@@ -13,10 +13,14 @@ The first one-cell extension from an open end follows the existing track's
 direction even when the pointer moves slightly off-axis; drag farther to start
 a bend. Branches off an existing through line create a switch automatically.
 
-Right-click cancels the active gesture/tool and returns to Draw track. It also
-closes operating windows such as Traffic, keeping their pause state. For removal,
-select **Remove**, then left-drag. Right-click cancels removal as well. Staged
-construction is retained when changing tools; Apply or Discard handles that draft.
+A short right-click cancels the active gesture/tool and returns to Draw track.
+Right-drag removes track; holding right for 0.4 seconds also activates removal.
+Moving 6 screen pixels starts a drag immediately, without waiting for the timer.
+Red removal previews commit on release, so Escape can cancel before deletion.
+Alternatively press **R** (remappable), or select **Remove**, then left-drag.
+Right-click inside Traffic closes it on release, keeping its pause state; dialog
+and toolbar holds never delete the map underneath them. Staged construction is
+retained when changing tools; Apply or Discard handles that draft.
 
 Open **Overlays** and enable **Draft construction**. The game pauses initially.
 You may resume while drafting; trains use only the actual built network.

@@ -172,7 +172,7 @@ func _run() -> void:
 	key.keycode = KEY_R
 	key.pressed = true
 	game._unhandled_input(key)
-	check(game.tracks == all_built and game.draw_track_mode, "R must no longer rotate or change construction mode")
+	check(game.tracks == all_built and game.demolition_mode, "R selects Remove without rotating or changing existing track")
 	game.queue_free()
 	await process_frame
 	print("Mouse track tests: %d checks, %d failures" % [checks, failures])

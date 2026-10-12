@@ -24,7 +24,7 @@ static func line(start: Vector2i, finish: Vector2i, tracks: Dictionary, fixed: A
 		return extension
 	if direct.x == 0 or direct.y == 0 or absi(direct.x) == absi(direct.y):
 		var direction := Vector2i(signi(direct.x), signi(direct.y))
-		if (not tracks.has(start) or Geometry.connections(tracks[start]).has(direction) or _can_branch(start, tracks, fixed)) and (not tracks.has(finish) or Geometry.connections(tracks[finish]).has(-direction) or _can_branch(finish, tracks, fixed)):
+		if (not tracks.has(start) or Geometry.connections(tracks[start]).has(direction) or _can_branch(start, tracks, fixed)) and (not tracks.has(finish) or Geometry.connections(tracks[finish]).has(-direction) or _can_merge(finish, tracks, fixed)):
 			return segment(start, finish)
 	var first: Vector2i = start
 	var last: Vector2i = finish
@@ -35,7 +35,7 @@ static func line(start: Vector2i, finish: Vector2i, tracks: Dictionary, fixed: A
 		var port: Vector2i = _endpoint_port(start, finish, tracks)
 		cells.append(start + port)
 		first = start + port * 2
-	if tracks.has(finish) and not _can_branch(finish, tracks, fixed):
+	if tracks.has(finish) and not _can_merge(finish, tracks, fixed):
 		last += _endpoint_port(finish, start, tracks)
 	for cell in segment(first, last):
 		if cell != cells.back():
@@ -50,6 +50,12 @@ static func _can_branch(cell: Vector2i, tracks: Dictionary, fixed: Array[Vector2
 	for port in Geometry.connections(tracks[cell]):
 		if not tracks.has(cell + port) or not Geometry.connections(tracks[cell + port]).has(-port): return false
 	return true
+
+
+static func _can_merge(cell: Vector2i, tracks: Dictionary, fixed: Array[Vector2i]) -> bool:
+	# Arrival may add a branch to an end tile too. Do not divert the approach
+	# onto an old port merely because only one through neighbor is built.
+	return not fixed.has(cell) and tracks.has(cell) and Geometry.is_straight(tracks[cell])
 
 
 static func _automatic_switch(old: Variant, requested: Array[Vector2i]) -> Variant:
@@ -134,6 +140,9 @@ static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i,
 				if old_ports.has(first):
 					second = old_ports[1] if old_ports[0] == first else old_ports[0]
 				else:
+					# A merge has one incoming branch. Retain an original port
+					# even when the target is an isolated straight tile.
+					second = old_ports[0]
 					for port in old_ports:
 						var old_neighbor: Vector2i = cell + port
 						if tracks.has(old_neighbor) and Geometry.connections(tracks[old_neighbor]).has(-port):

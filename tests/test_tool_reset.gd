@@ -37,6 +37,7 @@ func _run() -> void:
 		game.demolition_cells = {game.STATION_A: true}
 		game.corridor_pick = 2
 		game._input(event(MOUSE_BUTTON_RIGHT))
+		game._input(event(MOUSE_BUTTON_RIGHT, false))
 		check(not game.get(tool) and game.draw_track_mode and not game.is_dragging and game.corridor_pick == 0 and game.build_plan.is_empty() and game.demolition_cells.is_empty(), "right click releases the active tool and gesture")
 		check(game.tracks == original and game.money == funds and game.paused, "reset neither edits infrastructure nor resumes the game")
 		game._unhandled_input(event(MOUSE_BUTTON_RIGHT, false))
@@ -45,12 +46,14 @@ func _run() -> void:
 	game._open_traffic_dialog()
 	check(game.traffic_dialog.visible, "Traffic fixture opens")
 	game.traffic_dialog.window_input.emit(event(MOUSE_BUTTON_RIGHT))
+	game.traffic_dialog.window_input.emit(event(MOUSE_BUTTON_RIGHT, false))
 	check(not game.traffic_dialog.visible and game.draw_track_mode and game.paused, "right click inside Traffic closes it and returns to laying")
 	# Drafts survive tool changes; only the current gesture is cancelled.
 	game._set_planning_mode(true)
 	game.construction_plan.stage({Vector2i(40, 20): false}, game.tracks)
 	game.signal_tool_mode = true
 	game._unhandled_input(event(MOUSE_BUTTON_RIGHT))
+	game._unhandled_input(event(MOUSE_BUTTON_RIGHT, false))
 	check(game.planning_mode and not game.construction_plan.is_empty() and not game.signal_tool_mode, "right reset retains unapplied construction drafts")
 	game._discard_draft()
 	game._set_planning_mode(false)
@@ -67,11 +70,13 @@ func _run() -> void:
 	check(game.tracks.has(cell) and game.tracks.has(cell + Vector2i.RIGHT) and game.money == funds, "removal remains undoable")
 	mouse(game, cell, true)
 	game._input(event(MOUSE_BUTTON_RIGHT))
+	game._input(event(MOUSE_BUTTON_RIGHT, false))
 	mouse(game, cell + Vector2i.RIGHT, false)
 	check(game.tracks.has(cell) and game.tracks.has(cell + Vector2i.RIGHT), "right reset cancels a removal without committing it")
 	# The next left gesture builds normally after resetting a signal tool.
 	game.signal_tool_mode = true
 	game._input(event(MOUSE_BUTTON_RIGHT))
+	game._input(event(MOUSE_BUTTON_RIGHT, false))
 	mouse(game, Vector2i(45, 20), true)
 	mouse(game, Vector2i(46, 20), false)
 	check(game.tracks.has(Vector2i(45, 20)) and not game.track_signals.has(Vector2i(45, 20)) and game.money == funds - game.TRACK_BUILD_COST, "next left drag lays one piece instead of operating the old tool")

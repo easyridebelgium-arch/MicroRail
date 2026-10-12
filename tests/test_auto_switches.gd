@@ -41,6 +41,22 @@ func _run() -> void:
 				if Geometry.is_switch(kind):
 					var stem: Vector2i = Geometry.connections(kind)[0]
 					check(not Router.find_route(proposed, origin + branch * 3, origin + stem * 2).is_empty(), "branch is routable to its chosen stem")
+	# Merge from an already laid branch, including a target with no/one neighbor.
+	# Previously the arrival was diverted into an old port and missed the switch.
+	for direction in Geometry.DIRECTIONS:
+		for branch in Geometry.DIRECTIONS:
+			if branch == direction or branch == -direction: continue
+			for neighbor_count in [0, 1, 2]:
+				var source: Vector2i = origin + branch * 3
+				var base: Variant = Geometry.from_ports(direction, -direction)
+				var existing: Dictionary = {origin: base, source: Geometry.from_ports(branch, -branch)}
+				if neighbor_count > 0: existing[origin + direction] = base
+				if neighbor_count > 1: existing[origin - direction] = base
+				var approach := Builder.line(source, origin, existing)
+				var merge := Builder.plan(approach, existing, Vector2i(80, 50), open, fixed)
+				check(merge.error.is_empty() and merge.switch_count == 1, "existing branch merges into isolated/end/through target")
+				check(Geometry.is_switch(merge.tiles.get(origin)) and Geometry.connections(merge.tiles.get(origin)).has(branch), "switch appears on the selected merge tile with incoming branch")
+				check(merge.new_count == 2 and not merge.changes.has(source), "merge retains the old branch and adds only the two gap tiles")
 	# End beside a line: its neighbor, outside the stroke, must also be updated.
 	var old: Dictionary = {origin: false, origin + Vector2i.LEFT: false, origin + Vector2i.RIGHT: false}
 	var single: Array[Vector2i] = [origin + Vector2i.UP]
@@ -83,6 +99,29 @@ func _run() -> void:
 			game._redo_construction()
 			check(Geometry.is_switch(game.tracks[origin]), "Redo restores automatic switch")
 			game._undo_construction()
+	# Exercise the actual live mouse stroke, with intermediate hover samples.
+	for draw in [false, true]:
+		for neighbor_count in [0, 1, 2]:
+			var saved: Dictionary = game.tracks.duplicate()
+			game.tracks[origin] = false
+			game.tracks.erase(origin + Vector2i.RIGHT)
+			game.tracks.erase(origin + Vector2i.LEFT)
+			if neighbor_count > 0: game.tracks[origin + Vector2i.LEFT] = false
+			if neighbor_count > 1: game.tracks[origin + Vector2i.RIGHT] = false
+			var source: Vector2i = origin + Vector2i(-3, -3)
+			game.tracks[source] = Geometry.from_ports(Vector2i(-1, -1), Vector2i(1, 1))
+			var snapshot: Dictionary = game.tracks.duplicate()
+			game.draw_track_mode = draw
+			mouse(game, source, true)
+			for step in [1, 2, 3]:
+				game.pointer = game._cell_center(source + Vector2i.ONE * step)
+				game._refresh_build_plan(source + Vector2i.ONE * step)
+			check(game.build_plan.error.is_empty() and game._get_preview_cost() == 120, "live merging preview charges two gaps and one switch")
+			mouse(game, origin, false)
+			check(Geometry.is_switch(game.tracks[origin]) and game.money == 880, "live existing-branch merge builds target switch")
+			game._undo_construction()
+			check(game.tracks == snapshot and game.money == 1000, "undo restores both pre-existing pieces and exact balance")
+			game.tracks = saved
 	game.track_signals[origin] = "auto"
 	var initial: Dictionary = game.tracks.duplicate()
 	mouse(game, origin + Vector2i(3, -3), true)

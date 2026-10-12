@@ -201,6 +201,14 @@ var paused: bool = false
 var is_dragging: bool = false
 var drag_start: Vector2i = Vector2i.ZERO
 var drag_pointer_start: Vector2 = Vector2.INF
+const RIGHT_HOLD_SECONDS: float = 0.4
+const RIGHT_DRAG_PIXELS: float = 6.0
+var right_pending: bool = false
+var right_removing: bool = false
+var right_map_origin: bool = false
+var right_elapsed: float = 0.0
+var right_start_point: Vector2 = Vector2.ZERO
+var right_start_cell: Vector2i = Vector2i.ZERO
 
 var waiting_at_a: int = 8
 var waiting_at_b: int = 8
@@ -310,6 +318,7 @@ var goals_button: Button
 
 func _ready() -> void:
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
+	get_window().focus_exited.connect(_cancel_right_gesture)
 	header_box.resized.connect(_layout_header)
 
 	# Player settings first, so keys, scale and colours are right from frame one.
@@ -361,6 +370,7 @@ func _ready() -> void:
 		window.window_input.connect(_tool_window_input.bind(window))
 
 func _process(delta: float) -> void:
+	_advance_right_gesture(delta)
 	_move_camera_with_keyboard(delta)
 	hovered_cell = _mouse_to_cell()
 	_cancel_direct_inspection_if_dragged(hovered_cell)
@@ -425,10 +435,7 @@ func _modal_open() -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(InputActions.RESET_TOOL):
-		_reset_track_tools()
-		get_viewport().set_input_as_handled()
-		return
+	if _right_mouse_input(event): return
 	var focused: Control = get_viewport().gui_get_focus_owner()
 	if not (focused is LineEdit or focused is TextEdit) and event.is_action_pressed(InputActions.TOGGLE_FULLSCREEN):
 		GameSettings.toggle_fullscreen(get_window())
@@ -441,6 +448,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cancel_direct_inspection_if_dragged(_mouse_to_cell())
 
 	if not (focused is LineEdit or focused is TextEdit):
+		if event.is_action_pressed(InputActions.SELECT_REMOVE):
+			_select_remove_tool()
+			get_viewport().set_input_as_handled()
+			return
 		for index in range(InputActions.SPEED_ACTIONS.size()):
 			if event.is_action_pressed(InputActions.SPEED_ACTIONS[index]):
 				_set_game_speed(index)
@@ -452,6 +463,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed(InputActions.RESET_CAMERA):
+		_cancel_right_gesture()
 		_clear_direct_inspection()
 		is_dragging = false
 		is_panning = false
@@ -461,6 +473,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed(InputActions.CANCEL):
+		if right_pending:
+			_reset_track_tools()
+			return
 		_clear_direct_inspection()
 		corridor_pick = 0
 		is_dragging = false
@@ -484,6 +499,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var cell: Vector2i = _mouse_to_cell()
 
 		if event.is_action_pressed(InputActions.BUILD):
+			if right_pending:
+				_reset_track_tools()
+				return
 			_clear_direct_inspection()
 			if demolition_mode:
 				if _is_inside_map(cell):
@@ -727,8 +745,8 @@ func _update_instructions() -> void:
 
 	instructions.tooltip_text = ""
 	instructions.text = (
-		"Left-drag: automatic track | Remove tool: left-drag to remove"
-		+ " | Right-click: return to track laying | Connect or Draw"
+		"Left-drag: automatic track | Right-drag/hold: remove"
+		+ " | Short right-click: cancel | %s: Remove tool" % InputActions.key_label(InputActions.SELECT_REMOVE)
 		+ " | %s: pause | %s: cancel" % [
 			InputActions.key_label(InputActions.TOGGLE_PAUSE),
 			InputActions.key_label(InputActions.CANCEL)
@@ -740,6 +758,7 @@ func _update_instructions() -> void:
 
 
 func _on_viewport_size_changed() -> void:
+	_cancel_right_gesture()
 	queue_redraw()
 	_layout_header()
 
@@ -1737,13 +1756,16 @@ func _setup_toolbar() -> void:
 	remove_button.text = "Remove"
 	remove_button.toggle_mode = true
 	remove_button.focus_mode = Control.FOCUS_NONE
-	remove_button.tooltip_text = "Remove track: left-drag. Right-click returns to track laying."
+	remove_button.tooltip_text = "Remove track: left-drag. Or right-drag/hold. Shortcut: " + InputActions.key_label(InputActions.SELECT_REMOVE)
 	remove_button.pressed.connect(_select_remove_tool)
 	$Interface/HeaderBox/Toolbar.add_child(remove_button)
 	_update_toolbar()
 
 
-func _reset_track_tools() -> void:
+func _reset_track_tools(keep_right_gesture: bool = false) -> void:
+	if not keep_right_gesture:
+		right_pending = false
+		right_removing = false
 	_clear_direct_inspection()
 	inspect_mode = false
 	switch_tool_mode = false
@@ -1766,9 +1788,78 @@ func _reset_track_tools() -> void:
 
 
 func _tool_window_input(event: InputEvent, window: Window) -> void:
-	if event.is_action_pressed(InputActions.RESET_TOOL):
-		_reset_track_tools()
+	if event.is_action_pressed(InputActions.RESET_TOOL) or event.is_action_released(InputActions.RESET_TOOL):
+		_right_mouse_input(event, true)
 		window.set_input_as_handled()
+
+
+func _right_mouse_input(event: InputEvent, in_window: bool = false) -> bool:
+	if event.is_action_pressed(InputActions.RESET_TOOL):
+		if _modal_open() and not in_window: return false
+		_clear_direct_inspection()
+		is_dragging = false
+		is_panning = false
+		build_plan.clear()
+		demolition_cells.clear()
+		demolition_blocked.clear()
+		right_pending = true
+		right_removing = false
+		right_elapsed = 0.0
+		right_map_origin = not in_window and not _mouse_is_over_interface() and _is_inside_map(_mouse_to_cell())
+		right_start_point = to_local(_pointer_world())
+		right_start_cell = _mouse_to_cell()
+		get_viewport().set_input_as_handled()
+		return true
+	if event.is_action_released(InputActions.RESET_TOOL) and right_pending:
+		_advance_right_gesture(0.0)
+		if right_removing and not _mouse_is_over_interface() and not _modal_open():
+			_finish_demolition(_mouse_to_cell())
+		_reset_track_tools()
+		get_viewport().set_input_as_handled()
+		return true
+	if event is InputEventMouseMotion and right_pending:
+		_advance_right_gesture(0.0)
+		if right_removing: _collect_demolition_cells(_mouse_to_cell())
+		get_viewport().set_input_as_handled()
+		return true
+	return false
+
+
+func _advance_right_gesture(delta: float) -> void:
+	if not right_pending: return
+	# Real UI time, independent of pause, game speed and the simulation clock.
+	# Dialog/toolbar presses never turn into deletion of the map beneath them.
+	right_elapsed += maxf(delta, 0.0)
+	if right_map_origin and _modal_open():
+		_cancel_right_gesture()
+		return
+	if right_map_origin and _mouse_is_over_interface():
+		_reset_track_tools()
+		return
+	if right_removing or not right_map_origin: return
+	var motion_pixels: float = (to_local(_pointer_world()) - right_start_point).length() * camera.zoom.x * applied_ui_scale
+	if right_elapsed < RIGHT_HOLD_SECONDS and motion_pixels < RIGHT_DRAG_PIXELS: return
+	_reset_track_tools(true)
+	right_removing = true
+	demolition_mode = true
+	is_dragging = true
+	demolition_last_cell = right_start_cell
+	_collect_demolition_cells(right_start_cell)
+	_collect_demolition_cells(_mouse_to_cell())
+	_update_toolbar()
+
+
+func _cancel_right_gesture() -> void:
+	if not right_pending: return
+	var removing: bool = right_removing
+	right_pending = false
+	right_removing = false
+	is_dragging = false
+	demolition_cells.clear()
+	demolition_blocked.clear()
+	if removing:
+		demolition_mode = false
+		_update_toolbar()
 
 
 func _select_remove_tool() -> void:
@@ -1868,15 +1959,17 @@ func _update_toolbar() -> void:
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed(InputActions.RESET_TOOL) and not _modal_open():
+	if event.is_action_pressed(InputActions.BUILD) and right_pending:
 		_reset_track_tools()
 		get_viewport().set_input_as_handled()
 		return
+	if _right_mouse_input(event): return
 	if _modal_open():
 		_clear_direct_inspection()
 		return
 
 	if event.is_action_pressed(InputActions.CAMERA_PAN):
+		_cancel_right_gesture()
 		if not _mouse_is_over_interface():
 			_clear_direct_inspection()
 			is_panning = true
@@ -1908,13 +2001,13 @@ func _input(event: InputEvent) -> void:
 
 		if event.pressed and not _mouse_is_over_interface():
 			if event.is_action_pressed(InputActions.ZOOM_IN):
-				if not is_dragging:
+				if not is_dragging and not right_pending:
 					_zoom_camera(ZOOM_STEP)
 
 				get_viewport().set_input_as_handled()
 
 			elif event.is_action_pressed(InputActions.ZOOM_OUT):
-				if not is_dragging:
+				if not is_dragging and not right_pending:
 					_zoom_camera(1.0 / ZOOM_STEP)
 
 				get_viewport().set_input_as_handled()
@@ -2439,7 +2532,7 @@ func _move_camera_with_keyboard(delta: float) -> void:
 	if _modal_open():
 		return
 	# Avoid shifting an unfinished construction preview.
-	if is_dragging or is_panning:
+	if is_dragging or is_panning or right_pending:
 		return
 
 	var focused_control: Control = get_viewport().gui_get_focus_owner()
@@ -3248,6 +3341,8 @@ func _facility_markers() -> Array[Dictionary]:
 
 
 func _refresh_shortcut_tooltips() -> void:
+	if remove_button != null:
+		remove_button.tooltip_text = "Remove track: left-drag. Or right-drag/hold. Shortcut: " + InputActions.key_label(InputActions.SELECT_REMOVE)
 	inspect_button.tooltip_text = "Inspect trains, stations and industries — %s" % InputActions.key_label(InputActions.TOGGLE_INSPECT)
 	map_button.tooltip_text = "Show or hide the network map — %s" % InputActions.key_label(InputActions.TOGGLE_MAP)
 	goals_button.tooltip_text = "Show or hide scenario objectives — %s" % InputActions.key_label(InputActions.TOGGLE_GOALS)

@@ -23,17 +23,19 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation passed all 54 headless suites, including
+complete. The most recent validation verified all 55 headless suites, including
 desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
-tool reset, in Godot 4.6.3 (the platform update was previously tested on 4.7.stable).
+tool reset and click/hold/drag removal, in Godot 4.6.3 (the platform update was previously tested on 4.7.stable).
 Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
 repeat runs, and both suites now isolate/restore it; see the regression checks and acceptance coverage below.
 
 **Resume checkpoint:** maximized startup, adaptive window filling and saved
 fullscreen (Settings/F11) are implemented and confirmed working by the player.
-One piece is built per drag step, right-click restores track laying, and junction
-switches are created automatically with validated costs and grouped Undo/Redo.
+One piece is built per drag step; short right-click restores track laying and
+right-drag/hold removes track (R also selects Remove). Junction switches are
+created automatically on both departure and arrival, including merges onto end
+tiles, with validated costs and grouped Undo/Redo.
 Platform length measurement is implemented (`scripts/core/platforms.gd`, station
 panel line, `tests/test_platforms.gd`, `tests/test_platform_ui.gd`). Platform IDs, multi-platform detection
 from parallel sidings and `Platforms.assign` are also implemented (data and display only; trains still
@@ -47,7 +49,8 @@ reservations platform-aware, then return to planned-reversal/repeated-path consi
 - Mouse-drawn tracks with automatic bends, diagonals and a straight first extension
   tile when departing existing rails.
 - Construction costs, drag demolition and paused construction Undo/Redo.
-- Right-click returns active tools to track laying; Remove uses left-drag.
+- Short right-click returns active tools to track laying; right-drag/hold removes
+  track. R/Remove also selects left-drag removal.
   Track laying adds correctly oriented switches automatically, including the
   switch price in preview/drafts; see [automatic junctions](AUTOMATIC_SWITCHES.md).
 - Passenger and log-freight services, production and delivery income.

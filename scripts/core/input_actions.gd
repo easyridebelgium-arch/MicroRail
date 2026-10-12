@@ -15,6 +15,7 @@ const SPEED_ACTIONS: Array[StringName] = [SPEED_NORMAL, SPEED_DOUBLE, SPEED_FAST
 const TOGGLE_MAP: StringName = &"toggle_map"
 const TOGGLE_GOALS: StringName = &"toggle_goals"
 const TOGGLE_INSPECT: StringName = &"toggle_inspect"
+const SELECT_REMOVE: StringName = &"select_remove"
 const TOGGLE_LOG: StringName = &"toggle_log"
 const RESET_CAMERA: StringName = &"reset_camera"
 const CANCEL: StringName = &"cancel"
@@ -41,6 +42,7 @@ const ORDER: Array[StringName] = [
 	TOGGLE_MAP,
 	TOGGLE_GOALS,
 	TOGGLE_INSPECT,
+	SELECT_REMOVE,
 	TOGGLE_LOG,
 	RESET_CAMERA,
 	CANCEL,
@@ -75,6 +77,7 @@ static func label(action: StringName) -> String:
 		TOGGLE_MAP: return "Show / hide network map"
 		TOGGLE_GOALS: return "Show / hide objectives"
 		TOGGLE_INSPECT: return "Inspect mode"
+		SELECT_REMOVE: return "Select Remove tool"
 		TOGGLE_LOG: return "Show / hide event log"
 		RESET_CAMERA: return "Reset camera"
 		CANCEL: return "Cancel"
@@ -84,7 +87,7 @@ static func label(action: StringName) -> String:
 		CAMERA_RIGHT: return "Camera right"
 		CAMERA_FAST: return "Camera fast (hold)"
 		BUILD: return "Build track"
-		RESET_TOOL: return "Return to track laying"
+		RESET_TOOL: return "Click to cancel / hold or drag to remove"
 		CAMERA_PAN: return "Pan camera"
 		ZOOM_IN: return "Zoom in"
 		ZOOM_OUT: return "Zoom out"
@@ -118,6 +121,7 @@ static func default_keys(action: StringName) -> PackedInt32Array:
 		TOGGLE_MAP: return PackedInt32Array([KEY_M])
 		TOGGLE_GOALS: return PackedInt32Array([KEY_G])
 		TOGGLE_INSPECT: return PackedInt32Array([KEY_I])
+		SELECT_REMOVE: return PackedInt32Array([KEY_R])
 		TOGGLE_LOG: return PackedInt32Array([KEY_L])
 		RESET_CAMERA: return PackedInt32Array([KEY_HOME])
 		CANCEL: return PackedInt32Array([KEY_ESCAPE])

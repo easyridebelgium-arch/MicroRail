@@ -187,7 +187,8 @@ static func switch_type(stem: Vector2i, through: Vector2i, branch: Vector2i) -> 
 	if indices.has(-1):
 		return null
 	var kind: String = "junction_%d_%d_%d" % [indices[0], indices[1], indices[2]]
-	return kind if not connections(kind).is_empty() else null
+	if connections(kind).is_empty(): return null
+	return kind
 
 
 ## Builds a crossing from one port of each of its two lines. Null if both

@@ -19,7 +19,7 @@ func reset() -> void:
 func update(tick: int, active_ids: Array, waits: Dictionary) -> void:
 	if tick <= _last_tick: return
 	_last_tick = tick
-	var second := tick / TICKS_PER_SECOND
+	var second := int(floor(float(tick) / float(TICKS_PER_SECOND)))
 	for old in _buckets.keys():
 		if old <= second - WINDOW_SECONDS:
 			var bucket: Dictionary = _buckets[old]

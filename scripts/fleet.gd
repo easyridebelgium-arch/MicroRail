@@ -87,9 +87,11 @@ static func sale_price(train: Dictionary) -> int:
 	var speed_base: int = 200 if model["kind"] == "passenger" else 250
 	var capacity_level: int = int(train["capacity_level"])
 	var speed_level: int = int(train["speed_level"])
-	var invested: int = int(model["price"]) + capacity_base * capacity_level * (capacity_level + 1) / 2 + speed_base * speed_level * (speed_level + 1) / 2
+	var invested: int = int(model["price"])
+	invested += int(capacity_base * capacity_level * (capacity_level + 1) / 2.0)
+	invested += int(speed_base * speed_level * (speed_level + 1) / 2.0)
 	for wagon in train.get("wagons", []): invested += int(Consists.STOCK[wagon].price)
-	return invested / 2
+	return int(invested / 2.0)
 
 static func length(train: Dictionary) -> float:
 	return Consists.length(train)

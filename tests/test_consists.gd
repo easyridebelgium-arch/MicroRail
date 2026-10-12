@@ -20,6 +20,12 @@ func _initialize() -> void:
 	check(not Stock.valid(["coach"], "freight") and not Stock.valid(["log_wagon"], "passenger"), "mixed passenger/cargo stock must be refused")
 	check(not Stock.valid(["unknown"], "passenger") and not Stock.valid(["coach", "coach", "coach", "coach", "coach"], "passenger"), "unknown stock and overlength consists must be refused")
 	check(Fleet.sale_price(train) == 505, "selling a stored consist must refund half the locomotive and attached stock investment")
+	var upgraded := Fleet.make_train(4, "passenger_standard")
+	upgraded.capacity_level = 3
+	upgraded.speed_level = 2
+	check(Fleet.sale_price(upgraded) == 1250, "refund must include half the locomotive and all cumulative capacity/speed purchases")
+	upgraded.wagons = ["coach", "coach"]
+	check(Fleet.sale_price(upgraded) == 1430, "refund must also include attached wagon investment without rounding away upgrade costs")
 	var fleet := Fleet.defaults()
 	fleet.trains[0].wagons = ["log_wagon"]
 	check(not Fleet.is_valid(fleet), "save validation must reject incompatible stock")

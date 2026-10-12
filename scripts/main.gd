@@ -4004,8 +4004,10 @@ func _use_signal_tool(cell: Vector2i) -> void:
 		var working: Dictionary = construction_plan.projected(tracks)
 		if _plan_protected(cell) or not working.has(cell) or not TrackGeometry.is_straight(working[cell]): return
 		var signs: Dictionary = construction_plan.projected_signals(track_signals)
-		var mode: Variant = "auto" if not signs.has(cell) else "stop" if signs[cell] == "auto" else null
-		construction_plan.stage_signals({cell: mode}, track_signals, tracks)
+		var draft_mode: Variant = null
+		if not signs.has(cell): draft_mode = "auto"
+		elif signs[cell] == "auto": draft_mode = "stop"
+		construction_plan.stage_signals({cell: draft_mode}, track_signals, tracks)
 		return
 	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
 		_show_notice("Place a signal on straight track outside station platforms.")
@@ -4843,7 +4845,7 @@ func edit_consist(id: int, wagon: String, remove: bool = false) -> String:
 		for cell in reservations.footprint(origin.path, origin.distance, float(TILE_SIZE), Fleet.length(candidate)):
 			if reservations.owners.has(cell) and int(reservations.owners[cell]) != id: return "The longer body would overlap reserved or occupied track. Let the other train clear first."
 	var cost := int(Consists.STOCK[wagon].price)
-	if remove: cost = -int(cost / 2)
+	if remove: cost = -int(cost / 2.0)
 	train["wagons"] = wagons
 	money -= cost
 	total_vehicle_cost += cost

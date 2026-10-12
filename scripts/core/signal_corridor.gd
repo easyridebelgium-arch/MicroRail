@@ -16,6 +16,7 @@ static func plan(tracks: Dictionary, start: Vector2i, end: Vector2i, spacing: in
 		var cell: Vector2i = cells[index]
 		if protected.call(cell) or not Geometry.is_straight(tracks[cell]): continue
 		if mode.is_empty() or index % spacing == 0 or index == cells.size() - 1:
-			result.updates[cell] = null if mode.is_empty() else mode
+			if mode.is_empty(): result.updates[cell] = null
+			else: result.updates[cell] = mode
 	if result.updates.is_empty(): result.error = "No eligible straight track at the selected spacing."
 	return result

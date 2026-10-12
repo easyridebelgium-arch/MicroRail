@@ -175,9 +175,11 @@ func _select_train(index: int) -> void:
 	start_copy.add_item("Default route")
 	start_copy.set_item_metadata(0, "")
 	for key in game.additional_service_keys() + ["passenger"]:
-		start_copy.add_item("Copy of " + str(game.services[key].name))
-		start_copy.set_item_metadata(start_copy.item_count - 1, key)
-		if key == chosen_copy: start_copy.select(start_copy.item_count - 1)
+		for linked in [false, true]:
+			if linked and game.services[key].has("link"): continue
+			start_copy.add_item(("Linked to " if linked else "Copy of ") + str(game.services[key].name))
+			start_copy.set_item_metadata(start_copy.item_count - 1, ("link:" if linked else "") + key)
+			if start_copy.get_item_metadata(start_copy.item_count - 1) == chosen_copy: start_copy.select(start_copy.item_count - 1)
 	start_copy.disabled = start_button.disabled
 	store_button.disabled = not game.passenger_services.has(service)
 	for kind in ["capacity", "speed"]:
@@ -233,7 +235,7 @@ func _toggle_service() -> void:
 
 func _start_service() -> void:
 	var source: String = str(start_copy.get_selected_metadata()) if start_copy.item_count > 0 else ""
-	if source != "": status.text = game.duplicate_passenger_service(selected_id, source)
+	if source != "": status.text = game.duplicate_passenger_service(selected_id, source.trim_prefix("link:"), source.begins_with("link:"))
 	else: status.text = game.start_passenger_service(selected_id, start_station.get_selected_metadata())
 	refresh()
 

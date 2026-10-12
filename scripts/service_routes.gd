@@ -64,6 +64,45 @@ static func copy_route(source: Dictionary, target: Dictionary) -> Dictionary:
 	result["platforms"] = instructions.get("platforms", {})
 	return result
 
+## A linked service follows another passenger service's route ("link": key of
+## the source). The source cannot itself be linked, so a group is one level deep.
+static func valid_link(value: Dictionary, key: String) -> bool:
+	var service: Dictionary = value[key]
+	if not service.has("link"): return true
+	var source: Variant = service["link"]
+	if not source is String or source == key or not is_passenger_key(source) or not value.has(source): return false
+	return not value[source].has("link")
+
+## Copies each source's stops, mode, waypoints and platforms onto services
+## linked to it. A linked service keeps its own name and first-stop platform.
+static func propagate(configuration: Dictionary) -> Dictionary:
+	var result := configuration.duplicate(true)
+	for key in result:
+		var service: Dictionary = result[key]
+		var source_key: Variant = service.get("link", "")
+		if not source_key is String or not result.has(source_key) or source_key == key or result[source_key].has("link"):
+			service.erase("link")
+			continue
+		var source: Dictionary = result[source_key]
+		var own_first: String = str(service.stops[0]) if service.get("stops", []).size() > 0 else ""
+		var own_platform: int = int(service.get("platforms", {}).get(own_first, 1))
+		var own_auto: bool = service.get("auto", {}).has(own_first)
+		var copied := copy_route(source, service)
+		copied["name"] = service.name
+		copied["link"] = source_key
+		var first: String = str(copied.stops[0])
+		var platforms: Dictionary = copied.get("platforms", {})
+		if own_first == first and own_platform != 1: platforms[first] = own_platform
+		else: platforms.erase(first)
+		copied["platforms"] = platforms
+		var marks: Dictionary = source.get("auto", {}).duplicate()
+		marks.erase(first)
+		if own_first == first and own_auto: marks[first] = true
+		if marks.is_empty(): copied.erase("auto")
+		else: copied["auto"] = marks
+		result[key] = copied
+	return result
+
 static func defaults() -> Dictionary:
 	return {
 		"passenger": {"name": "Passenger Shuttle", "stops": ["a", "b"], "waypoints": {}, "mode": "shuttle"},
@@ -90,7 +129,7 @@ static func is_valid(value: Variant) -> bool:
 			for stop in stops:
 				if not stop is String or not STATIONS.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service): return false
+		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key): return false
 	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}) -> Dictionary:

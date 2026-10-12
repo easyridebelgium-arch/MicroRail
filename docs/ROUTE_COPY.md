@@ -34,3 +34,17 @@ service remains and Routes can fix it. Tests: `tests/test_service_duplication.gd
 draft discard, validated application, refusal on a moving target, save/load,
 vanished-leg warnings, freight exclusion and reachable Apply at 200% UI scale.
 The copy stores ordinary service instructions, so no save schema change is needed.
+
+## Linked services
+
+Several trains can run one route: in Fleet choose "Linked to …" instead of "Copy of …".
+A linked service stores `"link": "<source key>"`; on every Apply, `ServiceRoutes.propagate`
+copies the source's stops, mode, waypoints, platforms and Auto marks onto it. It keeps its
+own name, train and first-stop platform. Links are one level deep (a link to a linked
+service is stored as a link to its source), only passenger services can be linked, and
+removing the source unlinks its dependants. In Routes a linked service shows
+"Linked to …", its route controls are locked, and **Unlink** keeps the current route as an
+independent service. Because each linked train still follows the same single-track hold and
+Auto platform rules, trains sharing a route take turns instead of colliding. A source edit
+is refused for the whole Apply while any linked train is away from its first stop, like any
+other route edit. Tests: `tests/test_linked_services.gd`.

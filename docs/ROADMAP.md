@@ -11,12 +11,12 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | --- | --- | --- |
 | Phase 0 — Foundations | Implemented; requirements remain active for every update. | Continue deterministic, save and accessibility checks. Full input replay/controller support are later extensions. |
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
-| Phase 1B — Service operations | Partially complete. | Figure-eight/other repeated-path body routing (planned reversals at stops are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist), multiple trains per service. |
+| Phase 1B — Service operations | Partially complete. | Figure-eight/other repeated-path body routing (planned reversals at stops are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. Unified waiting inspection is implemented. |
 | Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Next implementation:** Phase 1B figure-eight/other repeated-path body routing and multiple trains per service. Automatic platform
+**Next implementation:** Phase 1B figure-eight/other repeated-path body routing, then headway/frequency controls (Phase 2) on top of linked services. Automatic platform
 choice is done at Apply time (the editor's "Auto" option; see [platforms](PLATFORMS.md)); choosing
 a different platform at arrival time, while the train is moving, remains optional later work and
 must preserve the physical body and its route behind the train.
@@ -25,7 +25,7 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation verified all 64 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
+complete. The most recent validation verified all 65 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
 desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
 tool reset, click/hold/drag removal, saved curved-junction layouts and safe route-copy drafts, in Godot 4.6.3
 (the platform update was previously tested on 4.7.stable).
@@ -49,7 +49,7 @@ editable draft, preserving its name and train and validating the existing safe e
 on Apply; see [route copying](ROUTE_COPY.md). Vanished waypoint legs produce an explicit
 draft warning. Drag reordering and Fleet "Copy of …" service duplication are done (see [route copying](ROUTE_COPY.md)). Auto stops re-route to a free platform when a train leaves its previous stop (`Main._maybe_reroute_platform`, `tests/test_platform_reroute.gd`). Single-track holds stop head-on lockups between stops (`SingleTrack`, `tests/test_single_track_holds.gd`; see [platforms](PLATFORMS.md)). Automatic platform choice (`Platforms.choose`, `Main._resolve_auto_platforms`, `tests/test_auto_platforms.gd`)
 is implemented; wait messages and the station panel name platforms. Continue
-Phase 1B with figure-eight/repeated-path body routing and multiple trains per service. Carriage trains can now reverse at intermediate stops
+Phase 1B with figure-eight/repeated-path body routing. Multiple trains per route are done as linked services (Fleet "Linked to …", see [route copying](ROUTE_COPY.md)). Carriage trains can now reverse at intermediate stops
 (`RouteBody.folds`/`body_pose`, `Consists.route_shape_error`, `tests/test_fold_bodies.gd`,
 `tests/test_planned_reversals.gd`, `tests/test_reversal_signals.gd`); platform selection must keep
 the tail's route and the extension past a reversal stop intact. Figure-eight circuits and other

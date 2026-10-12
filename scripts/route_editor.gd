@@ -23,6 +23,9 @@ var waypoint_y: SpinBox
 var waypoint_add: Button
 var selected_service_key: String = "passenger"
 var copy_controls: HFlowContainer
+var link_controls: HFlowContainer
+var link_label: Label
+var unlink_button: Button
 var copy_source: OptionButton
 var copy_button: Button
 var directive_warning: Label
@@ -65,6 +68,15 @@ func configure(owner_game: Node) -> void:
 	copy_button.tooltip_text = "Copy stops, mode, waypoints and platforms. Keeps this service's name and train; Apply checks safety."
 	copy_button.pressed.connect(_copy_route)
 	copy_controls.add_child(copy_button)
+	link_controls = HFlowContainer.new()
+	box.add_child(link_controls)
+	link_label = Label.new()
+	link_controls.add_child(link_label)
+	unlink_button = Button.new()
+	unlink_button.text = "Unlink"
+	unlink_button.tooltip_text = "Keep this route as it is but edit it independently from now on."
+	unlink_button.pressed.connect(_unlink)
+	link_controls.add_child(unlink_button)
 	name_field = LineEdit.new()
 	name_field.max_length = 40
 	name_field.placeholder_text = "Route name"
@@ -184,7 +196,16 @@ func _select_service(index: int) -> void:
 	selected_service_key = service_choice.get_item_metadata(index)
 	_show_service()
 
+func _unlink() -> void:
+	draft[_key()].erase("link")
+	_show_service()
+	status.text = "Unlinked. This service now keeps its own route."
+
 func _show_service() -> void:
+	draft = Services.propagate(draft)
+	var linked: bool = draft[_key()].has("link") and Services.is_passenger_key(_key())
+	link_controls.visible = linked
+	if linked: link_label.text = "Linked to %s — its stops, mode, waypoints and platforms follow that route." % draft[str(draft[_key()]["link"])].name
 	directive_warning.text = str(removed_waypoint_legs.get(_key(), ""))
 	name_field.text = draft[_key()]["name"]
 	editing_controls.visible = Services.is_passenger_key(_key())
@@ -192,6 +213,14 @@ func _show_service() -> void:
 	route_mode.select(1 if draft[_key()].get("mode", "shuttle") == "loop" else 0)
 	_refresh_copy_sources()
 	_refresh_stops()
+	if linked:
+		editing_controls.visible = false
+		route_mode.disabled = true
+		copy_controls.visible = false
+		waypoint_add.disabled = true
+	else:
+		route_mode.disabled = false
+		waypoint_add.disabled = false
 	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if Services.is_passenger_key(_key()) else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
 
 func _refresh_copy_sources() -> void:

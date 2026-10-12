@@ -3812,6 +3812,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 	return {"configuration": resolved, "notes": notes}
 
 func apply_service_routes(configuration: Dictionary) -> String:
+	if ServiceRoutes.is_valid(configuration): configuration = ServiceRoutes.propagate(configuration)
 	var auto_resolved := _resolve_auto_platforms(configuration)
 	configuration = auto_resolved["configuration"]
 	var result := _apply_resolved_routes(configuration)
@@ -4690,7 +4691,7 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 ## Starts a stored train as a copy of an existing passenger service: same stops,
 ## mode, waypoints and platforms, its own name. It starts at the source's first
 ## stop on platform 1; if the copy cannot be applied the default service stays.
-func duplicate_passenger_service(id: int, source: String) -> String:
+func duplicate_passenger_service(id: int, source: String, linked: bool = false) -> String:
 	var original: Dictionary = services.get(source, {})
 	if original.is_empty() or not ServiceRoutes.is_passenger_key(source): return "Choose a passenger service to copy."
 	var message := start_passenger_service(id, str(original.stops[0]))
@@ -4698,6 +4699,8 @@ func duplicate_passenger_service(id: int, source: String) -> String:
 	var key: String = str(Fleet.find(fleet, id).service)
 	var copy: Dictionary = original.duplicate(true)
 	copy["name"] = services[key].name
+	if linked: copy["link"] = str(original.get("link", source))
+	else: copy.erase("link")
 	var first: String = str(copy.stops[0])
 	var platforms: Dictionary = copy.get("platforms", {})
 	platforms.erase(first)
@@ -4710,7 +4713,7 @@ func duplicate_passenger_service(id: int, source: String) -> String:
 	configuration[key] = copy
 	var result := apply_service_routes(configuration)
 	if not result.begins_with("Routes applied"): return "%s The route could not be copied: %s Edit it in Routes." % [message, result]
-	return "%s started as a copy of %s." % [services[key].name, original.name]
+	return "%s started as a %s of %s." % [services[key].name, "linked copy" if linked else "copy", original.name]
 
 func remove_passenger_service(id: int) -> String:
 	if not paused: return "Pause before removing a service."
@@ -4721,6 +4724,8 @@ func remove_passenger_service(id: int) -> String:
 	if running.enabled or not running.at_home(): return "Withdraw this service and let it finish its trip, returning empty to its first station. Then pause and store it."
 	passenger_services.erase(key)
 	services.erase(key)
+	for other in services:
+		if services[other].get("link", "") == key: services[other].erase("link")
 	train.service = ""
 	_reset_traffic_state("Passenger service removed")
 	_rebuild_reservations()

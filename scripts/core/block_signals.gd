@@ -1,6 +1,7 @@
 extends RefCounted
 ## Signal tiles cut the network into conservative connected blocks. Authority
 ## is seeded from real body occupancy, then requested in permanent ID order.
+const RouteBody = preload("res://scripts/core/route_body.gd")
 const Geometry = preload("res://scripts/track_geometry.gd")
 const Reservations = preload("res://scripts/core/track_reservations.gd")
 var requested_blocks: Dictionary = {}
@@ -49,6 +50,7 @@ func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
 	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.id) < int(b.id))
 	for train in ordered:
 		requested_blocks[int(train.id)] = []
+		var closed := RouteBody.is_closed(train.path)
 		var spans := _helper._route_spans(train.path, train.cells, tile_size)
 		_spans[train.id] = spans
 		if not train.moving: continue
@@ -59,12 +61,12 @@ func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
 		var end := clampf(distance + direction * tile_size * Reservations.LOOKAHEAD_TILES, 0, train.path.get_baked_length())
 		var requested: Dictionary = {}
 		while true:
-			var index := _helper._index_at(spans, distance + direction * half)
+			var index := _helper._index_at(spans, RouteBody.distance_on_path(train.path, distance + direction * half, closed))
 			var cell: Vector2i = train.cells[index] if not train.cells.is_empty() else Vector2i(-1, -1)
 			if signs.has(cell) and not requested.has(cell):
 				requested[cell] = true
 				if signs[cell] == "stop": break
-				var block := _downstream(train.cells, index, direction)
+				var block := _downstream(train.cells, index, direction, closed)
 				if block >= 0 and not requested_blocks[int(train.id)].has(block): requested_blocks[int(train.id)].append(block)
 				var owners: Dictionary = block_owners.get(block, {})
 				if not _other_owner(owners, train.id).is_empty(): break
@@ -77,13 +79,14 @@ func limit(train: Dictionary, proposed: float, tile_size: float) -> Dictionary:
 	if signs.is_empty(): return {"distance": proposed, "conflict": {}}
 	var current: float = train.distance
 	var allowed := current
+	var closed := RouteBody.is_closed(train.path)
 	var body := Reservations.train_length(train)
 	var half := (body - Reservations.VEHICLE_LENGTH) * 0.5
 	var start_body := _helper.footprint(train.path, current, tile_size, body)
 	var direction := 1 if proposed >= current else -1
 	while absf(allowed - proposed) > 0.001:
 		var next := move_toward(allowed, proposed, 1.0)
-		var index := _helper._index_at(_spans.get(train.id, [[0.0, 0]]), next + direction * half)
+		var index := _helper._index_at(_spans.get(train.id, [[0.0, 0]]), RouteBody.distance_on_path(train.path, next + direction * half, closed))
 		for cell in _helper.footprint(train.path, next, tile_size, body):
 			if not signs.has(cell) or start_body.has(cell): continue
 			var reason := ""
@@ -94,10 +97,13 @@ func limit(train: Dictionary, proposed: float, tile_size: float) -> Dictionary:
 				reason = "Manual stop signal at %d,%d" % [cell.x, cell.y]
 			else:
 				var occurrence := -1
-				for i in range(maxi(0, index - 1), mini(train.cells.size(), index + 2)):
-					if train.cells[i] == cell: occurrence = i
+				var count: int = train.cells.size() - 1 if closed else train.cells.size()
+				for offset in range(-1, 2):
+					var i := index + offset
+					if closed: i = posmod(i, count)
+					if i >= 0 and i < count and train.cells[i] == cell: occurrence = i
 				if occurrence < 0: continue
-				var block := _downstream(train.cells, occurrence, direction)
+				var block := _downstream(train.cells, occurrence, direction, closed)
 				blocked_block = block
 				cause = "block_authority"
 				var owners: Dictionary = block_owners.get(block, {})
@@ -112,9 +118,12 @@ func limit(train: Dictionary, proposed: float, tile_size: float) -> Dictionary:
 		allowed = next
 	return {"distance": allowed, "conflict": {}}
 
-func _downstream(cells: Array[Vector2i], index: int, direction: int) -> int:
+func _downstream(cells: Array[Vector2i], index: int, direction: int, closed: bool = false) -> int:
+	var count := cells.size() - 1 if closed else cells.size()
 	var next := index + direction
-	while next >= 0 and next < cells.size():
+	for _step in range(count):
+		if closed: next = posmod(next, count)
+		elif next < 0 or next >= count: return -1
 		if cell_blocks.has(cells[next]): return int(cell_blocks[cells[next]])
 		next += direction
 	return -1

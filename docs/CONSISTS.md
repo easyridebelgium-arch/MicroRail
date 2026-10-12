@@ -76,9 +76,14 @@ waypoints remain supported when the full itinerary does not revisit any tile.
 Capacity and fares still use the existing simple passenger queues; passenger
 origin/destination demands come in Phase 2A.
 
-Routes such as **A–C–B** fold back through already-used tiles and remain rejected
-for carriage trains, as do **Loop** services. Those require continuous body routing
-across planned reversals/loop wraps before being enabled. Formation templates, independent
+Carriage **Loop** services now work on continuous physical circuits, with the
+closing first stop as their only repeated tile. The full body and every vehicle
+wrap around the retained curve without jumping. See [Loop consists](LOOP_CONSISTS.md)
+for construction, route and closing-leg waypoint instructions.
+
+Routes such as a folded **A–C–B** still retrace tiles and remain rejected for
+carriage trains. Planned intermediate reversals and other repeated-track routes
+need occurrence/history-aware body routing before being enabled. Formation templates, independent
 wagon inventory, classes, tankers/boxcars and cargo-specific loading are later
 features. Formal platform extensions, traction/power and yard operations are also
 later; the current checker only verifies straight track and signal-free stopping
@@ -96,4 +101,8 @@ authority allocation as the game. It also checks precise movement-denial records
 `test_multi_stop_consists.gd` covers all supported carriage counts fitting a
 three-stop route, actual outward/return stops, full-body dwell ownership and vehicle
 positions, signals, recovery to B, middle-stop/recovery save/load for primary and
-additional services, and atomic refusal of folded/Loop routes. Save format stays v23.
+additional services, and atomic refusal of folded routes and non-continuous Loops. Save format stays v23.
+
+Continuous carriage circuits and their wrapped nose/tail, block protection, saved
+bodies and physical recovery are covered by `test_loop_body.gd` and
+`test_loop_consist_integration.gd`; see [Loop consists](LOOP_CONSISTS.md).

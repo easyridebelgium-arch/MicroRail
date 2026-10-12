@@ -1,5 +1,6 @@
 extends RefCounted
 ## Initial rolling stock: passenger coaches and log wagons, up to four attachments.
+const RouteBody = preload("res://scripts/core/route_body.gd")
 const Geometry = preload("res://scripts/track_geometry.gd")
 const Reservations = preload("res://scripts/core/track_reservations.gd")
 const MAX_WAGONS := 4
@@ -34,11 +35,23 @@ static func stop_clearance(path: Curve2D, distance: float, body: float, tracks: 
 		if not tracks.has(cell) or not Geometry.same_connections(tracks[cell], false):
 			return "Consist needs continuous horizontal straight track on both sides of this stop (missing or incompatible at %d,%d)." % [cell.x, cell.y]
 	return ""
+static func route_shape_error(path: Curve2D, cells: Array, body: float, mode: String) -> String:
+	if body <= Reservations.VEHICLE_LENGTH: return ""
+	if path.point_count < 2: return "Complete the service route before running a consist."
+	var closed := mode == "loop"
+	if closed and (not RouteBody.is_closed(path) or path.get_baked_length() <= body):
+		return "Long Loop consists need a continuous circuit through the first stop, with no reversal at the join and room for the full train. Use Shuttle or revise the closing leg."
+	var seen: Dictionary = {}
+	for index in range(cells.size()):
+		var cell: Vector2i = cells[index]
+		if closed and index == cells.size() - 1 and cell == cells[0]: continue
+		if seen.has(cell): return "Long consists need a route that does not revisit track tiles, except the closing first stop of a continuous Loop. Repeated-path body routing comes later."
+		seen[cell] = true
+	return ""
+
 static func pose(path: Curve2D, distance: float) -> Dictionary:
-	var total := path.get_baked_length()
-	var edge := clampf(distance, 0.0, total)
-	var tangent := (path.sample_baked(minf(total, edge + 1.0)) - path.sample_baked(maxf(0, edge - 1.0))).normalized()
-	return {"position": path.sample_baked(edge) + tangent * (distance - edge), "angle": tangent.angle()}
+	var result := RouteBody.pose(path, distance)
+	return {"position": result.origin, "angle": result.x.angle()}
 static func offsets(train: Dictionary) -> Array[float]:
 	var result: Array[float] = []
 	var count: int = train.get("wagons", []).size() + 1

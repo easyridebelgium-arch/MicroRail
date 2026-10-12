@@ -29,12 +29,20 @@ fixed-tick FPS comparisons do not establish cross-version replay compatibility.
 | Post-recovery integrity | Existing recovery tests check position/load preservation, safe movement and save/load. Ownership is rebuilt normally and passed tiles release; never reset all locks while a train still physically occupies them. Extend multi-platform/body boundary cases as those systems arrive. |
 
 The next expansion of this checklist follows Phase 1B: continuous long-body routing
-across planned intermediate reversals/Loops, usable platform lengths, multiple platforms and
+across planned intermediate reversals/repeated paths, usable platform lengths, multiple platforms and
 safe multiple trains per service. Service priorities and directional signals get
 explicit new criteria when implemented.
 
 Three-stop carriage Shuttles are now exercised by `test_multi_stop_consists.gd`:
 body ownership and unchanged carriage positions across intermediate dwell, both
 travel directions, manual signals, middle-leg recovery, primary/additional service
-save/load, and rejection of planned reversals/repeated retained tiles. This expands
-supported intermediate **stops**, not Loop wrapping or folded body movement.
+save/load, and rejection of planned reversals/repeated retained tiles. These checks expand supported intermediate **stops**; continuous Loop wrapping
+coverage is listed below. Folded body movement remains planned.
+
+Continuous carriage circuits are checked by `test_loop_body.gd` and
+`test_loop_consist_integration.gd`: unchanged physical body at lap wrap, curved tail
+poses, locked nose/tail switches, wrapped signals, known blockers of atomic claims,
+mutable-curve cache invalidation, matching authority at 30/60/120 FPS, full laps,
+closing-leg recovery and primary/additional save/load. Two same-direction carriage
+services share blocks without body overlap. Legacy single-vehicle repeated switch
+occurrences still select their current route, rather than a later exit.

@@ -233,7 +233,7 @@ func _describe_wagon() -> void:
 	var stock: String = wagon_choice.get_selected_metadata()
 	var wagon: Dictionary = Fleet.Consists.STOCK[stock]
 	var train := Fleet.find(game.fleet, selected_id)
-	wagon_details.text = "%s: £%d | +%d %s | +32 px | Speed limit %.0f px/s | +£%d/s\nRemoval refunds £%d. Edit stored trains or empty trains at their first stop. Long consists need straight clearance on both sides of every stop and use Shuttle mode with a continuous route that never revisits a tile. Multiple stops are supported; Loop routes are not yet supported." % [wagon.name, wagon.price, wagon.capacity, "seats" if wagon.kind == "passenger" else "logs", wagon.speed, wagon.cost, int(wagon.price / 2)]
+	wagon_details.text = "%s: £%d | +%d %s | +32 px | Speed limit %.0f px/s | +£%d/s\nRemoval refunds £%d. Edit stored trains or empty trains at their first stop. Long consists need straight clearance on both sides of every stop and use continuous routes that never revisit a tile, except the closing first stop of a Loop. Loop approaches must continue straight through the first stop." % [wagon.name, wagon.price, wagon.capacity, "seats" if wagon.kind == "passenger" else "logs", wagon.speed, wagon.cost, int(wagon.price / 2)]
 	attach_button.disabled = train.get("wagons", []).size() >= Fleet.Consists.MAX_WAGONS or game.money < int(wagon.price)
 	detach_button.disabled = not train.get("wagons", []).has(stock)
 

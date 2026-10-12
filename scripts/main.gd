@@ -1592,10 +1592,6 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		_show_notice("Saved freight train state is invalid.")
 		return
 	var loaded_services := ServiceRoutes.from_save(data["services"])
-	for key in loaded_services:
-		if Fleet.length(Fleet.assigned(data.fleet, key)) > Reservations.VEHICLE_LENGTH and loaded_services[key].get("mode", "shuttle") == "loop":
-			_show_notice("Long consists need Shuttle routes; Loop body wrapping is not supported yet.")
-			return
 	var loaded_extra: Dictionary = {}
 	for key in data["passenger_services"]:
 		loaded_extra[key] = PassengerService.from_save(key, data["passenger_services"][key], loaded_services[key], Fleet.capacity(Fleet.assigned(data["fleet"], key)))
@@ -1603,18 +1599,15 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	var footprints: Dictionary = {}
 	var helper := Reservations.new()
 	var positions: Array = [
-		{"length": Fleet.length(Fleet.assigned(data.fleet, "passenger")), "cells": loaded_cells, "path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.STATIONS[loaded_services.passenger.stops[0]].cell)), "distance": loaded_distance},
+		{"mode": loaded_services.passenger.get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, "passenger")), "cells": loaded_cells, "path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.STATIONS[loaded_services.passenger.stops[0]].cell)), "distance": loaded_distance},
 		{"length": Fleet.length(Fleet.assigned(data.fleet, "freight")), "cells": loaded_freight_cells, "path": _reservation_path(loaded_freight_path, _cell_center(FOREST_SITE)), "distance": float(data["freight"]["distance"])}
 	]
-	for key in loaded_extra: positions.append({"length": Fleet.length(Fleet.assigned(data.fleet, key)), "cells": loaded_extra[key].cells, "path": loaded_extra[key].path, "distance": loaded_extra[key].distance})
+	for key in loaded_extra: positions.append({"mode": loaded_services[key].get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, key)), "cells": loaded_extra[key].cells, "path": loaded_extra[key].path, "distance": loaded_extra[key].distance})
 	for train in positions:
-		if train.length > Reservations.VEHICLE_LENGTH:
-			var seen_body: Dictionary = {}
-			for cell in train.cells:
-				if seen_body.has(cell):
-					_show_notice("Long consists cannot use retained routes that revisit track tiles yet.")
-					return
-				seen_body[cell] = true
+		var shape_error := Consists.route_shape_error(train.path, train.cells, train.length, train.get("mode", "shuttle"))
+		if not shape_error.is_empty():
+			_show_notice(shape_error)
+			return
 		for cell in helper.footprint(train.path, train.distance, float(TILE_SIZE), train.length):
 			if footprints.has(cell):
 				_show_notice("Save contains overlapping train bodies.")
@@ -4834,7 +4827,6 @@ func locate_object(row: Dictionary) -> bool:
 func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 	var body := Fleet.length(train)
 	if body <= Reservations.VEHICLE_LENGTH: return ""
-	if service.get("mode", "shuttle") == "loop": return "Long consists use Shuttle routes without repeated track tiles. Loop body wrapping comes later."
 	var path: Curve2D
 	var stops: Array
 	var cells: Array
@@ -4843,15 +4835,12 @@ func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 		path = RailRouter.make_path(cells, float(TILE_SIZE))
 		stops = [0.0, path.get_baked_length()]
 	else:
-		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), "shuttle")
+		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"))
 		path = built.path
 		stops = built.distances
 		cells = built.cells
-	var seen: Dictionary = {}
-	for cell in cells:
-		if seen.has(cell): return "Long consists need a route that does not revisit track tiles. Repeated-path body routing comes later."
-		seen[cell] = true
-	if path.point_count < 2: return "Complete the service route before running a consist."
+	var shape_error := Consists.route_shape_error(path, cells, body, service.get("mode", "shuttle"))
+	if not shape_error.is_empty(): return shape_error
 	for distance in stops:
 		var error := Consists.stop_clearance(path, float(distance), body, tracks, float(TILE_SIZE), track_signals)
 		if not error.is_empty(): return error

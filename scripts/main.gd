@@ -3904,9 +3904,46 @@ func traffic_summary() -> String:
 		lines.append("#%d %s: %s" % [int(train["id"]), train["name"], reservation_waits.get(service, fleet_train_status(int(train["id"])))])
 	return "\n\n".join(lines)
 
+func reverse_train_reason(id: int) -> String:
+	# Shared preflight for the inspector and command: rejection changes no state.
+	if not paused: return "Pause before reversing a train."
+	var train := Fleet.find(fleet, id)
+	var service: String = str(train.get("service", ""))
+	var path: Curve2D
+	var distance: float
+	var departure: float
+	if service == "passenger":
+		if passenger_returning: return "This train is already returning to its departure stop."
+		if passenger_stop_index < 0 or passenger_stop_index >= stop_distances.size(): return "No retained departure stop."
+		path = route_path
+		distance = route_distance
+		departure = stop_distances[passenger_stop_index]
+	elif passenger_services.has(service):
+		var state = passenger_services[service]
+		if state.returning: return "This train is already returning to its departure stop."
+		if state.stop_index < 0 or state.stop_index >= state.distances.size(): return "No retained departure stop."
+		path = state.path
+		distance = state.distance
+		departure = state.distances[state.stop_index]
+	elif service == "freight":
+		if freight_train.recovery_returning: return "This train is already returning to its departure stop."
+		path = freight_train.route_path
+		distance = freight_train.distance_along_route
+		departure = 0.0 if freight_train.to_terminal else path.get_baked_length()
+	else: return "Select an assigned passenger or freight train."
+	if path.point_count < 2: return "No retained path to return along."
+	if absf(distance - departure) <= 0.001: return "This train is already at its departure stop."
+	return ""
+
 func reverse_deadlocked_train(id: int) -> String:
+	# Traffic retains its confirmed-deadlock control; the inspector can act earlier.
 	if not paused: return "Pause before reversing a train."
 	if not deadlocks.contains(id): return "This train is not involved in a confirmed deadlock."
+	return reverse_train(id)
+
+func reverse_train(id: int) -> String:
+	var reason := reverse_train_reason(id)
+	if not reason.is_empty(): return reason
 	var train := Fleet.find(fleet, id)
 	var service: String = str(train.get("service", ""))
 	if service == "passenger":
@@ -3928,13 +3965,20 @@ func reverse_deadlocked_train(id: int) -> String:
 		freight_train.dwell = 0.0
 		freight_train._update_transform()
 	else: return "Select an assigned passenger or freight train."
-	var old_cycles: Array = deadlocks.cycles.duplicate(true)
 	_refresh_directional_routes(false)
-	_reset_traffic_state()
+	# Discard only this train's obsolete movement attempt. Other incidents remain.
+	movement_conflicts.erase(id)
+	movement_blocks.erase(id)
+	reservation_waits.erase(service)
+	traffic_wait_samples.erase(id)
+	deadlocks.update(movement_blocks, sim_clock.tick)
+	freight_train.reservation_wait = str(reservation_waits.get("freight", ""))
+	traffic_button.text = "Traffic (%d)" % deadlocks.cycles.size() if not deadlocks.cycles.is_empty() else "Traffic"
 	_rebuild_reservations()
 	_record_event(EventLog.TRAIN_REVERSED, str(id), {"service": service, "action": "return to departure stop"})
-	for cycle in old_cycles:
+	for cycle in deadlocks.cleared_cycles:
 		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle, "reversed": id})
+	_update_toolbar()
 	queue_redraw()
 	return "#%d %s reversed in place. Resume: it returns along its existing route under reservations, then waits at its departure stop." % [id, train["name"]]
 

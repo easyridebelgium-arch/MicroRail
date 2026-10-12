@@ -54,7 +54,24 @@ Recommendations follow evidence: a manual stop needs a deliberate signal change;
 loading needs production or a departure-rule adjustment; incomplete routes need track
 or stopping-clearance repair; a block wait needs its authority and route inspected.
 The inspector does not claim every wait needs a passing loop or forecast throughput.
-It does not release reservations, reverse trains or modify track itself.
+**Reverse** turns the inspected train around in place and returns it along its
+retained route to the departure stop of the current leg. This works before a
+confirmed deadlock, for primary/additional passenger trains and freight. Position,
+path and load remain unchanged when the command is issued. The result appears in
+the inspector; close and resume to move. Ordinary tile/body reservations, switch
+locks and automatic/manual stop signals still apply on the return. At arrival the
+train holds with its service disabled; use Traffic Resume or Fleet Enable when ready.
+Passenger riders return to the departure queue; freight cargo stays aboard.
+
+The button is disabled for stored trains, missing retained paths, trains already
+at their departure stop, and trains already returning. Commands revalidate these
+conditions before changing state. Reversing one train does not clear unrelated
+confirmed traffic incidents. It does not find a new escape route or guarantee that
+blocked track can be cleared. An incomplete return leg waits for repair.
+
+Current signals are bidirectional. One-way signals are planned; when implemented,
+the shared reversal validation must reject a return against their permitted
+movement direction before changing the train, not merely disable a UI button.
 
 No save-format change or global SignalBus is introduced. Requests and causes are
 transient diagnostic records from the existing authoritative decision code.
@@ -66,3 +83,7 @@ occupancy and control accessibility at 200% UI scale.
 station-versus-train targeting, drag construction, tool priority, draft mode and
 Escape/return-to-origin cancellation. Station panels retain their live behaviour;
 train popups open paused.
+
+`test_inspector_reverse.gd` covers the actual Reverse button, unconfirmed waits,
+atomic rejection, unrelated incident preservation, physical return and manual-signal
+compliance for passenger and freight trains.

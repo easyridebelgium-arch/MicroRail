@@ -144,6 +144,13 @@ func _run() -> void:
 	game.traffic_dialog.hide()
 	# Reversal action uses a confirmed-cycle fixture; monitor detection is covered
 	# separately by test_deadlock_integration.gd.
+	# Wait until it has actually left the current departure station. Reversing
+	# a dwelling train there is now rejected rather than starting a zero-length return.
+	for step in range(600):
+		var departing = game.passenger_services[key]
+		if absf(departing.distance - departing.distances[departing.stop_index]) > 1.0: break
+		tick(game)
+	check(game.reverse_train_reason(id).is_empty(), "Additional reversal fixture is physically away from its departure stop")
 	game.deadlocks.cycles = [[1, id]]
 	second_position = game.passenger_services[key].position
 	check(game.reverse_deadlocked_train(id).contains("reversed in place") and game.passenger_services[key].position == second_position and game.passenger_services[key].returning, "Additional train reverses physically without route reset")

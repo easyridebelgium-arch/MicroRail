@@ -1,5 +1,5 @@
 extends AcceptDialog
-## Paused, read-only diagnosis. Actions navigate to existing validated controls.
+## Paused diagnosis and validated physical turn-back command.
 var game: Node
 var selected_id := -1
 var data: Dictionary = {}
@@ -7,6 +7,7 @@ var summary: Label
 var authority: Label
 var recommendation: Label
 var buttons: Dictionary = {}
+var command_result: Label
 func configure(owner_game: Node) -> void:
 	game = owner_game
 	title = "Train operating inspector"
@@ -24,16 +25,21 @@ func configure(owner_game: Node) -> void:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		column.add_child(label)
 		set(field, label)
+	command_result = Label.new()
+	command_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(command_result)
 	var actions := HFlowContainer.new()
 	column.add_child(actions)
-	for entry in [["blocker", "Locate blocking train"], ["conflict", "Locate conflict cell"], ["route", "Show route and authority"], ["traffic", "Traffic controls"], ["fleet", "Fleet controls"]]:
+	for entry in [["reverse", "Reverse"], ["blocker", "Locate blocking train"], ["conflict", "Locate conflict cell"], ["route", "Show route and authority"], ["traffic", "Traffic controls"], ["fleet", "Fleet controls"]]:
 		var button := Button.new()
 		button.text = entry[1]
 		var action: String = entry[0]
-		button.pressed.connect(func() -> void: game.train_inspector_action(action, data))
+		if action == "reverse": button.pressed.connect(_reverse_train)
+		else: button.pressed.connect(func() -> void: game.train_inspector_action(action, data))
 		buttons[action] = button
 		actions.add_child(button)
 func open_train(id: int) -> void:
+	command_result.text = ""
 	selected_id = id
 	data = game.train_diagnostics(id)
 	if data.is_empty(): return
@@ -48,11 +54,19 @@ func open_train(id: int) -> void:
 	if int(data.blocker) > 0: lines.append("Blocking train: " + _names([data.blocker]))
 	authority.text = "\n".join(lines)
 	recommendation.text = "Suggested action\n" + str(data.advice) + "\nWaiting measurements reset on load; saved incidents are history. Authority is the last allocation, not a traffic forecast."
+	var reverse_reason: String = game.reverse_train_reason(id)
+	buttons.reverse.disabled = not reverse_reason.is_empty()
+	buttons.reverse.tooltip_text = reverse_reason if not reverse_reason.is_empty() else "Reverse in place and return to this leg's departure stop, obeying signals and reservations. Close and resume to move."
 	buttons.blocker.disabled = not game.can_locate_problem({"id": data.blocker, "cell": Vector2i(-1, -1)})
 	buttons.conflict.disabled = not game._is_inside_map(data.cell)
 	buttons.route.disabled = not game.services.has(data.service)
 	buttons.traffic.disabled = buttons.route.disabled
 	popup_centered_clamped(Vector2i(740, 550), 0.95)
+func _reverse_train() -> void:
+	var result: String = game.reverse_train(selected_id)
+	open_train(selected_id)
+	command_result.text = result
+
 func _names(ids: Array) -> String:
 	var names: PackedStringArray = []
 	for id in ids:

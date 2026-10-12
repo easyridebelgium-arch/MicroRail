@@ -7,10 +7,11 @@ lookahead contention alone are not deadlocks. Pausing freezes confirmation time.
 
 ## Reverse a train
 
-1. Open **Traffic**; this pauses the simulation and shows waiting reasons.
-2. Select a train in a confirmed cycle and click **Reverse selected train**.
+1. Click the train to open its inspector; this pauses the simulation.
+2. Click **Reverse**. A confirmed deadlock is not required. Alternatively use
+   **Traffic → Reverse selected train** for a train in a confirmed cycle.
    Its position, path and load stay unchanged. Only its direction reverses.
-3. Close Traffic and resume. It travels back along its existing path to the
+3. Close the inspector/Traffic and resume. It travels back along its existing path to the
    station/industry from which this leg departed, obeying reservations and signals.
    It can still wait for occupied track, a stop signal or an incomplete path.
 4. At arrival, it is held and its service disabled. Passenger riders return to
@@ -19,10 +20,12 @@ lookahead contention alone are not deadlocks. Pausing freezes confirmation time.
 5. Fix the layout or operating order. Use **Resume selected train** in Traffic
    or **Enable service** in Fleet when ready, then close the window and resume.
 
-Reversal logs `TRAIN_REVERSED` and clears the confirmed incident; physical arrival
-logs `TRAIN_RECOVERED`. A blocked cycle may form again and be detected again.
+Reversal logs `TRAIN_REVERSED` and clears any cycle broken by that train's change
+of direction; unrelated incidents remain. Physical arrival logs `TRAIN_RECOVERED`. A blocked cycle may form again and be detected again.
 Already returning trains cannot be reversed repeatedly through this control.
-There is no teleport, automatic siding selection or alternate-path search.
+There is no teleport, automatic siding selection or alternate-path search. Current
+signals are bidirectional. Future one-way signalling must add a shared preflight
+legality check that rejects wrong-way returns before changing state.
 
 ## Missing track and saves
 

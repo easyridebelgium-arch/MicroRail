@@ -4,6 +4,8 @@ extends RefCounted
 const Geometry = preload("res://scripts/track_geometry.gd")
 const LOOKAHEAD_TILES := 3.0
 const SAMPLE_STEP := 1.0
+const VEHICLE_LENGTH := 28.0
+const BODY_STEP := 4.0
 var owners: Dictionary = {}
 var occupied_owners: Dictionary = {}
 var switches: Dictionary = {}
@@ -12,9 +14,31 @@ var _switch_tiles: Dictionary = {}
 var waits: Dictionary = {}
 var _overlapping: Dictionary = {}
 
-func footprint(path: Curve2D, distance: float, tile_size: float) -> Array[Vector2i]:
-	var point := path.sample_baked(distance)
-	var tangent := (path.sample_baked(minf(path.get_baked_length(), distance + 1.0)) - path.sample_baked(maxf(0, distance - 1.0))).normalized()
+## Body centred on `distance`; `length` is the whole train in pixels. A single
+## vehicle (the default) keeps the original conservative rectangle. Longer
+## trains union that rectangle along the path, extrapolating past either end so
+## a train longer than its platform is detected instead of clamped away.
+func footprint(path: Curve2D, distance: float, tile_size: float, length: float = VEHICLE_LENGTH) -> Array[Vector2i]:
+	var extra := maxf(0.0, (length - VEHICLE_LENGTH) * 0.5)
+	var steps := ceili(extra / BODY_STEP) if extra > 0.0 else 0
+	var cells: Array[Vector2i] = []
+	for i in range(-steps, steps + 1):
+		var offset := extra * float(i) / float(steps) if steps > 0 else 0.0
+		for cell in _vehicle_cells(path, distance + offset, tile_size):
+			if not cells.has(cell): cells.append(cell)
+	return cells
+
+func _vehicle_cells(path: Curve2D, distance: float, tile_size: float) -> Array[Vector2i]:
+	var total := path.get_baked_length()
+	var point: Vector2
+	var tangent: Vector2
+	if distance < 0.0 or distance > total:
+		var edge := total if distance > total else 0.0
+		tangent = (path.sample_baked(minf(total, edge + 1.0)) - path.sample_baked(maxf(0.0, edge - 1.0))).normalized()
+		point = path.sample_baked(edge) + tangent * (distance - edge)
+	else:
+		point = path.sample_baked(distance)
+		tangent = (path.sample_baked(minf(total, distance + 1.0)) - path.sample_baked(maxf(0, distance - 1.0))).normalized()
 	# Conservative rotated rectangle enclosing both current vehicle sprites.
 	var extent := Vector2(absf(tangent.x) * 14 + absf(tangent.y) * 8, absf(tangent.y) * 14 + absf(tangent.x) * 8) + Vector2.ONE * 0.5
 	var low := Vector2i(((point - extent) / tile_size).floor())
@@ -23,6 +47,9 @@ func footprint(path: Curve2D, distance: float, tile_size: float) -> Array[Vector
 	for y in range(low.y, high.y + 1):
 		for x in range(low.x, high.x + 1): cells.append(Vector2i(x, y))
 	return cells
+
+static func train_length(train: Dictionary) -> float:
+	return maxf(VEHICLE_LENGTH, float(train.get("length", VEHICLE_LENGTH)))
 
 func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: Dictionary = {}) -> void:
 	owners.clear()
@@ -39,7 +66,7 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 	# Parked and dwelling trains are obstacles too. Existing occupancy must
 	# never be stolen by a lower-ID request.
 	for train in ordered:
-		for cell in footprint(train.path, train.distance, tile_size):
+		for cell in footprint(train.path, train.distance, tile_size, train_length(train)):
 			if owners.has(cell) and owners[cell] != train.id:
 				waits[train.id] = {"cell": cell, "owner": owners[cell]}
 				waits[owners[cell]] = {"cell": cell, "owner": train.id}
@@ -56,14 +83,20 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 			end = clampf(float(request_ends[train.id]), minf(train.distance, end), maxf(train.distance, end))
 		var spans := _route_spans(train.path, train.cells, tile_size)
 		var distance: float = train.distance
+		var body := train_length(train)
+		var half := (body - VEHICLE_LENGTH) * 0.5
+		# A long body spans several route cells, so switches under the nose or
+		# tail are locked too; only longer bodies pay for the coarser stepping.
+		var step := SAMPLE_STEP if half <= 0.0 else SAMPLE_STEP * 2.0
 		while true:
-			var required := footprint(train.path, distance, tile_size)
+			var required := footprint(train.path, distance, tile_size, body)
 			var settings: Dictionary = {}
-			var route_index := _index_at(spans, distance)
+			var low_index := _index_at(spans, distance - half)
+			var high_index := _index_at(spans, distance + half)
 			# Reserve the stem and selected exit with the switch, atomically.
 			for i in range(1, train.cells.size() - 1):
 				var cell: Vector2i = train.cells[i]
-				if absi(i - route_index) > 1 or not required.has(cell) or not Geometry.is_switch(tracks.get(cell)):
+				if i < low_index - 1 or i > high_index + 1 or not required.has(cell) or not Geometry.is_switch(tracks.get(cell)):
 					continue
 				for neighbor in [train.cells[i - 1], train.cells[i + 1]]:
 					if not required.has(neighbor): required.append(neighbor)
@@ -83,14 +116,14 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 			switches.merge(settings, true)
 			for cell in settings: switch_owners[cell] = train.id
 			if absf(distance - end) < 0.001: break
-			distance = move_toward(distance, end, SAMPLE_STEP)
+			distance = move_toward(distance, end, step)
 
-func limit(id: int, path: Curve2D, current: float, proposed: float, tile_size: float) -> float:
+func limit(id: int, path: Curve2D, current: float, proposed: float, tile_size: float, length: float = VEHICLE_LENGTH) -> float:
 	if _overlapping.has(id): return current
 	var allowed := current
 	while absf(allowed - proposed) > 0.001:
 		var next := move_toward(allowed, proposed, SAMPLE_STEP)
-		for cell in footprint(path, next, tile_size):
+		for cell in footprint(path, next, tile_size, length):
 			if int(owners.get(cell, -1)) != id or (_switch_tiles.has(cell) and int(switch_owners.get(cell, -1)) != id):
 				return allowed
 		allowed = next

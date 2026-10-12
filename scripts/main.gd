@@ -3716,12 +3716,12 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 	var passenger := Fleet.assigned(fleet, "passenger")
 	var freight := Fleet.assigned(fleet, "freight")
 	var trains: Array = [
-		{"id": int(passenger["id"]), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0},
-		{"id": int(freight["id"]), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.service_is_active() and freight_train.dwell <= 0.0 and (not freight_train.to_terminal or freight_train.distance_along_route > 0.001 or freight_train.cargo + forest_stock >= freight_train.get_minimum_load())}
+		{"id": int(passenger["id"]), "length": _fleet_length(passenger), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0},
+		{"id": int(freight["id"]), "length": _fleet_length(freight), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.service_is_active() and freight_train.dwell <= 0.0 and (not freight_train.to_terminal or freight_train.distance_along_route > 0.001 or freight_train.cargo + forest_stock >= freight_train.get_minimum_load())}
 	]
 	for key in additional_service_keys():
 		var running = passenger_services[key]
-		trains.append({"id": int(Fleet.assigned(fleet, key).id), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0})
+		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0})
 	reservation_trains.clear()
 	for train in trains: reservation_trains[int(train.id)] = train
 	reservations.rebuild(trains, tracks, float(TILE_SIZE))
@@ -3739,13 +3739,17 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 		reservations.rebuild(trains, tracks, float(TILE_SIZE), request_ends)
 	switch_states.merge(reservations.switches, true)
 
+# Whole-train length in pixels; plain trains are one vehicle until consists exist.
+func _fleet_length(entry: Dictionary) -> float:
+	return maxf(Reservations.VEHICLE_LENGTH, float(entry.get("length", Reservations.VEHICLE_LENGTH)))
+
 func _freight_reserved_movement(path: Curve2D, current: float, proposed: float) -> float:
 	return _reserved_movement("freight", path, current, proposed)
 
 func _reserved_movement(service: String, path: Curve2D, current: float, proposed: float) -> float:
 	var id := int(Fleet.assigned(fleet, service)["id"])
 	var signal_check: Dictionary = block_signals.limit(reservation_trains[id], proposed, float(TILE_SIZE))
-	var allowed: float = reservations.limit(id, path, current, float(signal_check["distance"]), float(TILE_SIZE))
+	var allowed: float = reservations.limit(id, path, current, float(signal_check["distance"]), float(TILE_SIZE), Reservations.train_length(reservation_trains[id]))
 	var signal_conflict: Dictionary = signal_check["conflict"]
 	if absf(allowed - proposed) > 0.001:
 		var conflict: Dictionary = signal_conflict if not signal_conflict.is_empty() else reservations.waits.get(id, {})
@@ -4085,7 +4089,7 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE))
 	if built.cells.is_empty(): return "Complete track from the starting station to %s first." % ServiceRoutes.STATIONS[configuration.stops[1]].name
 	_rebuild_reservations()
-	for cell in reservations.footprint(built.path, 0, float(TILE_SIZE)):
+	for cell in reservations.footprint(built.path, 0, float(TILE_SIZE), _fleet_length(train)):
 		if reservations.owners.has(cell): return "Starting platform is occupied or reserved. Let the other train clear it, then pause and try again."
 	var running := PassengerService.new()
 	running.configure(key, configuration, built)

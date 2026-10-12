@@ -51,10 +51,12 @@ func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
 		if not train.moving: continue
 		var direction := 1 if train.forward else -1
 		var distance: float = train.distance
-		var end := clampf(distance + direction * tile_size * Reservations.LOOKAHEAD_TILES, 0, train.path.get_baked_length())
+		var half := (Reservations.train_length(train) - Reservations.VEHICLE_LENGTH) * 0.5
+		# The nose leads the centre by half the body, so look that much further.
+		var end := clampf(distance + direction * (tile_size * Reservations.LOOKAHEAD_TILES + half), 0, train.path.get_baked_length())
 		var requested: Dictionary = {}
 		while true:
-			var index := _helper._index_at(spans, distance)
+			var index := _helper._index_at(spans, distance + direction * half)
 			var cell: Vector2i = train.cells[index] if not train.cells.is_empty() else Vector2i(-1, -1)
 			if signs.has(cell) and not requested.has(cell):
 				requested[cell] = true
@@ -71,12 +73,14 @@ func limit(train: Dictionary, proposed: float, tile_size: float) -> Dictionary:
 	if signs.is_empty(): return {"distance": proposed, "conflict": {}}
 	var current: float = train.distance
 	var allowed := current
-	var start_body := _helper.footprint(train.path, current, tile_size)
+	var body := Reservations.train_length(train)
+	var half := (body - Reservations.VEHICLE_LENGTH) * 0.5
+	var start_body := _helper.footprint(train.path, current, tile_size, body)
 	var direction := 1 if proposed >= current else -1
 	while absf(allowed - proposed) > 0.001:
 		var next := move_toward(allowed, proposed, 1.0)
-		var index := _helper._index_at(_spans.get(train.id, [[0.0, 0]]), next)
-		for cell in _helper.footprint(train.path, next, tile_size):
+		var index := _helper._index_at(_spans.get(train.id, [[0.0, 0]]), next + direction * half)
+		for cell in _helper.footprint(train.path, next, tile_size, body):
 			if not signs.has(cell) or start_body.has(cell): continue
 			var reason := ""
 			var owner := -1

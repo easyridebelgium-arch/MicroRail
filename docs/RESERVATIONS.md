@@ -25,6 +25,15 @@ shortest port-valid path through any assigned waypoints; passenger tiles and pla
   Their status names the blocker and location. `TRAIN_WAITING` events use the
   permanent train ID and are recorded on entry into waiting or a changed reason,
   rather than every tick. They appear in the existing event log.
+- **Train length.** Each train dictionary may carry `length` in pixels (default
+  one 28 px vehicle). The body is centred on the train's path distance, so the
+  footprint is the union of vehicle rectangles along `length`, sampled every 4 px
+  and extrapolated past either path end (a train longer than its platform is
+  detected, not clamped). Switch stem/exit locks are requested for every route
+  cell under the nose or tail, and block authority is requested by the nose and
+  kept while any part of the body is inside the block. Fleet entries read an
+  optional `length` key; nothing sets it yet because consists arrive later.
+  Longer trains step the reservation lookahead at 2 px instead of 1 px.
 - The **Reservations** toolbar toggle shows real ownership with hatching and
   `#ID` labels. It uses shape and text as well as colour.
 

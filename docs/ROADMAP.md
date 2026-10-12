@@ -1,9 +1,27 @@
 # Trainz development roadmap
 
-This roadmap combines the earlier gameplay suggestions with the requested future
-features. The phases are a proposed development order, not release dates. Features
-listed as planned are not implemented yet. Keep the core game playable while adding
-each system, with Godot and GDScript as the main development tools.
+This roadmap records the agreed development order, current implementation and
+remaining work. Phases are milestones, not release dates. Preserve completed work
+when regrouping features; an implemented feature in a later phase does not need to
+be removed or rebuilt. Godot and GDScript remain the core development tools.
+
+## Current position
+
+| Milestone | Current status | Work still needed to close the milestone |
+| --- | --- | --- |
+| Phase 0 — Foundations | Implemented; requirements remain active for every update. | Continue deterministic, save and accessibility checks. Full input replay/controller support are later extensions. |
+| Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
+| Phase 1B — Service operations | Partially complete. | Continuous consist body routing, formal platform lengths, multiple platforms/basic assignment, service cloning and multiple trains per service. |
+| Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Unified waiting inspector, evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. |
+| Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
+| Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
+
+**Next implementation:** the unified why-waiting inspector (Phase 1C). Then finish
+continuous consist routing and platform foundations (Phase 1B). Completed Phase 1C
+tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
+complete. The most recent gameplay regression run passed 40 headless suites in
+Godot 4.6.3 (the project declares 4.7); this is a recorded result, not a new test run
+for this documentation revision.
 
 ## Current foundation
 
@@ -23,6 +41,10 @@ each system, with Godot and GDScript as the main development tools.
   runtimes. Red signals limit future reservations to keep departure switches clear.
 - A fleet roster with permanent train IDs, four purchasable models, individual
   names, stored spares, replacement assignment, sales and per-train upgrades.
+- Passenger coaches and log wagons with full-body protection, saved composition
+  and two-stop Shuttle restrictions for longer trains.
+- Atomic construction drafts, corridor signals, searchable blueprints and JSON sharing.
+- Route/block/wait overlays, Problems/Find, session watchlists and alert preferences.
 - Station inspection, camera scrolling, minimap, introductory objectives and saves.
 
 These are prototype foundations. The fleet assigns one train to each active
@@ -31,6 +53,28 @@ Individual passenger destinations, multiple trains per service, multiple platfor
 and additional dispatch policies remain planned. See [multiple active services](MULTIPLE_SERVICES.md).
 Junctions, reservations and basic block signals provide shared-track safety.
 See [Fleet management](FLEET.md) for the implemented controls.
+
+## Architecture rules — across all phases
+
+- The authoritative track topology, routes, physical occupancy and granted movement
+  authority govern the simulation. TileMapLayers, train sprites and signal visuals
+  derive from committed state; rendering never grants movement or changes topology.
+- Reservation requests are resolved and committed by the explicit simulation
+  coordinator in fixed order. **Do not introduce a global reservation SignalBus.**
+  Direct Godot signals may notify UI, audio and alerts after a complete state commit;
+  subscribers do not independently grant reservations or change update order.
+- Use typed .tres Resources for stock/cargo/industry definitions as their systems
+  expand. Treat shared definitions as read-only prototypes, keep per-entity runtime
+  state separate, and save stable definition IDs instead of installation paths.
+  Version content catalogs separately from save schemas and validate dependencies.
+- Phase 0 remains an invariant: tick ordering, owned RNG, atomic versioned saves,
+  remapping, 100–200% UI scale, reduced motion and colour-blind-safe palettes.
+  Signal states and alerts always have text/shapes/patterns alongside colour. Custom
+  liveries must preserve those operational indicators.
+- A seed alone does not establish reproducibility. Initial state, generator/content
+  versions, rules, command timing and stable algorithm ordering also matter. Matching
+  results across rendering FPS is tested; cross-version/platform replay is not an
+  assumed guarantee.
 
 ## Phase 0 — Determinism, saves and accessibility first
 
@@ -50,73 +94,155 @@ input replay and controller support remain later work. See [foundation status](p
 | Accessibility defaults | UI-only scale from 100–200%, high-DPI layouts, colourblind-safe and high-contrast palettes, shapes/icons alongside colour, reduced motion/flashing and key remapping. Preserve AZERTY/QWERTY support and mouse-only construction. Test dialogs and toolbars at the largest supported scale. |
 | Input and interface separation | Use named input actions, keep typing and menu navigation from controlling the map, and design focus/navigation paths early. Full controller/Steam Deck support and radial menus wait until the core menus stabilise. |
 
-## Phase 1 — Network integrity, services, then planning and readable feedback
+## Phase 1 — Strict network, operations and feedback milestones
 
-Implementation order within this phase: junction topology → reservations and safe
-waiting → signals and deadlock/recovery handling → waypoints and safe route edits
-→ Shuttle/Loop route modes → multiple active passenger services with shared-track
-reservations → reservation-aware planning, conflict previews and bulk edits.
-A cost-only ghost preview can arrive earlier, but
-must not claim to predict traffic conflicts without the reservation layer.
+The dependency order is 1A → 1B → 1C. Basic waiting explanations ship with network
+integrity; the richer inspector belongs to 1C. Existing planning/search tools have
+already landed before all of 1B is complete and remain usable. Optional advanced
+signalling, priorities and cosmetic work need not block the basic exit criteria.
 
+### Phase 1A — Network integrity
 
-| Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
+Core implemented: port-aware junctions, separate physical occupancy and future
+reservations, body-aware switch/block locks, automatic blocks, manual holds,
+missing-track stopping, sustained deadlock detection and physical reversal/recovery.
+Maintain these guarantees while expanding the supported train/platform combinations.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices, stored spares and Shuttle/Loop routes are implemented. Implemented: up to eight independent active passenger services (e.g. A–B and A–C), each with its own assigned train, route, mode, directives and saved runtime. Shared switches, no overlaps, physical recovery, withdrawal/storage and save/load are checked. Multiple trains per service and multiple platforms remain later work. |
-| Train consists and rolling stock (Phase 2, after safe train-length handling) | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Implemented: up to four passenger coaches or log wagons per locomotive, capacity/cost/speed/length effects, visible vehicles, safe empty-home edits, straight signal-free stop clearance and full-body load validation. First consists use two-stop Shuttle routes without revisiting tiles; continuous body routing for Loops/intermediate reversals, formal platform extensions and other stock types remain later work. See [consists](CONSISTS.md). |
 | Junctions and switches | Build branching networks and share infrastructure between services. | Implemented: port-aware routing, locked switches, crossings and a switch tool. Further construction conveniences remain planned. |
 | Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Basic tile reservations, switch/selected-port locking, safe waiting events and a hatched ownership overlay are implemented. Shared passenger/freight routing is enabled. Basic deadlock detection, physical reversal, bidirectional automatic block signals and manual holds are implemented; reservations do not select alternate passing-loop paths. |
-| Priority and pathfinding rules | Offer simple dispatch priorities, initially express > local passenger > freight, so players can influence junction behaviour without configuring complex signalling. | Priorities choose between safe movements; they never override reservations. Allow player overrides, explain why a train is waiting, and prevent low-priority services from waiting indefinitely. Respect waypoint directives when choosing paths. |
-| Waypoints and waypoint directives | Place lightweight markers or directional waypoints to force a train through a particular track without constructing a station. Allow routing directives associated with signals. | Implemented: up to 16 ordered pass-through track cells per passenger leg (including a Loop closing leg) and outward freight leg, map selection, editing and persisted directives for passenger and freight routes. Shuttles return along that path in reverse; passenger Loops route last-to-first independently. Entry ports are preserved through waypoint routing; stops, reservations and signals remain authoritative. One-way/directional waypoint rules and independent Shuttle return directives remain planned. See [waypoints](WAYPOINTS.md). |
 | Signal control modes | Automatic signals/reservations by default, with optional one-way, route, platform and manual dispatch controls. | Bidirectional automatic blocks, manual stop signals and Traffic Hold/Resume are implemented; one-way, route and platform modes remain planned. All modes use reservations and explain blocked movements. See [signals and dispatch](SIGNALS.md). |
 | Deadlock detection and emergency recovery | Detect circular waits, identify involved trains/blocks and offer safe hold, turn-back, reroute or recovery actions. | Continuous actual wait cycles are detected after three simulation seconds. Traffic reverses the selected train in place, retaining its path and load until it physically returns to its departure stop, then holds it. Manual Hold/Resume is also available. Automatic turn-back, alternate routing and full reversal-location rules remain later work. See [deadlock recovery](DEADLOCKS.md). Full shunting and yard operations arrive later. |
-| Construction planning and conflict preview | Draft ghost tracks, stations, bridges, signals and blueprints before committing; show cost and affected services. | Implemented: multi-stroke track/switch/removal drafts, aggregate cost/refund and affected-service previews, atomic reservation-aware application and grouped Undo/Redo. Drafts remain separate from live simulation. Add terrain, ownership and travel-time warnings as those systems arrive; see [construction planning](CONSTRUCTION_PLANNING.md). |
+| Priority and pathfinding rules | Offer simple dispatch priorities, initially express > local passenger > freight, so players can influence junction behaviour without configuring complex signalling. | Priorities choose between safe movements; they never override reservations. Allow player overrides, explain why a train is waiting, and prevent low-priority services from waiting indefinitely. Respect waypoint directives when choosing paths. |
+
+### Phase 1B — Service operations
+
+Implemented: ordered waypoints, safe paused route edits, single-vehicle Shuttle/Loop
+modes, independently active passenger services, configured passing loops and initial
+coaches/log wagons. Long consists currently require two-stop Shuttle routes without
+revisiting track tiles. Straight stopping clearance is not a formal platform system.
+Continuous body routing must precede long Loop/intermediate-reversal support; usable
+platform lengths and safe assignment precede multiple platforms/trains per service.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
+| --- | --- | --- |
+| Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices, stored spares and Shuttle/Loop routes are implemented. Implemented: up to eight independent active passenger services (e.g. A–B and A–C), each with its own assigned train, route, mode, directives and saved runtime. Shared switches, no overlaps, physical recovery, withdrawal/storage and save/load are checked. Multiple trains per service and multiple platforms remain later work. |
+| Waypoints and waypoint directives | Place lightweight markers or directional waypoints to force a train through a particular track without constructing a station. Allow routing directives associated with signals. | Implemented: up to 16 ordered pass-through track cells per passenger leg (including a Loop closing leg) and outward freight leg, map selection, editing and persisted directives for passenger and freight routes. Shuttles return along that path in reverse; passenger Loops route last-to-first independently. Entry ports are preserved through waypoint routing; stops, reservations and signals remain authoritative. One-way/directional waypoint rules and independent Shuttle return directives remain planned. See [waypoints](WAYPOINTS.md). |
+| Train consists and rolling stock | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Implemented: up to four passenger coaches or log wagons per locomotive, capacity/cost/speed/length effects, visible vehicles, safe empty-home edits, straight signal-free stop clearance and full-body load validation. First consists use two-stop Shuttle routes without revisiting tiles. Phase 1B must add continuous body routing for Loops/intermediate reversals and formal platform lengths before those combinations are enabled. Other stock types follow their cargo/classes in Phase 2; see [consists](CONSISTS.md). |
+| Passing loops and multiple platforms | Reduce bottlenecks and let faster services pass slower trains. | Passing loops work with configured waypoints and signal boundaries; easier safe branch selection remains to be added. Multiple platforms are planned: introduce stable platform IDs, physical tracks, usable length, compatibility, deterministic basic assignment and safe entry/exit reservations in Phase 1B. Passenger/transfer-aware preferences belong to Phase 2A. See [tested passing loops](MULTIPLE_SERVICES.md). |
+| Service duplication, route cloning and drag reordering | Make service expansion and stop editing easier without disturbing running trains. | Planned in Phase 1B: clone into an editable draft, preserve waypoint-to-leg associations when reordering and flag directives whose legs disappear, preview changes and apply only at a safe point. Cloning does not automatically buy/spawn a train; validate assignments and current reservations before activating another service. |
+| Non-disruptive service edits and replacement rules | Draft changes for application after the trip, at a depot or when safe; replace ageing trains or increase capacity at sustained high occupancy. | Extend current immediate paused replacements once lifecycle, utilisation and safe change points exist. Keep automatic rules opt-in and show projected purchase costs. |
+| Formation templates and vehicle comparison | Save reusable consists and purchase missing vehicles; compare cost, capacity, power, reliability, fuel and infrastructure needs. | Depends on rolling stock composition and the corresponding simulated attributes. Avoid presenting unimplemented attributes as meaningful statistics. |
+| Versioned data definitions | Extend stock and cargo rosters without scattering balance constants through scripts. | Start typed .tres rolling-stock definitions alongside Phase 1B fleet work and introduce cargo/industry recipes before Phase 2B. Definitions are shared read-only prototypes; runtime loads/upgrades/positions remain separate. Saves reference stable definition IDs. Content-definition versions and save-schema versions are distinct; validate references and deterministic catalog ordering before simulation starts. |
+
+### Phase 1C — Planning and readable feedback
+
+Implemented: reservation-aware atomic drafts, cost/refund/service-impact previews,
+Undo/Redo, corridor signal batches, track blueprints/JSON sharing, route/block/wait
+overlays, searchable Problems/Find, session pins and configurable incident pause.
+Next combine waiting explanations into a train inspector, and extend the existing
+alert centre instead of creating another competing source of operational state.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
+| --- | --- | --- |
+| Unified why-waiting train inspector | Selecting a stalled train immediately explains its state and provides a useful next action. | Needs refinement in Phase 1C: show physical occupancy, granted/requested authority, reserved blocks, continuous wait duration and blocking permanent train ID/service. Distinguish loading, intentional holds, missing routes, signal waits and deadlocks. Derive recommendations from the actual cause: release a manual stop, inspect a named block, repair clearance, or consider a passing place only when layout evidence supports it. Existing Problems/Traffic/Overlays already provide parts of this information. |
+| Construction planning and conflict preview | Draft ghost tracks, stations, bridges, signals and blueprints before committing; show cost and affected services. | Implemented: multi-stroke track/switch/removal drafts, aggregate cost/refund and affected-service previews, atomic reservation-aware application and grouped Undo/Redo. Extend aggregate quotes to itemised track/switch/signal/platform costs as those systems exist. Add evidence-based structural warnings for shared single-track sections without passing places. These identify layout risks, not guaranteed future congestion. Demand/timetable forecasts remain in Phase 2A; terrain/ownership checks follow their systems. See [construction planning](CONSTRUCTION_PLANNING.md). |
 | Corridor selection and batch tools | Upgrade long segments, double-track, electrify, add signals/platforms or demolish in bulk. | Implemented: connected-corridor selection, spaced automatic/manual signals and whole-corridor signal removal through atomic drafts with grouped Undo/Redo. Track drag-demolition remains available. Track-speed, double-track, electrification and platform batches depend on their underlying systems; see [corridor signals](CORRIDOR_SIGNALS.md). |
 | Track inspection and route overlays | Toggle service paths, block occupancy, reservations, signals, speed limits and congestion; later add gradients, electrification, ownership and condition. | Implemented: collapsible service-path filtering, actual signal-block IDs/authority, hatched reservations, directional affected-service construction reports and measured waiting by conflict cell. Speed limits, occupancy/utilisation measurements and richer planning remain future work. Never substitute decorative colours for operational state. |
 | Search, filtering, pinning and jump-to | Find trains, stations, industries, services and later contracts; filter by type or status, highlight routes and maintain watchlists. | Implemented: searchable current problems and recent incidents, train/service names, severity filters and map location for original and independent trains. Implemented: global object search by name/ID/model/route/status, type filters, current-location map jump, selected-service route highlighting and a session watchlist that survives renaming. Persistent watchlists and preset status filters remain later refinements; see [object search](OBJECT_SEARCH.md). |
 | Advisory pathfinding | Recommend a route between stations with cost, travel time and supported conflict warnings without building it. | Reuse route and construction validation. Start with read-only advice; reserve shared pathfinding work for any later rival AI. |
-| Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Implemented: current problem counts and severity-filtered historical incident browsing from the saved event stream. Implemented: saved per-category Off/Notice/Notice + pause preferences for waiting, deadlock and recovery events, with pause applied after a complete fixed tick. Acknowledgement, watchlists and per-train rules remain planned; see [notifications](NOTIFICATIONS.md). Provide non-colour and non-audio cues, and coordinate pause behaviour with no-pause challenges. |
-| Passing loops and multiple platforms | Reduce bottlenecks and let faster services pass slower trains. | Depends on junctions, reservations and platform assignment. |
-| Route performance panel and company dashboard | Compare income, running costs, occupancy, waiting passengers and delays. Expand into historical graphs of profit, ridership, occupancy and punctuality per route and across the company. | Attribute costs and deliveries to services and individual trains. Start recording bounded historical data early; add delay statistics when timetables are introduced. |
-| Custom livery | Add selectable fleet colour palettes to the existing individual train names. | Stable identities and train renaming are implemented. Palette-friendly artwork and readable service indicators remain to be added. |
-| Detailed station life and waiting passengers | Show tiny pixel-art passengers accumulating on platforms during delays and boarding when trains arrive. | Drive visuals from actual queues; cap or group sprites for performance without changing simulated passenger counts. |
+| Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Implemented: searchable current problems/history, severity filters, click-to-locate and per-category Off/Notice/Notice + pause applied after a complete fixed tick. Extend this existing centre with acknowledgement, persistent watchlists and actionable evidence. Add optional highlight/slow-to-1×/pause for sustained incidents at 5×/10×, with deduplication and thresholds so routine signal waits do not repeatedly interrupt play. Respect no-pause rules; see [notifications](NOTIFICATIONS.md). |
+| Route performance panel and company dashboard | Compare income, running costs, occupancy, waiting passengers and delays. Expand into historical graphs of profit, ridership, occupancy and punctuality per route and across the company. | Measured continuous/recent/total traffic waiting already exists. Add bounded history for deliveries per simulation-time interval, occupancy, profit and incident episodes. Separate loading/dwell, deliberate holds and traffic waits; state denominators and whether loading resets each measure. Punctuality requires schedules, and forecasts require demand/operating history. |
 
-## Phase 2 — Passenger demand, freight chains and growth
+### Phase 1 exit criteria
 
-| Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
+- Supported running, parked and loading trains never share occupied body tiles;
+  ownership and physical occupancy are distinguishable in diagnostics.
+- Switches and blocks stay protected until the tail clears; manual stop signals,
+  holds and recovery never bypass reservation safety.
+- Save/load restores valid positions, loads and identities, rejects overlapping
+  bodies atomically, and recomputes authority before movement resumes.
+- Supported deadlocks are identified and expose a safe recovery action, or explain
+  which escape track/infrastructure is missing. Recovery never teleports a train.
+- Players can identify loading/dwell, dispatcher holds, incomplete routes, signal
+  waits and deadlocks, with a named blocker and a relevant action where applicable.
+- Configured passing loops and multiple compatible platforms work reliably with
+  train length, safe entry/exit reservations and deterministic basic assignment.
+- Regression results match at 30/60/120 rendering FPS for supported fixed-tick
+  scenarios; diagnostics and controls remain readable at 200% scale without colour
+  as the sole cue. Unsupported combinations fail clearly before spending or moving.
+
+## Phase 2 — Demand, freight and growth in playable increments
+
+### Phase 2A — Demand and passengers
+
+Begin with measured service frequency/headways before exact timetables; attainable
+frequency depends on round-trip time and available trains. Build real origin →
+destination journeys, then transfers/classes/fares. Basic platform assignment is a
+Phase 1B dependency; passenger-aware preferences extend it here. Structural layout
+warnings can precede demand, but queue/throughput forecasts need actual history and
+must be labelled estimates.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
+| Timetables and service frequencies | Set exact departures or recurring frequencies. Early and late arrivals affect passenger satisfaction and freight contract payouts. | Implement recurring service frequency/headway controls before exact departure timetables. Record actual versus target intervals and explain infeasible targets; multiple trains per service depend on Phase 1B body/platform safety. Exact schedules, punctuality penalties, missed services and recovery follow passenger destinations and reliable dwell rules. |
 | Passenger destinations and transfers | Reward networks that connect useful places, including journeys requiring a change of train. | Replace the current next-stop passenger model with origins, destinations and journey planning. |
-| Express versus local passenger demand | High-paying express passengers prefer direct travel between distant hubs; commuters accept frequent stops along a local line. | Define clear rules for directness, stops, journey time and fares. Depends on passenger destinations and service performance data. |
-| Timetables and service frequencies | Set exact departures or recurring frequencies. Early and late arrivals affect passenger satisfaction and freight contract payouts. | Build on a simulation clock, station dwell rules and shared-track dispatching. Define tolerances, holding for scheduled departure, missed services and recovery from delays; show the consequences before players accept a contract. |
+| Platform preferences | Prefer a platform by service, direction, train length, electrification, cargo access or transfer convenience, with safe fallback. | Basic platform infrastructure and assignment belong to Phase 1B. Phase 2A adds service/direction preferences, passenger transfer convenience and safe compatible fallback. Electrification and cargo-access preferences wait for those systems. Platform selection never overrides reservations. |
 | Holding rules and timed transfers | Wait for a connection or a target load, avoid early departure and cap waiting time. Protect transfers within configurable windows and warn about missed connections. | Requires timetables, passenger destinations and platform metadata. Avoid indefinite holds and explain knock-on delays. |
-| Platform preferences | Prefer a platform by service, direction, train length, electrification, cargo access or transfer convenience, with safe fallback. | Requires multi-platform stations and reservations; choices must respect train and infrastructure compatibility. |
-| Non-disruptive service edits and replacement rules | Draft changes for application after the trip, at a depot or when safe; replace ageing trains or increase capacity at sustained high occupancy. | Extend current immediate paused replacements once lifecycle, utilisation and safe change points exist. Keep automatic rules opt-in and show projected purchase costs. |
-| Formation templates and vehicle comparison | Save reusable consists and purchase missing vehicles; compare cost, capacity, power, reliability, fuel and infrastructure needs. | Depends on rolling stock composition and the corresponding simulated attributes. Avoid presenting unimplemented attributes as meaningful statistics. |
+| Express versus local passenger demand | High-paying express passengers prefer direct travel between distant hubs; commuters accept frequent stops along a local line. | Define clear rules for directness, stops, journey time and fares. Depends on passenger destinations and service performance data. |
 | Catchment visualisation and feeders | Show population, workplaces, inputs/outputs, walking distance and competing stations; abstract park-and-ride, bus and tram feeder capacity. | Implement catchment/destination rules first. Feeders are demand abstractions, not a second vehicle-management game. |
 | Demand and bottleneck adviser | Forecast queues, platform demand and shortages; explain persistent congestion with clickable evidence and recommendations. | Stopped-traffic measurements and a bounded recent-wait overlay are implemented. Forecasts still require utilisation and demand history. Start with transparent heuristics; present forecasts as estimates, not guaranteed outcomes. |
 | Passenger classes and preferences | Add commuters seeking frequency, business travellers prioritising speed/punctuality, tourists valuing comfort/scenery and budget travellers sensitive to fares. | Extend express/local demand rather than adding a competing demand system. Add classes gradually with understandable journey-choice rules. |
 | Fare control and demand elasticity | Set fares by service/class and offer off-peak discounts, balancing demand and revenue. | Depends on destinations, classes, satisfaction and simple documented price-response rules. |
-| Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Add cargo types, production recipes, storage limits and compatible loading rules. |
-| Cargo with distinct behaviours | Perishable cargo spoils over time, hazardous materials need lower speeds or special handling, and high-value express cargo rewards fast delivery. | Track shipment age and delivery terms; connect cargo requirements to rolling stock, facilities and routing. Make spoilage, restrictions and bonuses visible before loading. |
-| Mail and parcels | Add small, fast, high-value consignments, including carriage on compatible passenger trains. | Requires cargo definitions, compatible vehicles and explicit capacity sharing; introduce before complex intermodal logistics. |
-| Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Extend station construction and upgrades with clear benefits and costs. Tie platform capacity to train length, warehouses to cargo storage, and fuel facilities to compatible locomotive technology. |
-| Delivery contracts | Earn rewards for specified quantities delivered within deadlines. | Extend the existing objective system with selectable, timed contracts and clear failure conditions. |
 | Company reputation and passenger satisfaction | Reward reliable, comfortable service with demand growth, better contracts and subsidies instead of rewarding only transport volume. | Use understandable measures such as punctuality, crowding, journey time and amenities. Show causes and recovery options; connect reputation to town growth and contract availability. |
 | Marketing, subsidies and public-service obligations | Fund temporary demand boosts and win regional contracts for reliable service to underserved towns, with frequency/fare conditions. | Reuse contracts, reputation, timetables and demand modifiers. Show obligations and penalties before acceptance. |
+| Detailed station life and waiting passengers | Show tiny pixel-art passengers accumulating on platforms during delays and boarding when trains arrive. | Drive visuals from actual queues; cap or group sprites for performance without changing simulated passenger counts. |
+
+### Phase 2B — Freight and supply chains
+
+Complete logs → sawmill → timber delivery first, then add factory processing and a
+finished-goods destination. Only generalise recipes/cargo behaviour after that full
+chain is playable and its storage, stock compatibility and finances are verified.
+Versioned cargo/industry definitions start before the first processing industry.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
+| --- | --- | --- |
+| Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Phase 2B first delivers a playable logs → sawmill → timber delivery chain, then adds a factory and finished-goods destination to complete the logs → sawmill → timber → factory chain. Verify input consumption, production recipes, bounded storage, compatible wagons and delivery accounting before generalising cargo types. |
+| Cargo with distinct behaviours | Perishable cargo spoils over time, hazardous materials need lower speeds or special handling, and high-value express cargo rewards fast delivery. | Track shipment age and delivery terms; connect cargo requirements to rolling stock, facilities and routing. Make spoilage, restrictions and bonuses visible before loading. |
+| Mail and parcels | Add small, fast, high-value consignments, including carriage on compatible passenger trains. | Requires cargo definitions, compatible vehicles and explicit capacity sharing; introduce before complex intermodal logistics. |
+| Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Physical platforms and usable lengths belong to Phase 1B. Phase 2A adds waiting rooms and passenger loading amenities; Phase 2B adds cargo warehouses and handling. Fuel depots wait for locomotive technology and energy costs. Each facility needs a clear priced benefit. |
+| Delivery contracts | Earn rewards for specified quantities delivered within deadlines. | Extend the existing objective system with selectable, timed contracts and clear failure conditions. |
+
+### Phase 2C — Growth and persistence
+
+Connect growth to delivered passenger/cargo service. Offer unlimited money and
+slower/no growth as those systems arrive; expose no-breakdown options when
+maintenance exists. Persist scenario rules and separate challenge eligibility from
+relaxed sandbox play. Autosaves, basic scenario objectives and bounded performance
+history may land earlier once their foundations are reliable.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
+| --- | --- | --- |
+| Town and industry growth | Let reliable transport increase demand and create expansion opportunities. | Phase 2C: growth responds to measured delivered service and usable passenger/cargo demand. Provide slower-growth and no-growth options; integrate land rights when introduced. Do not couple visual town expansion to unimplemented demand. |
+| Sandbox and scenario modes | Offer relaxed construction alongside structured challenges. | Expose unlimited-money and growth-rate options with the supporting systems. Add no-breakdown and maintenance-pressure controls when maintenance exists. Save rule settings and define challenge/achievement eligibility. Reuse introductory objectives for a small early scenario framework; avoid requiring all later simulation features first. |
 | Operating budgets | Break costs down into maintenance, fuel/energy, workforce, vehicles, construction, interest, station upkeep and penalties. | Expand the company dashboard as each cost system arrives; avoid double-counting the same expense across categories. |
 | Leasing and second-hand stock | Offer low-upfront-cost leases and cheaper used vehicles with clear running-cost or reliability trade-offs. | Build on fleet identities, contracts and vehicle condition. Add simple purchase/lease terms before resale-market simulation. |
 | Incident log, journal and lightweight narratives | Generate factual headlines and selected passenger/cargo stories with destinations and senders/recipients. | Consume bounded simulation events and real shipment data. Cap visible stories; keep logs useful even with flavour text disabled. |
 | Rotating autosaves and recovery | Keep a bounded quick-save roster, configurable periodic autosaves and recovery from the last valid save. | Build on atomic versioned saves. In-game-hour autosaves are a proposed default, not a real-time guarantee. Never overwrite the only valid save when a write fails. |
 | Recent visual replay | Watch approximately the last ten simulation minutes and jump to incidents. | Combine the event stream with a small ring buffer of sampled train positions, headings, identities and relevant visual/map changes. Set explicit sample-rate and memory limits. This is visual history, not rollback, a save replacement or deterministic input replay. |
-| Town and industry growth | Let reliable transport increase demand and create expansion opportunities. | Growth should respond to delivered service and connect to land ownership rules when introduced. |
-| Sandbox and scenario modes | Offer relaxed construction alongside structured challenges. | Build on introductory objectives; expose economy, progression and difficulty settings. |
 
 ## Phase 3 — Infrastructure, maintenance and business decisions
 
-| Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
+Mechanical condition, breakdown penalties and workforce complexity use explicit
+difficulty presets/modifiers; relaxed play retains a no-breakdown option. Rival AI
+remains deferred. Keep stable IDs and validated content boundaries suitable for a
+future rival, without adding speculative AI frameworks.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
 | Terrain, bridges and tunnels | Balance construction cost against distance, grades and journey time. | Introduce terrain and elevation constraints before grade-dependent traction or weather effects. |
-| Maintenance yards and breakdowns | Route trains to depots or maintenance sheds. Neglected trains become slower, cost more to run, or break down and block single-track sections. | Add condition, maintenance schedules, depot visits and repair/recovery actions. Depends on fleet identities and safe traffic reservations. Provide warnings and configurable difficulty. |
+| Maintenance yards and breakdowns | Route trains to depots or maintenance sheds. Neglected trains become slower, cost more to run, or break down and block single-track sections. | Add condition, warnings, maintenance schedules, depot visits and repair/recovery actions after fleet and reservation safety. Gate mechanical penalties behind relaxed/standard/challenging presets or explicit modifiers; no-breakdown sandbox remains available. Difficulty changes frequency/severity and costs, never collision safety. |
 | Depots and stabling tracks | Store spare trains, hold vehicles between services and provide cleaning facilities away from running lines. | Share depot access and fleet management with maintenance yards. Track siding capacity and safe entry/exit reservations; add timetable-based layovers when schedules exist. Parking and cleaning remain distinct from mechanical maintenance. |
 | Track wear, rail classes and weight limits | Heavy trains wear infrastructure faster; choose light, standard or heavy rail with different costs and supported loads. | Requires train mass, maintenance costs and visible condition. Validate weight limits during routing and purchase planning. |
 | Work zones and temporary speed restrictions | Apply clear-duration slow orders for works, damage or weather, with affected services visible. | Reuse reservations and route speed constraints; integrate weather causes only when weather gameplay exists. |
@@ -129,7 +255,7 @@ must not claim to predict traffic conflicts without the reservation layer.
 
 ## Phase 4 — Historical progression and the changing environment
 
-| Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
 | Steam → diesel → electric eras | Advance through time or research investment. Early steam locomotives are affordable but slow; later electric trains offer high performance with costly electrification. | Add locomotive technology, operating costs, unlock rules and overhead catenary infrastructure. Validate that electric services have suitable electrified routes. Make era progression configurable for sandbox play. |
 | Research and technology tree | Invest in better signalling, higher-speed track, efficient locomotives and advanced cargo handling for long-term goals. | Use one unlock system shared with historical eras rather than separate conflicting progressions. Show prerequisites, research costs and benefits, with configurable time-based or investment-based progression. |
@@ -140,11 +266,11 @@ must not claim to predict traffic conflicts without the reservation layer.
 
 ## Phase 5 — Building tools, spectators and community content
 
-| Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
 | Blueprints and copy/paste track designs | Save and reuse junctions, loops and terminal layouts. | Implemented: rectangular capture of built track/switches/signals, relative placement through priced reservation-aware drafts and grouped Undo/Redo. Stations/platforms, rotation and land ownership checks follow their own systems; see [track blueprints](TRACK_BLUEPRINTS.md). |
 | Camera tools, spectator views and traffic overview | Expand existing camera scrolling and the minimap with free-camera controls, train-follow/ride-along mode, close station views with minimal UI, and a network traffic-density heat map. | Use stable train targets and traffic measurements, an easy return to normal controls, and protection against accidental construction while watching. Spectator controls can arrive earlier; the heat map builds on dashboard data. |
-| Procedural maps and shareable seeds | Generate terrain, rivers, towns, industries and resources with adjustable size/density and reproducible starts. | Requires Phase 0 RNG ownership, versioned generator settings and map validation. Share seed plus generator/game version and settings; a seed alone does not promise identical maps across releases. |
+| Procedural maps and shareable seeds | Generate terrain, rivers, towns, industries and resources with adjustable size/density and reproducible starts. | Start with bounded random industry placement for targeted scenarios before a full terrain generator. Validate placement, connectivity and objective feasibility. Share seed, generator/content versions and scenario/modifier rules; a seed alone does not guarantee matching maps across releases. Full terrain, rivers and town generation remain later work. |
 | Photo mode and sharing tools | Capture screenshots with optional route-name and train-information overlays for sharing. | Build on camera tools and selectable UI visibility. Start with local image export; keep posting to external services a deliberate player action. Video/GIF export is deferred outside core scope. |
 | Railway sound design | Give locomotives distinct horns and rail sounds, add station announcements, and use ambient audio to make the network feel alive. | Use spatial sound tied to train type, speed, distance and station events; scale platform crowd ambience from visible queues. Provide separate volume controls and visual equivalents for important audio cues; use appropriately licensed or original assets. |
 | Level and scenario editor | Create maps, place industries and define delivery challenges for sharing. | Define a versioned content format, validate maps and objectives, and separate scenario definitions from saved sessions. Start with local import/export and sharing through community forums. Steam Workshop integration is a later distribution-specific option, not a requirement for using the editor. |
@@ -152,16 +278,28 @@ must not claim to predict traffic conflicts without the reservation layer.
 | Town names, company lore and scenario flavour | Rename towns and add short generated histories, industry descriptions and regional needs such as commuter relief, export access or industrial revival. | Use lightweight local templates and editable text. No external generative service is required. |
 | Tourism, special trains and railway heritage | Offer scenic excursions, seasonal/royal/military services, preservation lines and an encyclopedia or railway museum. | Start as optional scenarios/contracts using existing routes, amenities and scenery data. In-world trophies or locomotive decals are low-priority cosmetic rewards. |
 | Lightweight modding | Support custom scenarios, train sprites and simple cargo definitions to extend the game and encourage community contributions. | Reuse scenario formats and data-driven vehicle/cargo definitions. Document schemas, asset requirements and version compatibility; validate content and report missing assets clearly. Start with data and asset packs rather than requiring executable mods. |
+| Custom livery | Add selectable fleet colour palettes to the existing individual train names. | Stable identities and train renaming are implemented. Provide basic player-selectable palettes freely, with additional cosmetic liveries and historical visual themes unlocked by achievements. Preserve readable operational markers independently of paint colours and colour-blind palettes. Cosmetic historical themes do not require technology-era simulation. |
 
 ## Modes, learning and accessibility — across all phases
 
-| Planned feature | Intended gameplay benefit | Dependencies and scope |
+A small scenario framework can arrive earlier than the full editor or procedural
+maps. Combine targeted, achievable modifiers with validated random industry
+placement instead of requiring a large content roster. Track-budget, single-track
+and low-cash challenges can precede schedules; strict punctuality cannot.
+
+Score throughput per simulation-time interval, mean traffic wait with a declared
+population of trains/trips, and incident episodes per declared time/delivery count.
+Distinguish traffic waits from dwell/loading/intentional holds. Cosmetic rewards
+augment freely selectable base liveries/themes and remain separate from operational
+readability and mechanical technology progression.
+
+| Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
 | Tutorial campaigns with progressive unlocking | Teach track building → stations → signals → contracts → growth, one system at a time. | Expand introductory objectives into guided scenarios as each system becomes available. Provide contextual explanations, repeatable lessons and an option to skip tutorials. |
 | Difficulty modifiers | Offer higher running costs, stricter contracts, optional no-pause play, and adjustable maintenance, weather and event pressure. | Present modifiers explicitly when creating a game and save them with the scenario. Keep a relaxed sandbox preset; ensure no-pause play still offers a usable route-editing workflow instead of relying on the current automatic pause. |
-| Seeded challenges and asynchronous community play | Offer daily/weekly seeds, campaign medals and score comparisons for profit, punctuality, efficiency or optional environmental goals; share results and seeds asynchronously. | Requires deterministic starts, versioned rules and explicit modifier eligibility. Start with local or manually shared results before hosted leaderboards and validation infrastructure. |
+| Seeded challenges and asynchronous community play | Offer daily/weekly seeds, campaign medals and score comparisons for profit, punctuality, efficiency or optional environmental goals; share results and seeds asynchronously. | Begin with local/manual sharing of low-cash, track-budget and single-track-only scenarios using feasible random industry placement. Punctuality challenges require schedules. Shared runs include seed, generator/content versions, rules and modifier eligibility; add daily/weekly challenges and hosted comparison only after reproducibility is demonstrated. |
 | Ghost networks and benchmark histories | Compare anonymised network layouts, construction timelines or performance against a benchmark. | Share versioned summaries or recorded timelines first. Executable deterministic replays additionally need an initial state, tick-stamped commands, RNG state and verification—not just the event log or position buffer. |
-| Achievements and challenge packs | Add replayable goals such as delivering a passenger target without delays or connecting every town below a track-length budget. | Extend scenario objectives with measurable constraints and clear eligibility rules for difficulty settings. Support local progress first; platform achievements are optional integration work. |
+| Achievements and challenge packs | Add replayable goals such as delivering a passenger target without delays or connecting every town below a track-length budget. | Extend measurable scenario objectives and explicit difficulty eligibility. Score throughput, waiting and incident episodes with documented denominators; count incidents once per episode, not once per blocked tick. Keep basic liveries available and unlock additional palettes/themes through local achievement milestones. Platform achievements are optional. |
 
 ## Tutorial coverage
 
@@ -193,59 +331,39 @@ instead of adding a separate campaign simulation.
 | Detailed staff rostering | Defer in favour of the single optional workforce abstraction. |
 | Hosted leaderboards and Steam Workshop | Optional distribution/community integrations after local content sharing and challenge formats are stable. |
 
-## Consolidated implementation priority
+## Agreed next implementation order
 
-1. Integrate and verify Phase 0: fixed ticks, owned RNG, coherent versioned saves,
-   events, remapping, UI scale, colourblind/high-contrast modes and reduced motion.
-2. Junctions, reservations, signals, physical deadlock recovery, directional
-   broken-track checks, waypoint routing and Shuttle/Loop modes (implemented).
-   Independent active passenger services, signal-limited reservation lookahead,
-   passing-loop directives, safe withdrawal/storage and saves are now implemented.
-   Multiple trains per service and priorities build on that foundation.
-3. Reservation-aware planning, overlays, batch signal edits, blueprints, search and
-   alert preferences are implemented, including measured waiting. Persistent
-   watchlists and predictive bottleneck advice remain refinements; predictions
-   wait for timetable and demand data.
-4. Extend physical occupancy to cover train length and retain switch/block locks
-   until the last vehicle clears. Verify platform fit, physical reversal and
-   load-time overlap checks before enabling consists/templates. Then add vehicle
-   comparison, safe composition edits and replacement rules.
-5. Destinations, timetables, transfers, catchments, satisfaction and freight depth.
-   Expand forecasts and company dashboards only as the underlying data becomes useful.
-6. Maintenance, depots, terrain, economy and optional workforce abstraction.
-7. Eras/research, weather and events; controllers once interaction patterns stabilise.
-8. Procedural maps, scenarios, campaigns, seeded challenges and community sharing.
+1. **Unified why-waiting inspector (1C):** current occupancy, requested/granted
+   authority, named blocker, measured waiting and evidence-based actions. Build on
+   existing Problems/Traffic/Overlays; keep routine waits distinct from incidents.
+2. **Continuous consist body routing (1B):** retain physical vehicle positions
+   across intermediate reversals, repeated paths and Loop boundaries before enabling
+   those combinations. Extend regression tests for tail locks and save/load.
+3. **Formal platform lengths and multiple platforms (1B):** physical geometry,
+   stable IDs, train fit, basic assignment and safe arrival/departure reservations;
+   improve passing-loop branch selection while preserving waypoint intent.
+4. **Service editor expansion and frequency foundation (1B → 2A):** draft-based
+   duplication/cloning/reordering, safe multiple trains per service, then measured
+   headways and frequency targets with clear attainable limits.
+5. **Passenger origins/destinations (2A):** queues, journey choices and then
+   transfers, classes/fares/satisfaction. Exact timetables follow frequency/dwell
+   foundations; introduce punctuality contracts only once those rules exist.
+6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
+   by factory/finished goods; verify stock, recipes, storage and payments first.
+7. **Growth, sandbox rules and persistence (2C):** service-driven growth,
+   eligibility-aware scenario rules, bounded metrics and reliable rotating saves.
+8. **Later mechanics (3–5):** opt-in maintenance, terrain/economy, research/eras,
+   optional weather effects, full scenario/editor/community expansion.
 
-Autosave and logs can land as soon as the save/event foundations are reliable; they
-need not wait for controller support. Visual polish and sound can proceed alongside
-the phases, with gameplay effects explicitly optional. Build the reservation layer
-once and reuse it for preview, dispatch, work zones, recovery and eventual shunting.
-Junctions, reservations, sustained deadlock detection, physical reversal, automatic
-block signals, manual dispatch and ordered waypoints are integrated. Missing track
-ahead on the current leg stops trains in place; a gap behind does not interrupt
-delivery. After turning, the new leg is checked again. Shuttle/Loop route modes
-and closing-leg waypoints are integrated. Multiple independent passenger services
-now run together on shared tracks with selected passing-loop paths and signal
-boundaries. Route inspection, signal-block authority overlays and directional
-affected-service construction feedback are now implemented; see
-[network inspection and testing](NETWORK_INSPECTION.md). Measured traffic waiting,
-a bounded recent-wait overlay, searchable current problems and historical incidents
-are now implemented; see [problems and waiting](PROBLEMS_AND_WAITING.md).
-Operational notification preferences and safe fixed-tick automatic pause are now
-implemented; see [notification controls](NOTIFICATIONS.md). Richer
-reservation-aware multi-stroke construction drafts are implemented; see
-[construction planning](CONSTRUCTION_PLANNING.md). Corridor selection and batch
-signal drafting are now implemented; see [corridor signals](CORRIDOR_SIGNALS.md).
-Reusable track blueprints, a searchable local browser and versioned JSON sharing
-are implemented; see [track blueprints](TRACK_BLUEPRINTS.md).
-Global object search, current map location, route highlighting and session
-watchlists are implemented; see [object search](OBJECT_SEARCH.md).
-Train-length-aware occupancy is implemented, with body footprints and switch/block
-locks held until the tail clears. Passenger coaches and log wagons are now
-player-accessible, with stop clearance, full-body load validation and safe
-composition edits; see [consists](CONSISTS.md). Headless checks use Godot 4.6.3
-in this environment (the project declares 4.7). Next: formation templates and
-vehicle comparison; continuous body routing must precede longer stop lists and
-Loop consists. Multiple trains per service follows those safety foundations.
-Predictive traffic advice waits for timetable/demand data; multiple trains per
-service follow the independent-service model. See [reservation behaviour and checks](RESERVATIONS.md).
+Introduce versioned .tres stock definitions alongside the relevant fleet work and
+cargo/industry definitions before processing chains. Small scenario modifiers,
+cosmetic art/sound, accessible feedback and save reliability may proceed alongside
+their prerequisite milestone. No global reservation SignalBus is planned.
+
+Implemented tools and evidence: [foundations](phase-0-foundations.md),
+[reservations](RESERVATIONS.md), [signals](SIGNALS.md), [recovery](DEADLOCKS.md),
+[waypoints](WAYPOINTS.md), [multiple services/passing loops](MULTIPLE_SERVICES.md),
+[consists](CONSISTS.md), [inspection](NETWORK_INSPECTION.md),
+[problems/waiting](PROBLEMS_AND_WAITING.md), [alerts](NOTIFICATIONS.md),
+[construction drafts](CONSTRUCTION_PLANNING.md), [corridor signals](CORRIDOR_SIGNALS.md),
+[blueprints](TRACK_BLUEPRINTS.md) and [object search](OBJECT_SEARCH.md).

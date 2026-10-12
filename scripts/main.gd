@@ -267,6 +267,7 @@ var service_button: Button
 var demolition_mode: bool = false
 var switch_tool_mode: bool = false
 var switch_button: Button
+var remove_button: Button
 var demolition_cells: Dictionary = {}
 var demolition_last_cell: Vector2i = Vector2i.ZERO
 var toolbar_icon_textures: Array[Texture2D] = []
@@ -356,6 +357,8 @@ func _ready() -> void:
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
 	_apply_settings()
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
+		window.window_input.connect(_tool_window_input.bind(window))
 
 func _process(delta: float) -> void:
 	_move_camera_with_keyboard(delta)
@@ -422,6 +425,10 @@ func _modal_open() -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(InputActions.RESET_TOOL):
+		_reset_track_tools()
+		get_viewport().set_input_as_handled()
+		return
 	var focused: Control = get_viewport().gui_get_focus_owner()
 	if not (focused is LineEdit or focused is TextEdit) and event.is_action_pressed(InputActions.TOGGLE_FULLSCREEN):
 		GameSettings.toggle_fullscreen(get_window())
@@ -478,6 +485,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		if event.is_action_pressed(InputActions.BUILD):
 			_clear_direct_inspection()
+			if demolition_mode:
+				if _is_inside_map(cell):
+					is_dragging = true
+					demolition_last_cell = cell
+					demolition_cells.clear()
+					demolition_blocked.clear()
+					_collect_demolition_cells(cell)
+				return
 			if corridor_pick > 0:
 				_pick_corridor_cell(cell)
 				return
@@ -514,37 +529,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_refresh_build_plan(cell, true)
 
 		if event.is_action_released(InputActions.BUILD):
+			if is_dragging and demolition_mode:
+				_finish_demolition(cell)
+				return
 			if _finish_direct_inspection(cell): return
 			if is_dragging:
 				_finish_track_drag(cell)
-
-		if event.is_action_pressed(InputActions.DEMOLISH):
-			_clear_direct_inspection()
-			if inspect_mode:
-				_close_station_inspector()
-				return
-
-			# Right-click still cancels a construction preview.
-			if is_dragging:
-				is_dragging = false
-				demolition_cells.clear()
-				demolition_blocked.clear()
-				return
-
-			if not _is_inside_map(cell):
-				return
-
-			demolition_mode = true
-			is_dragging = true
-			drag_start = cell
-			demolition_last_cell = cell
-			demolition_cells.clear()
-			demolition_blocked.clear()
-			_collect_demolition_cells(cell)
-
-		if event.is_action_released(InputActions.DEMOLISH):
-			if is_dragging and demolition_mode:
-				_finish_demolition(cell)
 
 func _check_route(force_reset: bool = false) -> void:
 	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}))
@@ -737,8 +727,8 @@ func _update_instructions() -> void:
 
 	instructions.tooltip_text = ""
 	instructions.text = (
-		"Left-drag: automatic track | Right-drag: remove"
-		+ " | Right-click: cancel | Use toolbar to choose Connect or Draw"
+		"Left-drag: automatic track | Remove tool: left-drag to remove"
+		+ " | Right-click: return to track laying | Connect or Draw"
 		+ " | %s: pause | %s: cancel" % [
 			InputActions.key_label(InputActions.TOGGLE_PAUSE),
 			InputActions.key_label(InputActions.CANCEL)
@@ -1016,14 +1006,16 @@ func _finish_track_drag(end_cell: Vector2i) -> void:
 		construction_plan.stage(changes, tracks)
 		_show_notice("Track stroke added to draft. Use Overlays → Apply plan when ready.")
 		return
-	var cost: int = int(build_plan["new_count"]) * TRACK_BUILD_COST
+	var cost: int = _build_plan_cost()
 	if cost > 0 and money < cost:
 		_show_notice("Insufficient funds: need £%d, available £%d." % [cost, money])
 		return
 	var cells: Array = []
+	var expected: Array = []
 	for cell in changes:
 		cells.append([cell.x, cell.y, changes[cell]])
-	_submit_command("build", {"cells": cells, "new_count": int(build_plan["new_count"])})
+		expected.append([cell.x, cell.y, tracks.get(cell)])
+	_submit_command("build", {"cells": cells, "new_count": int(build_plan["new_count"]), "expected": expected})
 
 
 # Paused edits run at once (and are stamped with the current tick). While the
@@ -1134,16 +1126,21 @@ func _execute_build(data: Dictionary) -> void:
 		changes[Vector2i(int(entry[0]), int(entry[1]))] = entry[2]
 
 	_rebuild_reservations()
-	for cell in changes:
-		if reservations.owners.has(cell):
-			_show_notice("Track is reserved by a train; wait until it clears.")
+	for entry in data.get("expected", []):
+		var cell := Vector2i(int(entry[0]), int(entry[1]))
+		if not ConstructionPlan._same(tracks.get(cell), entry[2]):
+			_show_notice("Track changed before this stroke was applied. Redraw it.")
 			return
-	var new_count: int = int(data["new_count"])
-	var cost: int = new_count * TRACK_BUILD_COST
-
-	if cost > 0 and money < cost:
-		_show_notice("Insufficient funds: need £%d, available £%d." % [cost, money])
+	var transaction = ConstructionPlan.new({"track": TRACK_BUILD_COST, "refund": TRACK_REFUND, "switch": SWITCH_COST})
+	transaction.stage(changes, tracks)
+	var error: String = transaction.validate(tracks, reservations.owners, track_signals, Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected, money)
+	if not error.is_empty():
+		_show_notice(error)
 		return
+	var new_count: int = 0
+	for cell in changes:
+		if not tracks.has(cell): new_count += 1
+	var cost: int = int(transaction.quote().net)
 
 	var before: Dictionary = {}
 	for cell in changes:
@@ -1197,7 +1194,11 @@ func _show_notice(message: String) -> void:
 func _get_preview_cost() -> int:
 	if inspect_mode or not is_dragging or demolition_mode:
 		return 0
-	return int(build_plan.get("new_count", 0)) * TRACK_BUILD_COST
+	return _build_plan_cost()
+
+
+func _build_plan_cost() -> int:
+	return int(build_plan.get("new_count", 0)) * TRACK_BUILD_COST + int(build_plan.get("switch_count", 0)) * SWITCH_COST
 
 
 func _save_game() -> void:
@@ -1732,10 +1733,52 @@ func _setup_toolbar() -> void:
 	switch_button.tooltip_text = "Switch tool: click a straight track to add a switch (£%d); click it again to cycle its shape, and the last click removes it" % SWITCH_COST
 	switch_button.pressed.connect(_toggle_switch_tool)
 	$Interface/HeaderBox/Toolbar.add_child(switch_button)
+	remove_button = Button.new()
+	remove_button.text = "Remove"
+	remove_button.toggle_mode = true
+	remove_button.focus_mode = Control.FOCUS_NONE
+	remove_button.tooltip_text = "Remove track: left-drag. Right-click returns to track laying."
+	remove_button.pressed.connect(_select_remove_tool)
+	$Interface/HeaderBox/Toolbar.add_child(remove_button)
+	_update_toolbar()
+
+
+func _reset_track_tools() -> void:
+	_clear_direct_inspection()
+	inspect_mode = false
+	switch_tool_mode = false
+	signal_tool_mode = false
+	waypoint_tool_mode = false
+	demolition_mode = false
+	draw_track_mode = true
+	is_dragging = false
+	is_panning = false
+	corridor_pick = 0
+	build_stroke.clear()
+	build_plan.clear()
+	demolition_cells.clear()
+	demolition_blocked.clear()
+	_close_station_inspector()
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
+		if window != null: window.hide()
+	_update_toolbar()
+	queue_redraw()
+
+
+func _tool_window_input(event: InputEvent, window: Window) -> void:
+	if event.is_action_pressed(InputActions.RESET_TOOL):
+		_reset_track_tools()
+		window.set_input_as_handled()
+
+
+func _select_remove_tool() -> void:
+	_reset_track_tools()
+	demolition_mode = true
 	_update_toolbar()
 
 
 func _select_straight_track() -> void:
+	demolition_mode = false
 	inspect_mode = false
 	switch_tool_mode = false
 	signal_tool_mode = false
@@ -1748,6 +1791,7 @@ func _select_straight_track() -> void:
 
 
 func _select_curved_track() -> void:
+	demolition_mode = false
 	inspect_mode = false
 	switch_tool_mode = false
 	signal_tool_mode = false
@@ -1760,6 +1804,7 @@ func _select_curved_track() -> void:
 
 
 func _toggle_switch_tool() -> void:
+	demolition_mode = false
 	signal_tool_mode = false
 	waypoint_tool_mode = false
 	switch_tool_mode = not switch_tool_mode
@@ -1793,11 +1838,11 @@ func _update_toolbar() -> void:
 	inspect_button.set_pressed_no_signal(inspect_mode)
 
 	straight_button.set_pressed_no_signal(
-		not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and not draw_track_mode
+		not demolition_mode and not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and not draw_track_mode
 	)
 
 	curve_button.set_pressed_no_signal(
-		not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and draw_track_mode
+		not demolition_mode and not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and draw_track_mode
 	)
 
 	if waypoint_button != null:
@@ -1806,6 +1851,7 @@ func _update_toolbar() -> void:
 		signal_button.set_pressed_no_signal(signal_tool_mode)
 	if switch_button != null:
 		switch_button.set_pressed_no_signal(switch_tool_mode)
+	if remove_button != null: remove_button.set_pressed_no_signal(demolition_mode)
 	pause_button.set_pressed_no_signal(paused)
 
 	pause_button.text = ""
@@ -1822,6 +1868,10 @@ func _update_toolbar() -> void:
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(InputActions.RESET_TOOL) and not _modal_open():
+		_reset_track_tools()
+		get_viewport().set_input_as_handled()
+		return
 	if _modal_open():
 		_clear_direct_inspection()
 		return
@@ -1841,7 +1891,7 @@ func _input(event: InputEvent) -> void:
 		if event.is_action_released(InputActions.BUILD) and _mouse_is_over_interface(): _clear_direct_inspection()
 		# Cancel construction if its drag ends over the interface.
 		if (
-			(event.is_action_released(InputActions.BUILD) or event.is_action_released(InputActions.DEMOLISH))
+			event.is_action_released(InputActions.BUILD)
 			and is_dragging
 			and _mouse_is_over_interface()
 		):
@@ -1994,6 +2044,7 @@ func _setup_station_inspector() -> void:
 
 
 func _toggle_inspect_mode() -> void:
+	demolition_mode = false
 	_clear_direct_inspection()
 	inspect_mode = not inspect_mode
 	switch_tool_mode = false
@@ -3465,6 +3516,7 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 	if not force and target == build_last_hover and target != drag_start:
 		return
 	build_last_hover = target
+	var fixed: Array[Vector2i] = [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
 	var cells: Array[Vector2i]
 	if draw_track_mode:
 		if build_stroke.is_empty():
@@ -3473,17 +3525,16 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 			if build_stroke.size() <= 2 and working.has(drag_start):
 				# A pointer update on the first new tile must not let the
 				# next update turn that tile into a bend.
-				build_stroke = TrackBuilder.line(drag_start, target, working)
+				build_stroke = TrackBuilder.line(drag_start, target, working, fixed)
 			elif working.has(target):
-				var addition: Array[Vector2i] = TrackBuilder.line(build_stroke.back(), target, working)
+				var addition: Array[Vector2i] = TrackBuilder.line(build_stroke.back(), target, working, fixed)
 				for index in range(1, addition.size()):
 					TrackBuilder.append_stroke(build_stroke, addition[index])
 			else:
 				TrackBuilder.append_stroke(build_stroke, target)
 		cells = build_stroke
 	else:
-		cells = TrackBuilder.line(drag_start, target, working)
-	var fixed: Array[Vector2i] = [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
+		cells = TrackBuilder.line(drag_start, target, working, fixed)
 	var single_direction := Vector2i.RIGHT
 	var short_direction := Vector2i.ZERO
 	# An empty starting cell is the first piece of the measured stroke, not an
@@ -3507,6 +3558,11 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 				single_direction = direction
 				break
 	build_plan = TrackBuilder.plan(cells, working, Vector2i(MAP_WIDTH, MAP_HEIGHT), _is_station_space, fixed, single_direction)
+	var signs: Dictionary = construction_plan.projected_signals(track_signals) if planning_mode else track_signals
+	for cell in build_plan.get("changes", {}):
+		if signs.has(cell) and not TrackGeometry.is_straight(build_plan.changes[cell]):
+			build_plan.invalid[cell] = true
+			build_plan.error = "Remove the signal before adding a switch on its tile."
 
 func _waiting(key: String) -> int:
 	return int(get("waiting_at_" + key))
@@ -4085,6 +4141,7 @@ func _setup_signal_tool() -> void:
 	signal_button.focus_mode = Control.FOCUS_NONE
 	signal_button.tooltip_text = "Click straight track: automatic block signal → manual stop → remove. Signals apply in both directions."
 	signal_button.pressed.connect(func() -> void:
+		demolition_mode = false
 		signal_tool_mode = not signal_tool_mode
 		waypoint_tool_mode = false
 		switch_tool_mode = false
@@ -4202,6 +4259,7 @@ func _setup_waypoint_tool() -> void:
 	waypoint_button.focus_mode = Control.FOCUS_NONE
 	waypoint_button.tooltip_text = "Select a track cell, then assign it to a service leg in Routes."
 	waypoint_button.pressed.connect(func() -> void:
+		demolition_mode = false
 		waypoint_tool_mode = not waypoint_tool_mode
 		signal_tool_mode = false
 		switch_tool_mode = false

@@ -23,14 +23,17 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation ran all 50 headless suites, including
-desktop-size UI fixtures, fullscreen checks and the new platform tests, in
-Godot 4.7.stable (earlier runs used 4.6.3). Tests that change player preferences must
+complete. The most recent validation passed all 54 headless suites, including
+desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
+tool reset, in Godot 4.6.3 (the platform update was previously tested on 4.7.stable).
+Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
 repeat runs, and both suites now isolate/restore it; see the regression checks and acceptance coverage below.
 
 **Resume checkpoint:** maximized startup, adaptive window filling and saved
 fullscreen (Settings/F11) are implemented and confirmed working by the player.
+One piece is built per drag step, right-click restores track laying, and junction
+switches are created automatically with validated costs and grouped Undo/Redo.
 Platform length measurement is implemented (`scripts/core/platforms.gd`, station
 panel line, `tests/test_platforms.gd`, `tests/test_platform_ui.gd`). Platform IDs, multi-platform detection
 from parallel sidings and `Platforms.assign` are also implemented (data and display only; trains still
@@ -44,6 +47,9 @@ reservations platform-aware, then return to planned-reversal/repeated-path consi
 - Mouse-drawn tracks with automatic bends, diagonals and a straight first extension
   tile when departing existing rails.
 - Construction costs, drag demolition and paused construction Undo/Redo.
+- Right-click returns active tools to track laying; Remove uses left-drag.
+  Track laying adds correctly oriented switches automatically, including the
+  switch price in preview/drafts; see [automatic junctions](AUTOMATIC_SWITCHES.md).
 - Passenger and log-freight services, production and delivery income.
 - Separate speed and capacity upgrades.
 - Ordered pass-through waypoints per passenger leg and freight service, with
@@ -130,7 +136,7 @@ Maintain these guarantees while expanding the supported train/platform combinati
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Junctions and switches | Build branching networks and share infrastructure between services. | Implemented: port-aware routing, locked switches, crossings and a switch tool. Further construction conveniences remain planned. |
+| Junctions and switches | Build branching networks and share infrastructure between services. | Implemented: port-aware routing, locked switches, crossings, automatic switch placement during track laying and the manual Switch tool. Automatic branches preserve the original through line and include switch costs; reserved/signalled/protected junctions reject edits. See [automatic junctions](AUTOMATIC_SWITCHES.md). Further construction conveniences remain planned. |
 | Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Basic tile reservations, switch/selected-port locking, safe waiting events and a hatched ownership overlay are implemented. Shared passenger/freight routing is enabled. Basic deadlock detection, physical reversal, bidirectional automatic block signals and manual holds are implemented; reservations do not select alternate passing-loop paths. |
 | Signal control modes | Automatic signals/reservations by default, with optional one-way, route, platform and manual dispatch controls. | Bidirectional automatic blocks, manual stop signals and Traffic Hold/Resume are implemented; one-way, route and platform modes remain planned. One-way implementation must validate manual reversal direction before any state change. All modes use reservations and explain blocked movements. See [signals and dispatch](SIGNALS.md). |
 | Deadlock detection and emergency recovery | Detect circular waits, identify involved trains/blocks and offer safe hold, turn-back, reroute or recovery actions. | Continuous actual wait cycles are detected after three simulation seconds. The train inspector offers Reverse before a confirmed deadlock; Traffic also reverses a selected deadlocked train in place, retaining its path and load until it physically returns to its departure stop, then holds it. Manual Hold/Resume is also available. Automatic turn-back, alternate routing and full reversal-location rules remain later work. See [deadlock recovery](DEADLOCKS.md). Full shunting and yard operations arrive later. |

@@ -9,14 +9,20 @@ When starting on empty ground, a one-cell drag places one piece in the starting
 cell; each further cell of movement adds one piece. Starting on an existing rail
 uses that rail as the anchor instead. Connecting to an existing endpoint includes
 the complete connection, without charging for either existing rail.
-The first one-cell extension follows the existing track's direction even when
-the pointer moves slightly off-axis; drag farther to start a bend.
+The first one-cell extension from an open end follows the existing track's
+direction even when the pointer moves slightly off-axis; drag farther to start
+a bend. Branches off an existing through line create a switch automatically.
+
+Right-click cancels the active gesture/tool and returns to Draw track. It also
+closes operating windows such as Traffic, keeping their pause state. For removal,
+select **Remove**, then left-drag. Right-click cancels removal as well. Staged
+construction is retained when changing tools; Apply or Discard handles that draft.
 
 Open **Overlays** and enable **Draft construction**. The game pauses initially.
 You may resume while drafting; trains use only the actual built network.
 
 Draw several track strokes as usual. Each stroke is added to the draft, so later
-strokes can connect to earlier ghost tracks. Use right-drag to stage removals and
+strokes can connect to earlier ghost tracks. Select **Remove** and left-drag to stage removals and
 **Switches** to cycle a planned straight into switch variants. A **P** marker
 identifies planned tiles; white crosses mark planned removals. Nothing is charged
 or changed in the real network until you apply the draft.
@@ -55,7 +61,7 @@ any old draft. Blueprint storage and additional corridor tools are separate step
 
 1. Enable Draft construction, then draw a five-tile line away from stations.
 2. Extend it by another stroke sharing an endpoint: the shared tile is charged once.
-3. Right-drag over a ghost tile: it disappears from the draft with no refund.
+3. Select Remove and left-drag over a ghost tile: it disappears without a refund.
 4. Apply, then Undo once: every stroke in that plan disappears together.
 5. Redo to restore them. Draft a gap ahead of a moving train, pause and apply:
    the train stays in place. Undo repairs that gap without resetting the train.

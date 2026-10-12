@@ -25,7 +25,7 @@ const CAMERA_RIGHT: StringName = &"camera_right"
 const CAMERA_FAST: StringName = &"camera_fast"
 
 const BUILD: StringName = &"build"
-const DEMOLISH: StringName = &"demolish"
+const RESET_TOOL: StringName = &"reset_tool"
 const CAMERA_PAN: StringName = &"camera_pan"
 const ZOOM_IN: StringName = &"zoom_in"
 const ZOOM_OUT: StringName = &"zoom_out"
@@ -54,7 +54,7 @@ const ORDER: Array[StringName] = [
 ## Mouse actions shown on the settings screen.
 const MOUSE_ORDER: Array[StringName] = [
 	BUILD,
-	DEMOLISH,
+	RESET_TOOL,
 	CAMERA_PAN,
 	ZOOM_IN,
 	ZOOM_OUT
@@ -84,7 +84,7 @@ static func label(action: StringName) -> String:
 		CAMERA_RIGHT: return "Camera right"
 		CAMERA_FAST: return "Camera fast (hold)"
 		BUILD: return "Build track"
-		DEMOLISH: return "Remove track"
+		RESET_TOOL: return "Return to track laying"
 		CAMERA_PAN: return "Pan camera"
 		ZOOM_IN: return "Zoom in"
 		ZOOM_OUT: return "Zoom out"
@@ -133,7 +133,7 @@ static func default_keys(action: StringName) -> PackedInt32Array:
 static func default_mouse_buttons(action: StringName) -> PackedInt32Array:
 	match action:
 		BUILD: return PackedInt32Array([MOUSE_BUTTON_LEFT])
-		DEMOLISH: return PackedInt32Array([MOUSE_BUTTON_RIGHT])
+		RESET_TOOL: return PackedInt32Array([MOUSE_BUTTON_RIGHT])
 		CAMERA_PAN: return PackedInt32Array([MOUSE_BUTTON_MIDDLE])
 		ZOOM_IN: return PackedInt32Array([MOUSE_BUTTON_WHEEL_UP])
 		ZOOM_OUT: return PackedInt32Array([MOUSE_BUTTON_WHEEL_DOWN])
@@ -185,6 +185,10 @@ static func apply_bindings(saved: Dictionary) -> void:
 
 
 static func apply_mouse_bindings(saved: Dictionary) -> void:
+	# Preserve the player's old right-mouse binding under its new purpose.
+	saved = saved.duplicate()
+	if not saved.has(str(RESET_TOOL)) and saved.has("demolish"):
+		saved[str(RESET_TOOL)] = saved["demolish"]
 	var merged: Dictionary = default_mouse_bindings()
 
 	for action in MOUSE_ORDER:

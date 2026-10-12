@@ -35,9 +35,9 @@ To test:
 
 1. Build A–B, let the passenger train depart, then pause halfway along the line.
 2. Turn on Service paths and select the passenger service.
-3. Right-drag a tile behind the train: the report should say the current leg is
+3. Select Remove and left-drag a tile behind the train: the report should say the current leg is
    clear and a later leg is incomplete. Cancel without releasing to keep it.
-4. Right-drag an unreserved tile ahead: the report should say the current leg
+4. With Remove selected, left-drag an unreserved tile ahead: the report should say the current leg
    would break. Cancel, or release to test stopping in place.
 5. Draw the missing tile back in: the report should say it restores the current
    leg. Release and resume to let the train continue.

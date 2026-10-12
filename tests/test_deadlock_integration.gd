@@ -15,6 +15,8 @@ func _initialize() -> void:
 func fixture() -> Node:
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	root.add_child(game)
+	# Never inherit a pause-on-deadlock preference from the player config.
+	Settings.notification_rules = {"waiting": 0, "deadlocks": 1, "recovery": 0}
 	return game
 func prepare(game: Node) -> void:
 	game.set_process(false)

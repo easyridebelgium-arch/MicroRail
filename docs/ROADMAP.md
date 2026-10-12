@@ -16,18 +16,24 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Next implementation:** remaining planned-reversal/repeated-path body routing and platform foundations
-(Phase 1B). The unified why-waiting inspector (Phase 1C) is now implemented; see
+**Next implementation:** platform IDs, multiple platforms per station and platform-aware arrival/departure
+reservations (Phase 1B), then planned-reversal/repeated-path body routing. Formal platform *lengths* are
+now measured and shown (see [platform lengths](PLATFORMS.md)). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation verified all 48 headless suites, including
-desktop-size UI fixtures and fullscreen preference/shortcut checks, in
-Godot 4.6.3 (the project declares 4.7); see the regression checks and acceptance coverage below.
+complete. The most recent validation ran all 49 headless suites, including
+desktop-size UI fixtures, fullscreen checks and the new platform tests, in
+Godot 4.7.stable (earlier runs used 4.6.3). Tests that change player preferences must
+restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
+repeat runs, and both suites now isolate/restore it; see the regression checks and acceptance coverage below.
 
 **Resume checkpoint:** maximized startup, adaptive window filling and saved
 fullscreen (Settings/F11) are implemented and confirmed working by the player.
-Continue Phase 1B with planned-reversal/repeated-path consist body routing, then
-formal platform lengths and multiple-platform foundations.
+Platform length measurement is implemented (`scripts/core/platforms.gd`, station
+panel line, `tests/test_platforms.gd`, `tests/test_platform_ui.gd`). Continue Phase 1B at
+step 3 of the agreed order: give platforms stable IDs, allow several platforms per
+station with basic assignment, and make arrival/departure reservations platform-aware.
+Then return to planned-reversal/repeated-path consist body routing.
 
 ## Current foundation
 
@@ -141,7 +147,7 @@ platform lengths and safe assignment precede multiple platforms/trains per servi
 | --- | --- | --- |
 | Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices, stored spares and Shuttle/Loop routes are implemented. Implemented: up to eight independent active passenger services (e.g. A–B and A–C), each with its own assigned train, route, mode, directives and saved runtime. Shared switches, no overlaps, physical recovery, withdrawal/storage and save/load are checked. Multiple trains per service and multiple platforms remain later work. |
 | Waypoints and waypoint directives | Place lightweight markers or directional waypoints to force a train through a particular track without constructing a station. Allow routing directives associated with signals. | Implemented: up to 16 ordered pass-through track cells per passenger leg (including a Loop closing leg) and outward freight leg, map selection, editing and persisted directives for passenger and freight routes. Shuttles return along that path in reverse; passenger Loops route last-to-first independently. Entry ports are preserved through waypoint routing; stops, reservations and signals remain authoritative. One-way/directional waypoint rules and independent Shuttle return directives remain planned. See [waypoints](WAYPOINTS.md). |
-| Train consists and rolling stock | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Implemented: up to four passenger coaches or log wagons per locomotive, capacity/cost/speed/length effects, visible vehicles, safe empty-home edits, straight signal-free stop clearance and full-body load validation. Consists now support two-/three-stop Shuttle routes without revisiting tiles, with body continuity across intermediate dwell, return visits, saved states and manual turn-back. Continuous carriage Loops are also implemented when only the closing first stop repeats and every station is a through stop; see [Loop consists](LOOP_CONSISTS.md). Phase 1B still needs planned intermediate-reversal/repeated-path body routing and formal platform lengths before those combinations are enabled. Other stock types follow their cargo/classes in Phase 2; see [consists](CONSISTS.md). |
+| Train consists and rolling stock | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Implemented: up to four passenger coaches or log wagons per locomotive, capacity/cost/speed/length effects, visible vehicles, safe empty-home edits, straight signal-free stop clearance and full-body load validation. Consists now support two-/three-stop Shuttle routes without revisiting tiles, with body continuity across intermediate dwell, return visits, saved states and manual turn-back. Continuous carriage Loops are also implemented when only the closing first stop repeats and every station is a through stop; see [Loop consists](LOOP_CONSISTS.md). Platform lengths are now measured and shown (see [platforms](PLATFORMS.md)); Phase 1B still needs planned intermediate-reversal/repeated-path body routing and platform IDs/multiple platforms before those combinations are enabled. Other stock types follow their cargo/classes in Phase 2; see [consists](CONSISTS.md). |
 | Passing loops and multiple platforms | Reduce bottlenecks and let faster services pass slower trains. | Passing loops work with configured waypoints and signal boundaries; easier safe branch selection remains to be added. Multiple platforms are planned: introduce stable platform IDs, physical tracks, usable length, compatibility, deterministic basic assignment and safe entry/exit reservations in Phase 1B. Passenger/transfer-aware preferences belong to Phase 2A. See [tested passing loops](MULTIPLE_SERVICES.md). |
 | Service duplication, route cloning and drag reordering | Make service expansion and stop editing easier without disturbing running trains. | Planned in Phase 1B: clone into an editable draft, preserve waypoint-to-leg associations when reordering and flag directives whose legs disappear, preview changes and apply only at a safe point. Cloning does not automatically buy/spawn a train; validate assignments and current reservations before activating another service. |
 | Non-disruptive service edits and replacement rules | Draft changes for application after the trip, at a depot or when safe; replace ageing trains or increase capacity at sustained high occupancy. | Extend current immediate paused replacements once lifecycle, utilisation and safe change points exist. Keep automatic rules opt-in and show projected purchase costs. |
@@ -358,7 +364,7 @@ instead of adding a separate campaign simulation.
    through the Loop boundary. Still needed: planned intermediate reversals and other
    repeated paths before enabling those combinations.
    Extend regression tests for tail locks and save/load.
-3. **Formal platform lengths and multiple platforms (1B):** physical geometry,
+3. **Formal platform lengths and multiple platforms (1B, lengths implemented):** physical geometry,
    stable IDs, train fit, basic assignment and safe arrival/departure reservations;
    improve passing-loop branch selection while preserving waypoint intent.
 4. **Service editor expansion and frequency foundation (1B → 2A):** draft-based
@@ -382,7 +388,7 @@ their prerequisite milestone. No global reservation SignalBus is planned.
 Implemented tools and evidence: [foundations](phase-0-foundations.md),
 [reservations](RESERVATIONS.md), [signals](SIGNALS.md), [recovery](DEADLOCKS.md),
 [waypoints](WAYPOINTS.md), [multiple services/passing loops](MULTIPLE_SERVICES.md),
-[consists](CONSISTS.md), [inspection](NETWORK_INSPECTION.md),
+[consists](CONSISTS.md), [platform lengths](PLATFORMS.md), [inspection](NETWORK_INSPECTION.md),
 [problems/waiting](PROBLEMS_AND_WAITING.md), [alerts](NOTIFICATIONS.md),
 [construction drafts](CONSTRUCTION_PLANNING.md), [corridor signals](CORRIDOR_SIGNALS.md),
 [blueprints](TRACK_BLUEPRINTS.md) and [object search](OBJECT_SEARCH.md).

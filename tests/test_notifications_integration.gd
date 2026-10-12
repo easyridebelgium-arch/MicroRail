@@ -110,6 +110,8 @@ func _run() -> void:
 	dialog.hide()
 	Settings.ui_scale = old_scale
 	Settings.notification_rules = Policy.defaults()
+	# Apply above wrote the test preferences to the real player config; restore it.
+	Settings.save_settings()
 	game.queue_free()
 	await process_frame
 	print("Notifications integration: %d checks, %d failures" % [checks, failures])

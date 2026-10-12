@@ -23,6 +23,7 @@ const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
+const Platforms = preload("res://scripts/core/platforms.gd")
 var notifications = NotificationPolicy.new()
 
 const TrafficMetrics = preload("res://scripts/core/traffic_metrics.gd")
@@ -2061,6 +2062,7 @@ func _update_station_inspector() -> void:
 				if running.connected and services[service].stops[running.next_stop()] == key: incoming += running.passengers
 		station_title.text = ServiceRoutes.STATIONS[key].name
 		station_details.text = "Services: %s\n\nWaiting passengers: %d\nIncoming passengers: %d\n\n%s\n\nManage individual trains and upgrades in Fleet." % [", ".join(serving) if not serving.is_empty() else "None", _waiting(key), incoming, "\n".join(states)]
+		station_details.text += "\n\n" + _platform_text(selected_station)
 		return
 	capacity_upgrade_button.show()
 	speed_upgrade_button.show()
@@ -2109,6 +2111,7 @@ func _update_station_inspector() -> void:
 		MAX_SPEED_LEVEL,
 		service_status
 	]
+	station_details.text += "\n\n" + _platform_text(selected_station)
 
 	_update_upgrade_button(
 		capacity_upgrade_button,
@@ -3485,6 +3488,11 @@ func _waiting(key: String) -> int:
 
 func _set_waiting(key: String, count: int) -> void:
 	set("waiting_at_" + key, count)
+
+# Platform length is measured from the live track, so laying straight track
+# behind a stop lengthens it immediately.
+func _platform_text(cell: Vector2i) -> String:
+	return Platforms.describe(Platforms.measure(tracks, track_signals, cell, float(TILE_SIZE)), float(TILE_SIZE))
 
 func _station_key(cell: Vector2i) -> String:
 	for key in ServiceRoutes.STATIONS:

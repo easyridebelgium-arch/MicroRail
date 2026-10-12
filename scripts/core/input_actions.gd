@@ -5,6 +5,7 @@ extends RefCounted
 ## the left hand on any keyboard layout.
 
 const TOGGLE_PAUSE: StringName = &"toggle_pause"
+const TOGGLE_FULLSCREEN: StringName = &"toggle_fullscreen"
 const SPEED_NORMAL: StringName = &"speed_normal"
 const SPEED_DOUBLE: StringName = &"speed_double"
 const SPEED_FAST: StringName = &"speed_fast"
@@ -32,6 +33,7 @@ const ZOOM_OUT: StringName = &"zoom_out"
 ## Keyboard actions shown on the settings screen.
 const ORDER: Array[StringName] = [
 	TOGGLE_PAUSE,
+	TOGGLE_FULLSCREEN,
 	SPEED_NORMAL,
 	SPEED_DOUBLE,
 	SPEED_FAST,
@@ -65,6 +67,7 @@ const MAX_MOUSE_BUTTON: int = 9
 static func label(action: StringName) -> String:
 	match action:
 		TOGGLE_PAUSE: return "Pause / resume"
+		TOGGLE_FULLSCREEN: return "Toggle fullscreen"
 		SPEED_NORMAL: return "Simulation speed 1×"
 		SPEED_DOUBLE: return "Simulation speed 2×"
 		SPEED_FAST: return "Simulation speed 5×"
@@ -107,6 +110,7 @@ static func uses_mouse(action: StringName) -> bool:
 static func default_keys(action: StringName) -> PackedInt32Array:
 	match action:
 		TOGGLE_PAUSE: return PackedInt32Array([KEY_SPACE])
+		TOGGLE_FULLSCREEN: return PackedInt32Array([KEY_F11])
 		SPEED_NORMAL: return PackedInt32Array([KEY_1])
 		SPEED_DOUBLE: return PackedInt32Array([KEY_2])
 		SPEED_FAST: return PackedInt32Array([KEY_3])

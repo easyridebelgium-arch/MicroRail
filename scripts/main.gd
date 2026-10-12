@@ -420,13 +420,17 @@ func _modal_open() -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	if not (focused is LineEdit or focused is TextEdit) and event.is_action_pressed(InputActions.TOGGLE_FULLSCREEN):
+		GameSettings.toggle_fullscreen(get_window())
+		get_viewport().set_input_as_handled()
+		return
 	if _modal_open():
 		_clear_direct_inspection()
 		return
 	if event is InputEventMouseMotion:
 		_cancel_direct_inspection_if_dragged(_mouse_to_cell())
 
-	var focused: Control = get_viewport().gui_get_focus_owner()
 	if not (focused is LineEdit or focused is TextEdit):
 		for index in range(InputActions.SPEED_ACTIONS.size()):
 			if event.is_action_pressed(InputActions.SPEED_ACTIONS[index]):

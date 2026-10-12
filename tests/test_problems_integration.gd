@@ -13,6 +13,8 @@ func tick(game: Node) -> void:
 	game.sim_clock.begin_tick()
 	game._simulation_step(1.0 / 60.0)
 func _run() -> void:
+	# Use a desktop window size; headless defaults to 64x64.
+	root.size = Vector2i(1280, 720)
 	var results: Array = []
 	for fps in [30, 60, 120]:
 		var game = load("res://scenes/main/main.tscn").instantiate()

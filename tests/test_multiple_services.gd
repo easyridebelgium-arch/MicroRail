@@ -44,6 +44,8 @@ func write_save(path: String, value: Dictionary) -> void:
 	file.store_string(JSON.stringify(value))
 	file.close()
 func _run() -> void:
+	# Use a desktop window size; headless defaults to 64x64.
+	root.size = Vector2i(1280, 720)
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	game.paused = true
 	root.add_child(game)

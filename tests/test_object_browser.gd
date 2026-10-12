@@ -8,6 +8,8 @@ func check(ok: bool, message: String) -> void:
 		printerr(message)
 func _initialize() -> void: _run.call_deferred()
 func _run() -> void:
+	# Use a desktop window size; headless defaults to 64x64.
+	root.size = Vector2i(1280, 720)
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	game.paused = true
 	root.add_child(game)

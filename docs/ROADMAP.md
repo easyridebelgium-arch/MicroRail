@@ -82,7 +82,9 @@ The merged foundation and fleet integration passes headless checks in Godot 4.6.
 including fixed-step movement, save migration and RNG continuation. The Phase 0
 accessibility and command-queue work is integrated: UI scale to 200%, keyboard and
 mouse remapping, compact layouts and saved pending construction commands. Full
-input replay and controller support remain later work. See [foundation status](phase-0-foundations.md).
+input replay and controller support remain later work. The desktop viewport now
+fills its window, starts maximized and offers saved fullscreen with a remappable
+F11 shortcut; see [display controls](DISPLAY.md). See [foundation status](phase-0-foundations.md).
 
 | Foundation | Scope and completion evidence |
 | --- | --- |

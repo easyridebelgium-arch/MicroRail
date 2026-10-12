@@ -13,6 +13,7 @@ var scale_choice: OptionButton
 var palette_choice: OptionButton
 var reduced_motion_check: CheckBox
 var compact_header_check: CheckBox
+var fullscreen_check: CheckBox
 var key_grid: GridContainer
 var status: Label
 
@@ -42,6 +43,9 @@ func configure() -> void:
 	outer.add_child(box)
 
 	box.add_child(_heading("Display"))
+	fullscreen_check = CheckBox.new()
+	fullscreen_check.text = "Fullscreen"
+	box.add_child(fullscreen_check)
 
 	scale_choice = OptionButton.new()
 	for scale_value in Settings.UI_SCALES:
@@ -144,6 +148,8 @@ func open_dialog() -> void:
 	palette_choice.select(Settings.palette_mode)
 	reduced_motion_check.button_pressed = Settings.reduced_motion
 	compact_header_check.button_pressed = Settings.compact_header
+	fullscreen_check.button_pressed = Settings.fullscreen
+	fullscreen_check.tooltip_text = "Toggle fullscreen: " + Actions.key_label(Actions.TOGGLE_FULLSCREEN)
 	var rules := Settings.NotificationPolicy.normalize(Settings.notification_rules)
 	for category in notification_choices:
 		notification_choices[category].select(int(rules[category]))
@@ -228,6 +234,12 @@ func _reset_mouse_buttons() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# Window controls also work here, but never steal a key being remapped.
+	if visible and capturing_action == &"" and event.is_action_pressed(Actions.TOGGLE_FULLSCREEN):
+		Settings.toggle_fullscreen(get_tree().root)
+		fullscreen_check.button_pressed = Settings.fullscreen
+		get_viewport().set_input_as_handled()
+		return
 	if capturing_action == &"" or not visible:
 		return
 
@@ -347,6 +359,7 @@ func _apply() -> void:
 	Settings.palette_mode = maxi(palette_choice.selected, 0)
 	Settings.reduced_motion = reduced_motion_check.button_pressed
 	Settings.compact_header = compact_header_check.button_pressed
+	Settings.fullscreen = fullscreen_check.button_pressed
 	for category in notification_choices:
 		Settings.notification_rules[category] = notification_choices[category].selected
 

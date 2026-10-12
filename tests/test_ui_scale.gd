@@ -21,6 +21,9 @@ func check(value: bool, message: String) -> void:
 
 
 func _run() -> void:
+	# Headless windows default to 64x64. Adaptive layout must be tested with
+	# an actual desktop size rather than the old fixed reference canvas.
+	root.size = Vector2i(1280, 720)
 	var original_scale: float = Settings.ui_scale
 	var scene: PackedScene = load("res://scenes/main/main.tscn")
 	var game = scene.instantiate()

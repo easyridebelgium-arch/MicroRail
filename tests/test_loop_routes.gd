@@ -21,6 +21,8 @@ func advance_until(game: Node, predicate: Callable, limit: int = 4000) -> void:
 		tick(game)
 	check(false, "Timed out waiting for loop movement")
 func _run() -> void:
+	# Use a desktop window size; headless defaults to 64x64.
+	root.size = Vector2i(1280, 720)
 	var defaults := Services.defaults()
 	check(defaults.passenger.mode == "shuttle" and Services.is_valid(defaults), "Existing routes default to Shuttle")
 	for mode in ["unknown", 2, null]:

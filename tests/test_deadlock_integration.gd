@@ -57,6 +57,8 @@ func collide(game: Node, fps: int) -> bool:
 		if not game.deadlocks.cycles.is_empty(): break
 	return overlap
 func _run() -> void:
+	# Use a desktop window size; headless defaults to 64x64.
+	root.size = Vector2i(1280, 720)
 	var snapshots: Array = []
 	for fps in [30, 60, 120]:
 		var game = fixture()

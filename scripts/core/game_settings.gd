@@ -30,6 +30,9 @@ const PALETTE_NAMES: Array[String] = [
 static var ui_scale: float = 1.0
 static var palette_mode: int = PaletteMode.DEFAULT
 static var reduced_motion: bool = false
+static var fullscreen: bool = false
+## Restore the previous desktop window when leaving fullscreen.
+static var _windowed_mode: Window.Mode = Window.MODE_MAXIMIZED
 
 ## Hides the title and key hints and shortens the status text. Always on at 175%
 ## and above, where the header would otherwise fill the window.
@@ -55,6 +58,7 @@ static func load_settings() -> void:
 	)
 	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
 	compact_header = bool(config.get_value("display", "compact_header", false))
+	fullscreen = bool(config.get_value("display", "fullscreen", false))
 
 	notification_rules = NotificationPolicy.normalize(config.get_value("notifications", "rules", {}))
 
@@ -72,6 +76,7 @@ static func save_settings() -> bool:
 	config.set_value("display", "palette", palette_mode)
 	config.set_value("display", "reduced_motion", reduced_motion)
 	config.set_value("display", "compact_header", compact_header)
+	config.set_value("display", "fullscreen", fullscreen)
 	config.set_value("input", "bindings", key_bindings)
 	config.set_value("input", "mouse_bindings", mouse_bindings)
 	config.set_value("notifications", "rules", NotificationPolicy.normalize(notification_rules))
@@ -81,7 +86,30 @@ static func save_settings() -> bool:
 
 ## Applies the settings that act on the window itself.
 static func apply(window: Window) -> void:
+	# Use the real window size: enlarging it reveals more map, rather than
+	# enlarging a fixed 1280x720 canvas. UI scaling still works independently.
+	window.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+	window.content_scale_size = Vector2i.ZERO
 	window.content_scale_factor = ui_scale
+	apply_fullscreen(window)
+
+
+static func apply_fullscreen(window: Window) -> void:
+	var currently_fullscreen: bool = window.mode in [Window.MODE_FULLSCREEN, Window.MODE_EXCLUSIVE_FULLSCREEN]
+	if fullscreen == currently_fullscreen:
+		return
+	if fullscreen:
+		_windowed_mode = window.mode if window.mode in [Window.MODE_WINDOWED, Window.MODE_MAXIMIZED] else Window.MODE_MAXIMIZED
+		window.mode = Window.MODE_FULLSCREEN
+	else:
+		window.mode = _windowed_mode
+
+
+static func toggle_fullscreen(window: Window) -> void:
+	fullscreen = not fullscreen
+	apply_fullscreen(window)
+	if not save_settings():
+		push_warning("Could not save fullscreen preference; it applies for this session only.")
 
 
 static func use_compact_header() -> bool:

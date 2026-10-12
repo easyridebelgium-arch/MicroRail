@@ -20,6 +20,8 @@ func add_loop(game: Node, left: int, right: int, row: int) -> void:
 	game.tracks[Vector2i(right, row + 3)] = Geometry.from_ports(Vector2i.UP, Vector2i.LEFT)
 	for x in range(left + 1, right): game.tracks[Vector2i(x, row + 3)] = false
 func _run() -> void:
+	# Use a desktop window size; headless defaults to 64x64.
+	root.size = Vector2i(1280, 720)
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	game.set_process(false)
 	root.add_child(game)

@@ -29,6 +29,12 @@ fixed-tick FPS comparisons do not establish cross-version replay compatibility.
 | Post-recovery integrity | Existing recovery tests check position/load preservation, safe movement and save/load. Ownership is rebuilt normally and passed tiles release; never reset all locks while a train still physically occupies them. Extend multi-platform/body boundary cases as those systems arrive. |
 
 The next expansion of this checklist follows Phase 1B: continuous long-body routing
-across intermediate reversals/Loops, usable platform lengths, multiple platforms and
+across planned intermediate reversals/Loops, usable platform lengths, multiple platforms and
 safe multiple trains per service. Service priorities and directional signals get
 explicit new criteria when implemented.
+
+Three-stop carriage Shuttles are now exercised by `test_multi_stop_consists.gd`:
+body ownership and unchanged carriage positions across intermediate dwell, both
+travel directions, manual signals, middle-leg recovery, primary/additional service
+save/load, and rejection of planned reversals/repeated retained tiles. This expands
+supported intermediate **stops**, not Loop wrapping or folded body movement.

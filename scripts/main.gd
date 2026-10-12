@@ -1593,8 +1593,8 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		return
 	var loaded_services := ServiceRoutes.from_save(data["services"])
 	for key in loaded_services:
-		if Fleet.length(Fleet.assigned(data.fleet, key)) > Reservations.VEHICLE_LENGTH and (loaded_services[key].get("mode", "shuttle") == "loop" or loaded_services[key].stops.size() != 2):
-			_show_notice("Long consists need two-stop Shuttle routes.")
+		if Fleet.length(Fleet.assigned(data.fleet, key)) > Reservations.VEHICLE_LENGTH and loaded_services[key].get("mode", "shuttle") == "loop":
+			_show_notice("Long consists need Shuttle routes; Loop body wrapping is not supported yet.")
 			return
 	var loaded_extra: Dictionary = {}
 	for key in data["passenger_services"]:
@@ -4834,7 +4834,7 @@ func locate_object(row: Dictionary) -> bool:
 func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 	var body := Fleet.length(train)
 	if body <= Reservations.VEHICLE_LENGTH: return ""
-	if service.get("mode", "shuttle") == "loop" or service.stops.size() != 2: return "Long consists currently use two-stop Shuttle routes. Continuous body routing for Loops and intermediate reversals comes later."
+	if service.get("mode", "shuttle") == "loop": return "Long consists use Shuttle routes without repeated track tiles. Loop body wrapping comes later."
 	var path: Curve2D
 	var stops: Array
 	var cells: Array

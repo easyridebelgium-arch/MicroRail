@@ -63,7 +63,7 @@ func check_route(game: Node, notify: bool = true) -> void:
 
 func rebuild_at_home(game: Node) -> void:
 	if at_home():
-		var built := Services.build(game.tracks, configuration.stops, float(game.TILE_SIZE), configuration.get("waypoints", {}), configuration.get("mode", "shuttle"))
+		var built := Services.build(game.tracks, configuration.stops, float(game.TILE_SIZE), configuration.get("waypoints", {}), configuration.get("mode", "shuttle"), configuration.get("platforms", {}))
 		if not built.cells.is_empty() and built.cells != cells: configure(key, configuration, built)
 	check_route(game)
 
@@ -157,7 +157,7 @@ static func from_save(service_key: String, value: Variant, service: Dictionary, 
 		if float(value[field]) != floor(float(value[field])): return null
 	if value.stop_index >= service.stops.size() or value.return_stop >= service.stops.size() or value.passengers > capacity or value.dwell > 2 or value.operating_timer >= 1: return null
 	if value.returning and value.return_stop != value.stop_index: return null
-	var built := Runtime.passenger_path(Runtime.decode(value.cells), service.stops, 32, service.get("waypoints", {}), service.get("mode", "shuttle"))
+	var built := Runtime.passenger_path(Runtime.decode(value.cells), service.stops, 32, service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}))
 	if built.is_empty() or built.cells.is_empty(): return null
 	var original_forward: bool = not value.forward if value.returning else value.forward
 	if service.get("mode", "shuttle") == "loop" and not original_forward: return null

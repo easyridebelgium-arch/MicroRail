@@ -15,6 +15,7 @@ var add_button: Button
 var remove_button: Button
 var up_button: Button
 var down_button: Button
+var platform_choice: OptionButton
 var waypoint_leg: OptionButton
 var waypoint_list: ItemList
 var waypoint_x: SpinBox
@@ -71,6 +72,13 @@ func configure(owner_game: Node) -> void:
 	remove_button = _button("Remove", _remove_stop)
 	up_button = _button("Up", _move_stop.bind(-1))
 	down_button = _button("Down", _move_stop.bind(1))
+	platform_choice = OptionButton.new()
+	for number in [1, 2, 3]: platform_choice.add_item("Platform %d" % number)
+	platform_choice.tooltip_text = "Platform used at the selected stop. Platforms 2 and 3 are sidings beside the station tile; build and connect them first."
+	platform_choice.disabled = true
+	platform_choice.item_selected.connect(_select_platform)
+	editing_controls.add_child(platform_choice)
+	stop_list.item_selected.connect(_show_platform)
 	var waypoint_heading := Label.new()
 	waypoint_heading.text = "Pass-through waypoints — no loading or station wait"
 	box.add_child(waypoint_heading)
@@ -155,12 +163,19 @@ func _show_service() -> void:
 func _refresh_stops(selected: int = -1) -> void:
 	stop_list.clear()
 	var stops: Array = draft[_key()]["stops"]
+	# Platform choices only make sense for stops that remain on the route.
+	var platforms: Dictionary = draft[_key()].get("platforms", {})
+	for stop in platforms.keys():
+		if not stops.has(stop): platforms.erase(stop)
+	draft[_key()]["platforms"] = platforms
 	for index in range(stops.size()):
 		var key: String = stops[index]
 		var stop_name: String = Services.STATIONS[key]["name"] if Services.STATIONS.has(key) else ("Forest — load logs" if key == "forest" else "Terminal — unload logs")
-		stop_list.add_item("%d. %s" % [index + 1, stop_name])
+		var chosen: int = int(draft[_key()].get("platforms", {}).get(key, 1))
+		stop_list.add_item("%d. %s%s" % [index + 1, stop_name, "" if chosen == 1 else " — platform %d" % chosen])
 	if selected >= 0 and selected < stops.size():
 		stop_list.select(selected)
+	_show_platform(selected)
 	var itinerary := stops.duplicate()
 	if draft[_key()].get("mode", "shuttle") == "loop": itinerary.append(stops[0])
 	else:
@@ -171,6 +186,23 @@ func _refresh_stops(selected: int = -1) -> void:
 	for stop in itinerary: names.append(str(stop).to_upper())
 	heading.text = "Stop sequence: " + " → ".join(names)
 	_refresh_legs()
+
+func _show_platform(index: int) -> void:
+	var stops: Array = draft[_key()]["stops"]
+	platform_choice.disabled = index < 0 or index >= stops.size()
+	if platform_choice.disabled: return
+	platform_choice.select(int(draft[_key()].get("platforms", {}).get(stops[index], 1)) - 1)
+
+func _select_platform(choice: int) -> void:
+	var selected: PackedInt32Array = stop_list.get_selected_items()
+	if selected.is_empty(): return
+	var stop: String = draft[_key()]["stops"][selected[0]]
+	var platforms: Dictionary = draft[_key()].get("platforms", {})
+	if choice == 0: platforms.erase(stop)
+	else: platforms[stop] = choice + 1
+	draft[_key()]["platforms"] = platforms
+	_refresh_stops(selected[0])
+	status.text = "Platform changed in draft. Apply checks that the siding is connected and long enough for the train."
 
 func _select_mode(index: int) -> void:
 	draft[_key()]["mode"] = "loop" if index == 1 else "shuttle"

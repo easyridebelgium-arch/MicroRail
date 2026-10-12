@@ -11,19 +11,19 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | --- | --- | --- |
 | Phase 0 — Foundations | Implemented; requirements remain active for every update. | Continue deterministic, save and accessibility checks. Full input replay/controller support are later extensions. |
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
-| Phase 1B — Service operations | Partially complete. | Planned-reversal/repeated-path consist body routing, routing and reserving platforms at sidings (lengths, numbering and the assignment rule exist), service cloning and multiple trains per service. |
+| Phase 1B — Service operations | Partially complete. | Planned-reversal/repeated-path consist body routing, automatic platform choice and platform-aware reservations (lengths, numbering, assignment rule and fixed per-stop sidings exist), service cloning and multiple trains per service. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. Unified waiting inspection is implemented. |
 | Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Next implementation:** route trains to sidings (switch-connected platforms), choose a platform on arrival
-with `Platforms.assign` and make arrival/departure reservations platform-aware (Phase 1B), then
-planned-reversal/repeated-path body routing. Platform lengths, stable numbered platforms (1 = stop track,
+**Next implementation:** choose a free platform at arrival time with `Platforms.assign` and make
+arrival/departure reservations platform-aware (Phase 1B), then planned-reversal/repeated-path body routing.
+Services can already be assigned a fixed platform per stop in Routes (trains drive onto switch-connected sidings). Platform lengths, stable numbered platforms (1 = stop track,
 2 = siding below, 3 = siding above) and the assignment rule are implemented and shown in the station panel;
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation ran all 49 headless suites, including
+complete. The most recent validation ran all 50 headless suites, including
 desktop-size UI fixtures, fullscreen checks and the new platform tests, in
 Godot 4.7.stable (earlier runs used 4.6.3). Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
@@ -34,8 +34,10 @@ fullscreen (Settings/F11) are implemented and confirmed working by the player.
 Platform length measurement is implemented (`scripts/core/platforms.gd`, station
 panel line, `tests/test_platforms.gd`, `tests/test_platform_ui.gd`). Platform IDs, multi-platform detection
 from parallel sidings and `Platforms.assign` are also implemented (data and display only; trains still
-stop at the station's own tile). Continue Phase 1B at step 3 of the agreed order: let services route to
-and reserve a chosen platform, then return to planned-reversal/repeated-path consist body routing.
+stop at the station's own tile). Services can also be given a fixed platform per stop in the Routes editor
+(`ServiceRoutes.stop_cell`, `platforms` in each service, `tests/test_platform_routes.gd`; the first stop's
+platform is fixed). Continue Phase 1B at step 3 of the agreed order: pick a free platform at arrival and make
+reservations platform-aware, then return to planned-reversal/repeated-path consist body routing.
 
 ## Current foundation
 
@@ -366,7 +368,7 @@ instead of adding a separate campaign simulation.
    through the Loop boundary. Still needed: planned intermediate reversals and other
    repeated paths before enabling those combinations.
    Extend regression tests for tail locks and save/load.
-3. **Formal platform lengths and multiple platforms (1B, lengths, IDs and assignment rule implemented; routing to sidings pending):** physical geometry,
+3. **Formal platform lengths and multiple platforms (1B, lengths, IDs and assignment rule implemented; fixed per-stop platform choice implemented; automatic choice at arrival pending):** physical geometry,
    stable IDs, train fit, basic assignment and safe arrival/departure reservations;
    improve passing-loop branch selection while preserving waypoint intent.
 4. **Service editor expansion and frequency foundation (1B → 2A):** draft-based

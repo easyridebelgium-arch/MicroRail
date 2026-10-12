@@ -34,9 +34,36 @@ must contain the tile directly beside the stop tile (same column). The station
 panel lists every platform with its length, the longest train it fits and the train
 currently occupying it.
 
+## Choosing a platform for a service
+
+In **Routes**, select a stop in the stop list and pick **Platform 1/2/3** beside the
+Up/Down buttons; the list shows `— platform N` for any choice other than 1. Apply
+rebuilds the route to that platform's stop tile, so the train really drives onto the
+siding and loads/unloads there. Two services can therefore use different platforms
+of one station, and the existing reservations and signals keep them apart.
+
+Rules:
+
+- The choice is stored per stop in the service as `platforms: {stop: number}`. It is
+  optional; services without it keep using platform 1. No save-version change was
+  needed. Saved runtime routes must end on the chosen platform's stop tile, or the
+  save is rejected.
+- The siding must already be built and connected (normally with a switch), exactly
+  like any other track. If it is missing or not connected, Apply refuses and
+  changes nothing.
+- A consist's platform fit is checked at the chosen platform's stop tile, using the
+  siding's own straight length.
+- The first stop's platform cannot change while that service stands on its current
+  platform, because the train starts every trip there. Choose platforms for later
+  stops, or move the first stop to another station.
+- Platform choices for stops removed from a route are dropped automatically.
+
+Platform choice is fixed per service. The automatic rule that picks a free platform
+at arrival time (`Platforms.assign`, below) is not wired to movement yet.
+
 `Platforms.assign` is the basic assignment rule: the lowest-numbered platform that
-fits the whole train and is not busy. It is a pure function with tests; **trains do
-not use sidings yet** because routing still targets the station's own stop tile.
+fits the whole train and is not busy. It is a pure function with tests; services use
+sidings only through the fixed per-stop choice above.
 
 ## Relationship to the existing check
 
@@ -48,10 +75,10 @@ extension tiles behind the start and beyond the end of a route (172 checks).
 
 ## Not yet implemented
 
-- Routing trains to a siding: connect sidings with switches, let arrival choose
-  `Platforms.assign`, and make arrival/departure reservations platform-aware so two
-  trains can use separate platforms of one station at the same time.
-- Persisting a player's platform preference per service.
+- Choosing a free platform at arrival time (`Platforms.assign`) instead of a fixed
+  choice, with arrival/departure reservations that wait for a platform to clear.
+- Platform choice for the first stop, and for freight terminals.
+- A build tool or overlay for sidings; today they are ordinary track.
 - Vertical or diagonal platforms (the existing rule only accepts horizontal track).
 - Routing consist bodies through planned reversals and repeated paths, which is
   still the other open item of Phase 1B.

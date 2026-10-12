@@ -13,7 +13,7 @@ The first one-cell extension from an open end follows the existing track's
 direction even when the pointer moves slightly off-axis; drag farther to start
 a bend. Branches off an existing through line create a switch automatically.
 
-A short right-click cancels the active gesture/tool and returns to Draw track.
+A short right-click cancels the active gesture/tool and returns to Connect track.
 Right-drag removes track; holding right for 0.4 seconds also activates removal.
 Moving 6 screen pixels starts a drag immediately, without waiting for the timer.
 Red removal previews commit on release, so Escape can cancel before deletion.
@@ -21,6 +21,12 @@ Alternatively press **R** (remappable), or select **Remove**, then left-drag.
 Right-click inside Traffic closes it on release, keeping its pause state; dialog
 and toolbar holds never delete the map underneath them. Staged construction is
 retained when changing tools; Apply or Discard handles that draft.
+
+A straight approach can also join an existing curve with an automatic switch,
+preserving both original curve connections. The three-port shape must allow the
+movement; a tight turn, extra exit or conflicting nearby track is still rejected.
+The preview/status message explains the rejection. Occupied/reserved curves
+remain protected, including in a loaded game.
 
 Open **Overlays** and enable **Draft construction**. The game pauses initially.
 You may resume while drafting; trains use only the actual built network.

@@ -225,16 +225,27 @@ static func straight_base(track_type: Variant) -> Variant:
 	return null
 
 
+## Original two-port connection, including the curve beneath an automatic switch.
+static func switch_base(track_type: Variant) -> Variant:
+	var ports: Array[Vector2i] = connections(track_type)
+	if ports.size() == 2: return track_type
+	if is_switch(track_type): return from_ports(ports[0], ports[1])
+	return null
+
+
 ## Every switch that can replace a straight tile without changing where its
 ## stem and through ports are: either end may be the stem, and the branch may
 ## leave on any side that makes a valid piece with the stem. Ordered.
 static func switch_variants(straight: Variant) -> Array:
-	var result: Array = []
-
 	if not is_straight(straight):
-		return result
+		return []
+	return _base_switch_variants(straight)
 
-	var ports: Array[Vector2i] = connections(straight)
+
+static func _base_switch_variants(base: Variant) -> Array:
+	var result: Array = []
+	var ports: Array[Vector2i] = connections(base)
+	if ports.size() != 2: return result
 
 	for stem_index in range(2):
 		var stem: Vector2i = ports[stem_index]
@@ -254,14 +265,14 @@ static func switch_variants(straight: Variant) -> Array:
 
 ## What clicking a tile with the Switch tool turns it into: a straight becomes
 ## the first switch variant, each switch becomes the next variant, and the last
-## goes back to the straight. Null for tiles that cannot hold a switch.
+## restores its original straight or curve. Null for unsupported manual placement.
 static func next_switch_variant(track_type: Variant) -> Variant:
-	var base: Variant = straight_base(track_type)
+	var base: Variant = switch_base(track_type) if is_switch(track_type) else straight_base(track_type)
 
 	if base == null:
 		return null
 
-	var variants: Array = switch_variants(base)
+	var variants: Array = _base_switch_variants(base)
 
 	if variants.is_empty():
 		return null

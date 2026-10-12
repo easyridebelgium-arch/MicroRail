@@ -8,6 +8,9 @@ side of an existing straight tile also includes that neighboring switch.
 Merging onto a straight end tile works even if it has zero or one connected
 neighbors, including when the approach begins on an already-built branch. The
 switch is placed on the selected merge tile, not on an offset old-port approach.
+Straight approaches can also merge into existing curves when a valid three-port
+shape exists. The switch keeps the curve's original two ports; those connections
+remain usable. An impossible tight turn or fourth exit remains a failed preview.
 
 The normal switch price (£100) is added to new-track costs (£10 per piece).
 The preview shows the full amount. The approach and switch commit together;
@@ -25,9 +28,11 @@ angle determines the stem orientation, with the stroke's requested continuation
 breaking ties for perpendicular branches. Existing route authority still controls
 the active switch state. Four-way crossings and extra exits require separate
 junctions; automatic construction does not convert them into unsupported switches.
-The manual Switch tool remains available for cycling a junction's shape.
+The manual Switch tool remains available for cycling a junction's shape. A switch
+created on a curve cycles through variants of that same curve and restores the
+original curve when removed. Blueprint placement also recognizes the curved base.
 
-Short right-click returns active map tools to Draw track and cancels the current
+Short right-click returns active map tools to Connect track and cancels the current
 gesture. Right-drag, or holding right for 0.4 seconds, previews track removal,
 which commits on release. A drag starts after 6 screen pixels; it needs no hold
 delay. Escape, entering UI or losing window focus cancels the gesture safely.
@@ -43,3 +48,7 @@ retention, left-drag removal and migration of the previous mouse binding.
 `test_right_mouse_gesture.gd` checks hold/drag classification at 30/60/120 FPS and
 1×/10× speeds, movement thresholds at 100%/200% UI scale, cancellation, protected
 track, draft removal, typing/modal guards and remappable R.
+`test_curve_junctions.gd` covers every simple curve and arrival direction, with
+zero/one/two connected neighbors; it checks retained old routes, actual mouse
+merges, saved/reloaded layouts, costs, Undo/Redo, drafts, blueprints, manual switch
+cycling and occupied-curve rejection.

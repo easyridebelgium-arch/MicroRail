@@ -38,7 +38,8 @@ func _run() -> void:
 		game.corridor_pick = 2
 		game._input(event(MOUSE_BUTTON_RIGHT))
 		game._input(event(MOUSE_BUTTON_RIGHT, false))
-		check(not game.get(tool) and game.draw_track_mode and not game.is_dragging and game.corridor_pick == 0 and game.build_plan.is_empty() and game.demolition_cells.is_empty(), "right click releases the active tool and gesture")
+		check(not game.get(tool) and not game.draw_track_mode and not game.is_dragging and game.corridor_pick == 0 and game.build_plan.is_empty() and game.demolition_cells.is_empty(), "right click releases the active tool and gesture")
+		check(game.straight_button.button_pressed and not game.curve_button.button_pressed, "right reset selects Connect, not Draw, in the toolbar")
 		check(game.tracks == original and game.money == funds and game.paused, "reset neither edits infrastructure nor resumes the game")
 		game._unhandled_input(event(MOUSE_BUTTON_RIGHT, false))
 		check(not game.is_dragging, "right release cannot start demolition")
@@ -47,7 +48,7 @@ func _run() -> void:
 	check(game.traffic_dialog.visible, "Traffic fixture opens")
 	game.traffic_dialog.window_input.emit(event(MOUSE_BUTTON_RIGHT))
 	game.traffic_dialog.window_input.emit(event(MOUSE_BUTTON_RIGHT, false))
-	check(not game.traffic_dialog.visible and game.draw_track_mode and game.paused, "right click inside Traffic closes it and returns to laying")
+	check(not game.traffic_dialog.visible and not game.draw_track_mode and game.paused, "right click inside Traffic closes it and returns to laying")
 	# Drafts survive tool changes; only the current gesture is cancelled.
 	game._set_planning_mode(true)
 	game.construction_plan.stage({Vector2i(40, 20): false}, game.tracks)

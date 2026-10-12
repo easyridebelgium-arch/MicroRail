@@ -54,8 +54,8 @@ static func place(data: Dictionary, anchor: Vector2i, tracks: Dictionary, signal
 			result.error = "Blueprint overlaps a platform or facility grounds."
 			return result
 		if tracks.has(cell) and not _same(tracks[cell], row[2]):
-			var base: Variant = Geometry.straight_base(row[2])
-			if not Geometry.is_straight(tracks[cell]) or not Geometry.is_switch(row[2]) or base == null or not Geometry.same_connections(tracks[cell], base):
+			var base: Variant = Geometry.switch_base(row[2])
+			if Geometry.connections(tracks[cell]).size() != 2 or not Geometry.is_switch(row[2]) or base == null or not Geometry.same_connections(tracks[cell], base):
 				result.error = "Blueprint overlaps different track at %d,%d." % [cell.x, cell.y]
 				return result
 		result.tracks[cell] = row[2]

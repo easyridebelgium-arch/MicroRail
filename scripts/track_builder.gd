@@ -53,14 +53,14 @@ static func _can_branch(cell: Vector2i, tracks: Dictionary, fixed: Array[Vector2
 
 
 static func _can_merge(cell: Vector2i, tracks: Dictionary, fixed: Array[Vector2i]) -> bool:
-	# Arrival may add a branch to an end tile too. Do not divert the approach
+	# Arrival may add a branch to a straight or curve end tile. Do not divert it
 	# onto an old port merely because only one through neighbor is built.
-	return not fixed.has(cell) and tracks.has(cell) and Geometry.is_straight(tracks[cell])
+	return not fixed.has(cell) and tracks.has(cell) and Geometry.connections(tracks[cell]).size() == 2
 
 
 static func _automatic_switch(old: Variant, requested: Array[Vector2i]) -> Variant:
-	if not Geometry.is_straight(old): return null
 	var ports: Array[Vector2i] = Geometry.connections(old)
+	if ports.size() != 2: return null
 	var branches: Array[Vector2i] = []
 	for port in requested:
 		if not ports.has(port) and not branches.has(port): branches.append(port)
@@ -69,7 +69,8 @@ static func _automatic_switch(old: Variant, requested: Array[Vector2i]) -> Varia
 	var best: Variant = null
 	var best_score: float = INF
 	for stem in ports:
-		var kind: Variant = Geometry.switch_type(stem, -stem, branch)
+		var through: Vector2i = ports[1] if ports[0] == stem else ports[0]
+		var kind: Variant = Geometry.switch_type(stem, through, branch)
 		if kind == null: continue
 		var score: float = Vector2(stem).normalized().dot(Vector2(branch).normalized())
 		if requested.has(stem): score -= 0.01
@@ -159,10 +160,10 @@ static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i,
 					_fail(result, cell, "This junction cannot support that movement. Use another switch.")
 					continue
 				kind = old
-			elif Geometry.is_straight(old) and (not ports.has(first) or not ports.has(second)):
+			elif ports.size() == 2 and (not ports.has(first) or not ports.has(second)):
 				kind = _automatic_switch(old, [first, second])
 				if kind == null:
-					_fail(result, cell, "A switch supports one branch. Use separate junctions for more exits.")
+					_fail(result, cell, "Cannot add this branch without a tight turn or extra exit. Join from another direction or use a separate switch.")
 					continue
 		if kind == null:
 			_fail(result, cell, "Turn too tight. Draw a wider bend.")
@@ -182,7 +183,7 @@ static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i,
 		else:
 			result["new_count"] += 1
 		result["changes"][cell] = kind
-	# A new end touching the side of an existing straight also needs a switch,
+	# A new end touching the side of an existing straight/curve needs a switch,
 	# even if that existing tile wasn't explicitly included in the mouse stroke.
 	for cell in result["tiles"].keys():
 		if tracks.has(cell): continue

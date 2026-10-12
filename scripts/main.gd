@@ -1091,8 +1091,8 @@ func _use_switch_tool(cell: Vector2i) -> void:
 	_submit_command("set_tile", {"x": cell.x, "y": cell.y, "tile": next})
 
 
-# Swaps one tile between a straight and its switch variants. The stem and
-# through ports never change, so existing routes stay valid.
+# Cycling retains the original two-port connection, whether straight or curved.
+# Removing a switch restores that base.
 func _execute_set_tile(data: Dictionary) -> void:
 	_rebuild_reservations()
 	var cell := Vector2i(int(data["x"]), int(data["y"]))
@@ -1102,8 +1102,8 @@ func _execute_set_tile(data: Dictionary) -> void:
 		return
 
 	var old_tile: Variant = tracks[cell]
-	var old_base: Variant = TrackGeometry.straight_base(old_tile)
-	var new_base: Variant = TrackGeometry.straight_base(new_tile)
+	var old_base: Variant = TrackGeometry.switch_base(old_tile)
+	var new_base: Variant = TrackGeometry.switch_base(new_tile)
 
 	if old_base == null or new_base == null or not TrackGeometry.same_connections(old_base, new_base):
 		return
@@ -1772,7 +1772,7 @@ func _reset_track_tools(keep_right_gesture: bool = false) -> void:
 	signal_tool_mode = false
 	waypoint_tool_mode = false
 	demolition_mode = false
-	draw_track_mode = true
+	draw_track_mode = false
 	is_dragging = false
 	is_panning = false
 	corridor_pick = 0

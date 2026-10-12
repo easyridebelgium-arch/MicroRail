@@ -200,6 +200,7 @@ var wait_remaining: float = 0.0
 var paused: bool = false
 var is_dragging: bool = false
 var drag_start: Vector2i = Vector2i.ZERO
+var drag_pointer_start: Vector2 = Vector2.INF
 
 var waiting_at_a: int = 8
 var waiting_at_b: int = 8
@@ -507,6 +508,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				demolition_cells.clear()
 				demolition_blocked.clear()
 				drag_start = cell
+				drag_pointer_start = to_local(_pointer_world())
 				build_stroke.assign([cell])
 				is_dragging = true
 				_refresh_build_plan(cell, true)
@@ -3459,7 +3461,8 @@ func _update_objective_panel() -> void:
 
 func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 	var working: Dictionary = construction_plan.projected(tracks) if planning_mode else tracks
-	if not force and target == build_last_hover:
+	# Within the first cell the pointer still determines a single tile's angle.
+	if not force and target == build_last_hover and target != drag_start:
 		return
 	build_last_hover = target
 	var cells: Array[Vector2i]
@@ -3481,7 +3484,29 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 	else:
 		cells = TrackBuilder.line(drag_start, target, working)
 	var fixed: Array[Vector2i] = [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
-	build_plan = TrackBuilder.plan(cells, working, Vector2i(MAP_WIDTH, MAP_HEIGHT), _is_station_space, fixed)
+	var single_direction := Vector2i.RIGHT
+	var short_direction := Vector2i.ZERO
+	# An empty starting cell is the first piece of the measured stroke, not an
+	# extra piece on top of its length. Existing endpoint tiles are free anchors.
+	if cells.size() > 1 and not working.has(drag_start) and not working.has(cells.back()):
+		short_direction = cells[1] - cells[0]
+		cells = cells.duplicate()
+		cells.pop_back()
+	if cells.size() == 1 and short_direction != Vector2i.ZERO:
+		single_direction = short_direction
+	elif cells.size() == 1 and drag_pointer_start.is_finite():
+		var offset := to_local(_pointer_world()) - drag_pointer_start
+		if offset.length() * camera.zoom.x * applied_ui_scale >= 3.0:
+			var angle: float = roundf(offset.angle() / (PI / 4.0)) * (PI / 4.0)
+			single_direction = Vector2i(roundi(cos(angle)), roundi(sin(angle)))
+	if cells.size() == 1 and not working.has(drag_start):
+		# A new piece beside an open rail continues that rail's exit direction.
+		for direction in TrackGeometry.DIRECTIONS:
+			var neighbor: Vector2i = drag_start - direction
+			if working.has(neighbor) and TrackGeometry.connections(working[neighbor]).has(direction):
+				single_direction = direction
+				break
+	build_plan = TrackBuilder.plan(cells, working, Vector2i(MAP_WIDTH, MAP_HEIGHT), _is_station_space, fixed, single_direction)
 
 func _waiting(key: String) -> int:
 	return int(get("waiting_at_" + key))

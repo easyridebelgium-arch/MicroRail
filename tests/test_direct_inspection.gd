@@ -50,7 +50,8 @@ func _run() -> void:
 	mouse(game, game._cell_center(Vector2i(40, 18)), true)
 	check(game.is_dragging and game.direct_inspect_train < 0, "empty-map press must retain the ordinary construction gesture")
 	mouse(game, game._cell_center(Vector2i(44, 18)), false)
-	check(game.tracks.has(Vector2i(40, 18)) and game.tracks.has(Vector2i(44, 18)) and not game.train_inspector.visible, "empty-map drag must build through the ordinary construction path")
+	check(game.tracks.has(Vector2i(40, 18)) and game.tracks.has(Vector2i(43, 18)) and not game.tracks.has(Vector2i(44, 18)) and not game.train_inspector.visible, "four-cell empty-map drag must build four pieces without an extra endpoint")
+	check(game.money == balance - 80, "empty-map drag charges four pieces in addition to the prior station extension")
 	game.signal_tool_mode = true
 	mouse(game, game._cell_center(Vector2i(7, 8)), true)
 	mouse(game, game.pointer, false)

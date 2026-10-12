@@ -1,5 +1,17 @@
 # Construction drafting
 
+A click on empty ground previews and places one horizontal track piece. A short
+drag within that cell sets its direction, including diagonals, without requiring
+a second piece. Continue into more cells to build a longer stroke. This works in
+both Draw and Connect modes; each new cell is charged once. Clicking an existing
+track does not replace it, and direct station/train clicks retain inspection.
+When starting on empty ground, a one-cell drag places one piece in the starting
+cell; each further cell of movement adds one piece. Starting on an existing rail
+uses that rail as the anchor instead. Connecting to an existing endpoint includes
+the complete connection, without charging for either existing rail.
+The first one-cell extension follows the existing track's direction even when
+the pointer moves slightly off-axis; drag farther to start a bend.
+
 Open **Overlays** and enable **Draft construction**. The game pauses initially.
 You may resume while drafting; trains use only the actual built network.
 

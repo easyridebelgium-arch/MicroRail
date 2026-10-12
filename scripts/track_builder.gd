@@ -17,6 +17,11 @@ static func line(start: Vector2i, finish: Vector2i, tracks: Dictionary) -> Array
 	if start == finish:
 		return segment(start, finish)
 	var direct: Vector2i = finish - start
+	# A one-cell gesture off an existing endpoint is just its straight lead-out.
+	# Do not manufacture extra cells to bend toward a nearby off-axis pointer.
+	if tracks.has(start) and not tracks.has(finish) and maxi(absi(direct.x), absi(direct.y)) == 1:
+		var extension: Array[Vector2i] = [start, start + _endpoint_port(start, finish, tracks)]
+		return extension
 	if direct.x == 0 or direct.y == 0 or absi(direct.x) == absi(direct.y):
 		var direction := Vector2i(signi(direct.x), signi(direct.y))
 		if (not tracks.has(start) or Geometry.connections(tracks[start]).has(direction)) and (not tracks.has(finish) or Geometry.connections(tracks[finish]).has(-direction)):
@@ -65,10 +70,10 @@ static func append_stroke(cells: Array[Vector2i], target: Vector2i) -> void:
 			cells.append(cell)
 
 
-static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i, blocked: Callable, fixed: Array[Vector2i]) -> Dictionary:
+static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i, blocked: Callable, fixed: Array[Vector2i], single_direction: Vector2i = Vector2i.RIGHT) -> Dictionary:
 	var result: Dictionary = {"tiles": {}, "changes": {}, "invalid": {}, "error": "", "new_count": 0}
-	if cells.size() < 2:
-		result["error"] = "Drag across at least two cells; direction is automatic."
+	if cells.is_empty():
+		result["error"] = "Choose a tile to build track."
 		return result
 	var seen: Dictionary = {}
 	for index in range(cells.size()):
@@ -85,7 +90,14 @@ static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i,
 			continue
 		var first: Vector2i
 		var second: Vector2i
-		if index == 0 or index == cells.size() - 1:
+		if cells.size() == 1:
+			# A short stroke places one tile; an existing tile stays untouched.
+			if tracks.has(cell):
+				result["tiles"][cell] = tracks[cell]
+				continue
+			first = single_direction
+			second = -first
+		elif index == 0 or index == cells.size() - 1:
 			var neighbor: Vector2i = cells[1] if index == 0 else cells[index - 1]
 			first = neighbor - cell
 			second = -first

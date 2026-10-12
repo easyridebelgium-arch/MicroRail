@@ -22,7 +22,9 @@ func _run() -> void:
 	game.inspection_button.button_pressed = true
 	game.inspection_panel.plan_toggle.button_pressed = true
 	var balance: int = game.money
-	drag(game, Vector2i(40, 15), Vector2i(44, 15))
+	# Five cells of movement from empty ground build 40..44. The next stroke
+	# shares the actual ghost endpoint (44), so it is charged only once.
+	drag(game, Vector2i(40, 15), Vector2i(45, 15))
 	drag(game, Vector2i(44, 15), Vector2i(48, 15))
 	check(not game.tracks.has(Vector2i(40, 15)) and game.money == balance, "draft strokes must not change real tracks or money")
 	check(game.construction_plan.quote().cost == 90, "shared endpoint must be charged once across multiple strokes")

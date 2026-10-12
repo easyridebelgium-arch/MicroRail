@@ -52,5 +52,36 @@ static func describe(platform: Dictionary, tile_size: float) -> String:
 	var fit := "no train fits" if most < 0 else ("locomotive only" if most == 0 else "locomotive + %d vehicle%s" % [most, "" if most == 1 else "s"])
 	return "Platform: %d tiles (%.0f px), fits %s" % [int(platform.tiles), float(platform.length), fit]
 
+## Platform numbers are tied to the row offset from the station's stop tile, so
+## they never renumber when another siding appears: 1 = the stop tile's own
+## track, 2 = the row below it, 3 = the row above it.
+const ROW_OFFSETS: Array[int] = [0, 1, -1]
+
+static func number_for_offset(offset: int) -> int:
+	return ROW_OFFSETS.find(offset) + 1
+
+## Every platform of a station: its own track plus any straight signal-free
+## siding on a neighbouring row through the same column. Returns dictionaries
+## from `measure` plus `id` ("<station>/<number>"), `number` and `offset`,
+## ordered by number.
+static func for_station(tracks: Dictionary, signs: Dictionary, key: String, stop: Vector2i, tile_size: float) -> Array:
+	var result: Array = []
+	for offset in ROW_OFFSETS:
+		var platform := measure(tracks, signs, stop + Vector2i(0, offset), tile_size)
+		if int(platform.tiles) <= 0: continue
+		platform["offset"] = offset
+		platform["number"] = number_for_offset(offset)
+		platform["id"] = "%s/%d" % [key, platform.number]
+		result.append(platform)
+	return result
+
+## Basic assignment: the lowest-numbered platform that fits the whole train and
+## is not in `busy` (platform IDs). Returns the platform ID, or "" if none.
+static func assign(platforms: Array, body: float, tile_size: float, busy: Dictionary = {}) -> String:
+	for platform in platforms:
+		if busy.has(platform.id): continue
+		if fits(platform, body, tile_size): return str(platform.id)
+	return ""
+
 static func _usable(tracks: Dictionary, signs: Dictionary, cell: Vector2i) -> bool:
 	return tracks.has(cell) and not signs.has(cell) and Geometry.same_connections(tracks[cell], false)

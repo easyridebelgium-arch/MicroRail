@@ -3492,7 +3492,18 @@ func _set_waiting(key: String, count: int) -> void:
 # Platform length is measured from the live track, so laying straight track
 # behind a stop lengthens it immediately.
 func _platform_text(cell: Vector2i) -> String:
-	return Platforms.describe(Platforms.measure(tracks, track_signals, cell, float(TILE_SIZE)), float(TILE_SIZE))
+	var key := ""
+	for station in ServiceRoutes.STATIONS:
+		if ServiceRoutes.STATIONS[station].cell == cell: key = station
+	if key.is_empty():
+		return Platforms.describe(Platforms.measure(tracks, track_signals, cell, float(TILE_SIZE)), float(TILE_SIZE))
+	var lines: PackedStringArray = []
+	var platforms := Platforms.for_station(tracks, track_signals, key, cell, float(TILE_SIZE))
+	if platforms.is_empty(): return Platforms.describe(Platforms.measure(tracks, track_signals, cell, float(TILE_SIZE)), float(TILE_SIZE))
+	for platform in platforms:
+		var holder := int(reservations.occupied_owners.get(platform.cell, -1))
+		lines.append("Platform %d: %s%s" % [int(platform.number), Platforms.describe(platform, float(TILE_SIZE)).trim_prefix("Platform: "), " — occupied by train #%d" % holder if holder > 0 else ""])
+	return "\n".join(lines)
 
 func _station_key(cell: Vector2i) -> String:
 	for key in ServiceRoutes.STATIONS:

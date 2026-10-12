@@ -17,6 +17,27 @@ live track, so laying straight track behind a stop lengthens the platform at onc
 a signal or switch ends it. Nothing new needs buying or saving: no save fields were
 added, and the earlier save format (v23) is unchanged.
 
+## Numbered platforms and sidings
+
+A station can now have up to three platforms, found automatically from the track
+(no new tool, no save fields):
+
+| Number | ID | Where |
+| --- | --- | --- |
+| 1 | `<station>/1` | the stop tile's own track |
+| 2 | `<station>/2` | a straight signal-free siding on the row **below** the stop tile |
+| 3 | `<station>/3` | the same on the row **above** it |
+
+Numbers come from the row offset, so they are stable: building platform 3 never
+renumbers platform 2, and removing platform 2 leaves platform 3 unchanged. A siding
+must contain the tile directly beside the stop tile (same column). The station
+panel lists every platform with its length, the longest train it fits and the train
+currently occupying it.
+
+`Platforms.assign` is the basic assignment rule: the lowest-numbered platform that
+fits the whole train and is not busy. It is a pure function with tests; **trains do
+not use sidings yet** because routing still targets the station's own stop tile.
+
 ## Relationship to the existing check
 
 `Consists.stop_clearance` still decides whether a consist may start, edit or
@@ -27,9 +48,10 @@ extension tiles behind the start and beyond the end of a route (172 checks).
 
 ## Not yet implemented
 
-- Stable platform IDs, several platforms per station and basic platform assignment.
-- Platform-aware arrival/departure reservations, so two trains can use separate
-  platforms of one station.
+- Routing trains to a siding: connect sidings with switches, let arrival choose
+  `Platforms.assign`, and make arrival/departure reservations platform-aware so two
+  trains can use separate platforms of one station at the same time.
+- Persisting a player's platform preference per service.
 - Vertical or diagonal platforms (the existing rule only accepts horizontal track).
 - Routing consist bodies through planned reversals and repeated paths, which is
   still the other open item of Phase 1B.

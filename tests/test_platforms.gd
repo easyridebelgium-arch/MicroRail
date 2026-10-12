@@ -47,5 +47,26 @@ func _initialize() -> void:
 				var body := Consists.length({"wagons": wagons})
 				check(Consists.stop_clearance(path, 0.0, body, line, 32).is_empty() == Platforms.fits(start, body, 32), "start platform agrees with clearance (ext %d, %d vehicles)" % [extension, count])
 				check(Consists.stop_clearance(path, path.get_baked_length(), body, line, 32).is_empty() == Platforms.fits(finish, body, 32), "end platform agrees with clearance (ahead %d, %d vehicles)" % [ahead, count])
+	# Sidings on neighbouring rows become numbered platforms with stable IDs.
+	var yard := {}
+	for x in range(2, 21): yard[Vector2i(x, 8)] = false
+	check(Platforms.for_station(yard, {}, "a", Vector2i(4, 8), 32).size() == 1, "a lone track is platform 1")
+	for x in range(3, 12): yard[Vector2i(x, 9)] = false
+	var two := Platforms.for_station(yard, {}, "a", Vector2i(4, 8), 32)
+	check(two.size() == 2 and two[1].id == "a/2" and two[1].offset == 1 and two[1].cell == Vector2i(4, 9), "row below is platform 2")
+	for x in range(4, 8): yard[Vector2i(x, 7)] = false
+	var three := Platforms.for_station(yard, {}, "a", Vector2i(4, 8), 32)
+	check(three.size() == 3 and three[2].id == "a/3" and three[2].offset == -1, "row above is platform 3")
+	check(three[1].id == "a/2", "existing platform IDs do not renumber when another appears")
+	yard.erase(Vector2i(4, 9))
+	var gap := Platforms.for_station(yard, {}, "a", Vector2i(4, 8), 32)
+	check(gap.size() == 2 and gap[1].id == "a/3", "a removed siding leaves the others' IDs unchanged")
+	yard[Vector2i(4, 9)] = false
+	var long_body := 92.0
+	check(Platforms.assign(three, long_body, 32) == "a/1", "assignment prefers the lowest platform that fits")
+	check(Platforms.assign(three, long_body, 32, {"a/1": true}) == "a/2", "an occupied platform is skipped")
+	check(Platforms.assign(three, long_body, 32, {"a/1": true, "a/2": true}) == "", "a platform too short is never assigned")
+	check(Platforms.assign(three, 28.0, 32, {"a/1": true, "a/2": true}) == "a/3", "the locomotive alone fits the short platform")
+	check(Platforms.assign([], 28.0, 32) == "", "no platforms means no assignment")
 	print("Platform tests: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)

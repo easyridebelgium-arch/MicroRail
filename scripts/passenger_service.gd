@@ -87,6 +87,7 @@ func advance(game: Node, delta: float) -> void:
 		passengers += count
 		boarding = false
 		game._record_event(game.EventLog.TRAIN_DEPARTED, id, {"service": key, "stop": origin, "passengers": passengers})
+	game._maybe_reroute_platform(key)
 	var destination := next_stop()
 	var target := target_distance()
 	distance = game._reserved_movement(key, path, distance, move_toward(distance, target, FleetData.speed(train) * delta), target)

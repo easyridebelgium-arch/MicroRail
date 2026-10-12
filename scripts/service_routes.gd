@@ -32,6 +32,15 @@ static func valid_platforms(service: Dictionary) -> bool:
 		if typeof(number) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(number)) or float(number) != floor(float(number)) or not PLATFORM_ROWS.has(int(number)): return false
 	return true
 
+## Stops whose platform is chosen automatically at each departure ("auto":
+## {stop: true}); the stored `platforms` entry is the platform in use right now.
+static func valid_auto(service: Dictionary) -> bool:
+	var marks: Variant = service.get("auto", {})
+	if not marks is Dictionary: return false
+	for key in marks:
+		if not key is String or not service.stops.has(key) or not STATIONS.has(key) or marks[key] != true: return false
+	return true
+
 static func is_passenger_key(key: Variant) -> bool:
 	if not key is String: return false
 	if key == "passenger": return true
@@ -81,7 +90,7 @@ static func is_valid(value: Variant) -> bool:
 			for stop in stops:
 				if not stop is String or not STATIONS.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service) or not valid_platforms(service): return false
+		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service): return false
 	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}) -> Dictionary:
@@ -154,4 +163,8 @@ static func from_save(value: Dictionary) -> Dictionary:
 		var normalized_platforms: Dictionary = {}
 		for stop in chosen: normalized_platforms[stop] = int(chosen[stop])
 		result[service]["platforms"] = normalized_platforms
+		var marks: Dictionary = {}
+		for stop in result[service].get("auto", {}): marks[stop] = true
+		if marks.is_empty(): result[service].erase("auto")
+		else: result[service]["auto"] = marks
 	return result

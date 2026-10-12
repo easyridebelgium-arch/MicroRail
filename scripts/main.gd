@@ -597,6 +597,7 @@ func _move_train(delta: float) -> void:
 		_board_passengers()
 		train_needs_boarding = false
 		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
+	_maybe_reroute_platform("passenger")
 	var next_stop: int = _next_passenger_stop()
 	var target_distance: float = _passenger_target_distance()
 	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta), target_distance)
@@ -3768,8 +3769,18 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 		var service: Dictionary = resolved[key]
 		var platforms: Dictionary = service.get("platforms", {})
 		if not platforms is Dictionary: continue
+		var marks: Dictionary = service.get("auto", {}).duplicate() if service.get("auto", {}) is Dictionary else {}
+		var stored: Dictionary = services.get(key, {})
+		var unchanged: bool = stored.get("stops", []) == service.get("stops", [])
 		for stop in platforms.keys():
 			if int(platforms[stop]) != 0: continue
+			marks[stop] = true
+			if unchanged and stored.get("auto", {}).has(stop):
+				# Already auto and the route is unchanged: keep the platform in use.
+				var in_use: int = int(stored.get("platforms", {}).get(stop, 1))
+				if in_use == 1: platforms.erase(stop)
+				else: platforms[stop] = in_use
+				continue
 			if not ServiceRoutes.STATIONS.has(stop) or not service.get("stops", []).has(stop):
 				platforms.erase(stop)
 				continue
@@ -3794,6 +3805,10 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 			if number == 1: platforms.erase(stop)
 			else: platforms[stop] = number
 		service["platforms"] = platforms
+		for stop in marks.keys():
+			if not service.get("stops", []).has(stop): marks.erase(stop)
+		if marks.is_empty(): service.erase("auto")
+		else: service["auto"] = marks
 	return {"configuration": resolved, "notes": notes}
 
 func apply_service_routes(configuration: Dictionary) -> String:
@@ -4089,6 +4104,90 @@ func _leg_stops(service: String, path: Curve2D) -> Array:
 	if service == "passenger": return stop_distances
 	if passenger_services.has(service): return passenger_services[service].distances
 	return [0.0, path.get_baked_length()]
+
+## Cell where another train's current claim ends (its destination platform).
+func _claim_end_cell(other: int) -> Vector2i:
+	var claim: Dictionary = section_claims.get(other, {})
+	var train: Dictionary = reservation_trains.get(other, {})
+	if claim.is_empty() or train.is_empty(): return Vector2i(-1, -1)
+	var point: Vector2 = train.path.sample_baked(float(claim.target))
+	return Vector2i(floori(point.x / TILE_SIZE), floori(point.y / TILE_SIZE))
+
+## A platform is free for `id` when no other train stands on its stop tile and
+## no other train's current leg ends there.
+func _platform_free(id: int, cell: Vector2i) -> bool:
+	var holder := int(reservations.occupied_owners.get(cell, -1))
+	if holder > 0 and holder != id: return false
+	for other in section_claims.keys():
+		if int(other) != id and _claim_end_cell(int(other)) == cell: return false
+	return true
+
+## Auto stops: a train about to leave a stop picks a free platform at its next
+## stop (planned platform first) and re-routes to it. The train stands still on
+## the shared prefix of both routes, so only the distances beyond change.
+func _maybe_reroute_platform(service: String) -> void:
+	var config: Dictionary = services.get(service, {})
+	var marks: Dictionary = config.get("auto", {})
+	if marks.is_empty() or config.get("mode", "shuttle") != "shuttle" or paused: return
+	var index: int
+	var next_index: int
+	var distance: float
+	var distances: Array
+	var returning: bool
+	var running = null
+	if service == "passenger":
+		index = passenger_stop_index
+		next_index = _next_passenger_stop()
+		distance = route_distance
+		distances = stop_distances
+		returning = passenger_returning
+	elif passenger_services.has(service):
+		running = passenger_services[service]
+		index = running.stop_index
+		next_index = running.next_stop()
+		distance = running.distance
+		distances = running.distances
+		returning = running.returning
+	else:
+		return
+	if returning or next_index < 0 or next_index >= distances.size() or index >= distances.size() or absf(distance - float(distances[index])) > 0.001: return
+	var stop: String = config.stops[next_index]
+	if not marks.has(stop): return
+	var id := int(Fleet.assigned(fleet, service)["id"])
+	var planned := int(config.get("platforms", {}).get(stop, 1))
+	var body := Fleet.length(Fleet.assigned(fleet, service))
+	var options := Platforms.for_station(tracks, track_signals, stop, ServiceRoutes.STATIONS[stop]["cell"], float(TILE_SIZE))
+	var ordered: Array = []
+	for platform in options:
+		if int(platform.number) == planned: ordered.push_front(platform)
+		else: ordered.append(platform)
+	for platform in ordered:
+		var number := int(platform.number)
+		if not Platforms.fits(platform, body, float(TILE_SIZE)): continue
+		if not _platform_free(id, ServiceRoutes.stop_cell({stop: number}, stop)): continue
+		if number == planned: return
+		var trial: Dictionary = config.get("platforms", {}).duplicate()
+		if number == 1: trial.erase(stop)
+		else: trial[stop] = number
+		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), "shuttle", trial)
+		if built.cells.is_empty() or built.distances.size() != distances.size(): continue
+		config["platforms"] = trial
+		if service == "passenger":
+			route_cells.assign(built.cells)
+			route_path = built.path
+			stop_distances.assign(built.distances)
+			route_distance = float(built.distances[index])
+		else:
+			running.cells.assign(built.cells)
+			running.path = built.path
+			running.distances.assign(built.distances)
+			running.distance = float(built.distances[index])
+			running.configuration = config.duplicate(true)
+		_refresh_switch_states(route_cells)
+		_refresh_directional_routes()
+		_rebuild_reservations()
+		_record_event(EventLog.ROUTE_CHANGED, str(id), {"service": service, "action": "platform", "stop": stop, "platform": number, "was": planned})
+		return
 
 ## Cell of the stop a service's train is heading for next (-1,-1 if unknown).
 func _service_target_cell(service: String) -> Vector2i:

@@ -150,6 +150,11 @@ func _button(title_text: String, callback: Callable) -> Button:
 
 func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 	draft = game.services.duplicate(true)
+	for key in draft:
+		var chosen: Dictionary = draft[key].get("platforms", {})
+		for stop in draft[key].get("auto", {}): chosen[stop] = 0
+		draft[key]["platforms"] = chosen
+		draft[key].erase("auto")
 	removed_waypoint_legs.clear()
 	directive_warning.text = ""
 	service_choice.clear()

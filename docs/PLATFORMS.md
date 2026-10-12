@@ -83,6 +83,19 @@ platform 1 with a note. Stored services always hold a concrete number. Wait
 messages name the platform ("Waiting for X at Station B platform 2 (track 20,9)") and
 the station panel lists which services use each platform.
 
+## Re-routing at departure
+
+Stops set to Auto are remembered (`auto` in the service, saved with it). When a train
+is about to leave a stop for an Auto stop, `Main._maybe_reroute_platform` checks that
+station's platforms in order (planned platform first): a platform is free when no other
+train stands on its stop tile and no other train's current leg ends there, and it must
+fit the train and be routable. If the planned platform is not free, the train
+switches to the first free one: the stored platform and the route are replaced while
+the train stands still, and the train's distance becomes the new distance of the stop it
+is standing at. Shuttle services only; Loop and fixed platforms are never changed. If no
+platform is free the train waits at its stop (see below). Tests:
+`tests/test_platform_reroute.gd`.
+
 ## Single-track holds
 
 Auto platforms only choose platforms; they do not stop two trains entering the same
@@ -104,8 +117,8 @@ stands on), so two services sharing one platform at both ends take turns.
 
 ## Not yet implemented
 
-- Switching platform at arrival time while the train is moving; Auto is resolved when
-  routes are applied.
+- Switching platform while the train is already moving towards a station; the choice
+  is made when it leaves its previous stop.
 - Platform choice for the first stop, and for freight terminals.
 - A build tool or overlay for sidings; today they are ordinary track.
 - Vertical or diagonal platforms (the existing rule only accepts horizontal track).

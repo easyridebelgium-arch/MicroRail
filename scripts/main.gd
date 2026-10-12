@@ -158,6 +158,9 @@ var switch_states: Dictionary = {}
 var reservations = Reservations.new()
 var deadlocks = DeadlockMonitor.new()
 var movement_conflicts: Dictionary = {}
+var direct_inspect_train := -1
+var direct_inspect_station := Vector2i(-1, -1)
+var direct_inspect_cell := Vector2i(-1, -1)
 var authority_revision := 0
 var authority_tick := 0
 var reservation_button: Button
@@ -355,6 +358,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_move_camera_with_keyboard(delta)
 	hovered_cell = _mouse_to_cell()
+	_cancel_direct_inspection_if_dragged(hovered_cell)
 	if is_dragging and demolition_mode:
 		_collect_demolition_cells(hovered_cell)
 	elif is_dragging:
@@ -417,7 +421,10 @@ func _modal_open() -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _modal_open():
+		_clear_direct_inspection()
 		return
+	if event is InputEventMouseMotion:
+		_cancel_direct_inspection_if_dragged(_mouse_to_cell())
 
 	var focused: Control = get_viewport().gui_get_focus_owner()
 	if not (focused is LineEdit or focused is TextEdit):
@@ -432,6 +439,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed(InputActions.RESET_CAMERA):
+		_clear_direct_inspection()
 		is_dragging = false
 		is_panning = false
 		demolition_cells.clear()
@@ -440,6 +448,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed(InputActions.CANCEL):
+		_clear_direct_inspection()
 		corridor_pick = 0
 		is_dragging = false
 		demolition_cells.clear()
@@ -462,6 +471,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var cell: Vector2i = _mouse_to_cell()
 
 		if event.is_action_pressed(InputActions.BUILD):
+			_clear_direct_inspection()
 			if corridor_pick > 0:
 				_pick_corridor_cell(cell)
 				return
@@ -486,6 +496,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_use_switch_tool(cell)
 				return
 
+			if not planning_mode: _begin_direct_inspection(cell, to_local(_pointer_world()))
 			if _can_build_at(cell):
 				demolition_mode = false
 				demolition_cells.clear()
@@ -496,10 +507,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_refresh_build_plan(cell, true)
 
 		if event.is_action_released(InputActions.BUILD):
+			if _finish_direct_inspection(cell): return
 			if is_dragging:
 				_finish_track_drag(cell)
 
 		if event.is_action_pressed(InputActions.DEMOLISH):
+			_clear_direct_inspection()
 			if inspect_mode:
 				_close_station_inspector()
 				return
@@ -606,7 +619,7 @@ func _cell_center(cell: Vector2i) -> Vector2:
 
 
 func _mouse_to_cell() -> Vector2i:
-	var mouse_position: Vector2 = get_local_mouse_position()
+	var mouse_position: Vector2 = to_local(_pointer_world())
 
 	return Vector2i(
 		int(floor(mouse_position.x / TILE_SIZE)),
@@ -1810,10 +1823,12 @@ func _update_toolbar() -> void:
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
 	if _modal_open():
+		_clear_direct_inspection()
 		return
 
 	if event.is_action_pressed(InputActions.CAMERA_PAN):
 		if not _mouse_is_over_interface():
+			_clear_direct_inspection()
 			is_panning = true
 			is_dragging = false
 			get_viewport().set_input_as_handled()
@@ -1823,6 +1838,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 	if event is InputEventMouseButton:
+		if event.is_action_released(InputActions.BUILD) and _mouse_is_over_interface(): _clear_direct_inspection()
 		# Cancel construction if its drag ends over the interface.
 		if (
 			(event.is_action_released(InputActions.BUILD) or event.is_action_released(InputActions.DEMOLISH))
@@ -1978,6 +1994,7 @@ func _setup_station_inspector() -> void:
 
 
 func _toggle_inspect_mode() -> void:
+	_clear_direct_inspection()
 	inspect_mode = not inspect_mode
 	switch_tool_mode = false
 	signal_tool_mode = false
@@ -4484,6 +4501,7 @@ func _plan_protected(cell: Vector2i) -> bool:
 	return _is_station_space(cell) or cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
 
 func _set_planning_mode(enabled: bool) -> void:
+	_clear_direct_inspection()
 	if not enabled and not construction_plan.is_empty():
 		inspection_panel.plan_toggle.set_pressed_no_signal(true)
 		_show_notice("Apply or discard the draft before leaving planning mode.")
@@ -4908,3 +4926,46 @@ func train_inspector_action(action: String, data: Dictionary) -> void:
 		fleet_editor.selected_id = id
 		_open_fleet_editor()
 	queue_redraw()
+
+func _pointer_world() -> Vector2:
+	return get_global_mouse_position()
+
+func _clear_direct_inspection() -> void:
+	direct_inspect_train = -1
+	direct_inspect_station = Vector2i(-1, -1)
+	direct_inspect_cell = Vector2i(-1, -1)
+
+func _begin_direct_inspection(cell: Vector2i, point: Vector2) -> void:
+	direct_inspect_cell = cell
+	# Precise vehicle hit testing leaves the rest of an occupied platform clickable.
+	for train in inspection_trains():
+		var entry := Fleet.find(fleet, train.id)
+		for offset in Consists.offsets(entry):
+			var pose: Dictionary
+			if train.path.point_count >= 2: pose = Consists.pose(train.path, train.distance + offset)
+			else:
+				var position_at: Vector2 = train_position if train.key == "passenger" else freight_train.position if train.key == "freight" else passenger_services[train.key].position
+				pose = {"position": position_at, "angle": 0.0}
+			if Rect2(Vector2(-16, -10), Vector2(32, 20)).has_point((point - Vector2(pose.position)).rotated(-float(pose.angle))):
+				direct_inspect_train = int(train.id)
+				return
+	for station in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]:
+		if cell == station or (cell.x >= station.x - 1 and cell.x <= station.x + 1 and cell.y >= station.y - 2 and cell.y < station.y):
+			direct_inspect_station = station
+			return
+	_clear_direct_inspection()
+
+func _cancel_direct_inspection_if_dragged(cell: Vector2i) -> void:
+	if direct_inspect_cell != Vector2i(-1, -1) and cell != direct_inspect_cell: _clear_direct_inspection()
+
+func _finish_direct_inspection(cell: Vector2i) -> bool:
+	_cancel_direct_inspection_if_dragged(cell)
+	var id := direct_inspect_train
+	var station := direct_inspect_station
+	_clear_direct_inspection()
+	if id < 0 and station == Vector2i(-1, -1): return false
+	is_dragging = false
+	build_plan.clear()
+	if id >= 0: return inspect_train(id)
+	_inspect_station_at(station)
+	return true

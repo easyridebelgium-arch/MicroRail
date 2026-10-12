@@ -1,6 +1,14 @@
 # Why is this train waiting?
 
-Use **Inspect** (default `I`) and click a train or carriage tile on the map. Train
+With ordinary track-building controls selected, **left-click a visible train or
+carriage** to inspect it directly. A click opens on release; dragging to another
+cell builds track instead, including when starting from a station. Clicking the
+platform outside a train sprite, or a station/industry building, opens its existing
+station information panel. The primary click follows the player's remapped Build
+mouse binding (left by default). Signal/switch/waypoint tools and draft construction
+keep their own click actions.
+
+You can also use **Inspect** (default `I`) and click a train or carriage tile on the map. Train
 selection takes precedence over the platform beneath it; click the station building
 above the track for station controls. Alternatively select a train/service in
 **Find**, or a current/historical entry in **Problems**, then **Inspect train now**.
@@ -53,3 +61,8 @@ transient diagnostic records from the existing authoritative decision code.
 `test_train_inspector.gd` covers navigation, allocation preservation, cause separation,
 missing-track location, stale-wait handling, full cycle identities, authority versus
 occupancy and control accessibility at 200% UI scale.
+
+`test_direct_inspection.gd` checks actual press/release/motion input dispatch,
+station-versus-train targeting, drag construction, tool priority, draft mode and
+Escape/return-to-origin cancellation. Station panels retain their live behaviour;
+train popups open paused.

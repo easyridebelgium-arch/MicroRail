@@ -20,8 +20,14 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 (Phase 1B). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent gameplay regression run passed 47 headless suites in
+complete. The most recent validation verified all 48 headless suites, including
+desktop-size UI fixtures and fullscreen preference/shortcut checks, in
 Godot 4.6.3 (the project declares 4.7); see the regression checks and acceptance coverage below.
+
+**Resume checkpoint:** maximized startup, adaptive window filling and saved
+fullscreen (Settings/F11) are implemented and confirmed working by the player.
+Continue Phase 1B with planned-reversal/repeated-path consist body routing, then
+formal platform lengths and multiple-platform foundations.
 
 ## Current foundation
 
@@ -46,6 +52,8 @@ Godot 4.6.3 (the project declares 4.7); see the regression checks and acceptance
 - Atomic construction drafts, corridor signals, searchable blueprints and JSON sharing.
 - Route/block/wait overlays, Problems/Find, session watchlists and alert preferences.
 - Station inspection, camera scrolling, minimap, introductory objectives and saves.
+- Maximized desktop startup, map/toolbars filling the window and saved fullscreen
+  through Settings or remappable F11; UI scale remains independent of map zoom.
 
 These are prototype foundations. The fleet assigns one train to each active
 service; additional passenger services can run together and spares stay off-map.

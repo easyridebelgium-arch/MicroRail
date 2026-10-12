@@ -32,6 +32,7 @@ var traffic_wait_samples: Dictionary = {}
 var problems_dialog: ConfirmationDialog
 var problems_button: Button
 
+const Consists = preload("res://scripts/core/consists.gd")
 const ObjectBrowser = preload("res://scripts/object_browser.gd")
 var object_browser: ConfirmationDialog
 var object_pins: Dictionary = {}
@@ -817,7 +818,7 @@ func _draw() -> void:
 	_draw_train()
 	for key in additional_service_keys():
 		var running = passenger_services[key]
-		_draw_passenger_vehicle(running.position, running.heading, int(Fleet.assigned(fleet, key).id))
+		_draw_passenger_consist(key, running.path, running.distance, running.position, running.heading, running.forward)
 
 
 func _draw_grid() -> void:
@@ -942,7 +943,7 @@ func _draw_station(cell: Vector2i, station_name: String) -> void:
 
 
 func _draw_train() -> void:
-	_draw_passenger_vehicle(train_position, train_heading, int(Fleet.assigned(fleet, "passenger").id))
+	_draw_passenger_consist("passenger", route_path, route_distance, train_position, train_heading, travelling_to_b)
 
 func _draw_passenger_vehicle(at: Vector2, angle: float, id: int) -> void:
 	draw_set_transform(at, angle)
@@ -1155,7 +1156,7 @@ func _charge_operating_cost(delta: float) -> void:
 
 	while operating_timer >= 1.0:
 		operating_timer -= 1.0
-		var cost: int = int(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["running_cost"])
+		var cost: int = Fleet.running_cost(Fleet.assigned(fleet, "passenger"))
 		money -= cost
 		total_operating_cost += cost
 
@@ -1565,27 +1566,38 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	var loaded_freight_cells: Array[Vector2i] = RuntimeRoutes.decode(runtime["freight_cells"])
 	if loaded_freight_cells.is_empty(): loaded_freight_cells = WaypointRouter.find_route(loaded_tracks, FOREST_SITE, CARGO_TERMINAL, data["services"]["freight"].get("waypoints", {}).get("forest>terminal", []))
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
-	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"])):
+	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"]) + Consists.extra_capacity(Fleet.assigned(data["fleet"], "freight"))):
 		_show_notice("Saved freight train state is invalid.")
 		return
 	var loaded_services := ServiceRoutes.from_save(data["services"])
+	for key in loaded_services:
+		if Fleet.length(Fleet.assigned(data.fleet, key)) > Reservations.VEHICLE_LENGTH and (loaded_services[key].get("mode", "shuttle") == "loop" or loaded_services[key].stops.size() != 2):
+			_show_notice("Long consists need two-stop Shuttle routes.")
+			return
 	var loaded_extra: Dictionary = {}
 	for key in data["passenger_services"]:
 		loaded_extra[key] = PassengerService.from_save(key, data["passenger_services"][key], loaded_services[key], Fleet.capacity(Fleet.assigned(data["fleet"], key)))
-	if not loaded_extra.is_empty():
-		var footprints: Dictionary = {}
-		var helper := Reservations.new()
-		var positions: Array = [
-			{"path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.STATIONS[loaded_services.passenger.stops[0]].cell)), "distance": loaded_distance},
-			{"path": _reservation_path(loaded_freight_path, _cell_center(FOREST_SITE)), "distance": float(data["freight"]["distance"])}
-		]
-		for key in loaded_extra: positions.append({"path": loaded_extra[key].path, "distance": loaded_extra[key].distance})
-		for train in positions:
-			for cell in helper.footprint(train.path, train.distance, float(TILE_SIZE)):
-				if footprints.has(cell):
-					_show_notice("Save contains overlapping trains.")
+	# Validate full bodies even when only the original passenger/freight pair exists.
+	var footprints: Dictionary = {}
+	var helper := Reservations.new()
+	var positions: Array = [
+		{"length": Fleet.length(Fleet.assigned(data.fleet, "passenger")), "cells": loaded_cells, "path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.STATIONS[loaded_services.passenger.stops[0]].cell)), "distance": loaded_distance},
+		{"length": Fleet.length(Fleet.assigned(data.fleet, "freight")), "cells": loaded_freight_cells, "path": _reservation_path(loaded_freight_path, _cell_center(FOREST_SITE)), "distance": float(data["freight"]["distance"])}
+	]
+	for key in loaded_extra: positions.append({"length": Fleet.length(Fleet.assigned(data.fleet, key)), "cells": loaded_extra[key].cells, "path": loaded_extra[key].path, "distance": loaded_extra[key].distance})
+	for train in positions:
+		if train.length > Reservations.VEHICLE_LENGTH:
+			var seen_body: Dictionary = {}
+			for cell in train.cells:
+				if seen_body.has(cell):
+					_show_notice("Long consists cannot use retained routes that revisit track tiles yet.")
 					return
-				footprints[cell] = true
+				seen_body[cell] = true
+		for cell in helper.footprint(train.path, train.distance, float(TILE_SIZE), train.length):
+			if footprints.has(cell):
+				_show_notice("Save contains overlapping train bodies.")
+				return
+			footprints[cell] = true
 	# Commit only after validating every service and train.
 	tracks = loaded_tracks
 	track_signals = {}
@@ -2106,6 +2118,15 @@ func _update_upgrade_button(
 		button.tooltip_text = "All upgrades of this type are installed."
 		return
 
+	if upgrade_name.to_lower() == "speed":
+		var service := "freight" if selected_station in [FOREST_SITE, CARGO_TERMINAL] else "passenger"
+		var train := Fleet.assigned(fleet, service)
+		var speed := freight_train.get_speed() if service == "freight" else _get_train_speed()
+		if speed >= Consists.speed_limit(train):
+			button.text = "Speed: stock limit"
+			button.disabled = true
+			button.tooltip_text = "Attached stock caps the speed. Remove it before buying another speed upgrade."
+			return
 	button.text = "%s + (£%d)" % [upgrade_name, price]
 	button.disabled = not paused or money < price
 
@@ -2144,11 +2165,11 @@ func _remove_station_space_tracks(track_data: Dictionary) -> int:
 
 	return removed_count
 func _get_train_capacity() -> int:
-	return int(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["capacity"]) + capacity_upgrade_level * CAPACITY_PER_UPGRADE
+	return int(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["capacity"]) + capacity_upgrade_level * CAPACITY_PER_UPGRADE + Consists.extra_capacity(Fleet.assigned(fleet, "passenger"))
 
 
 func _get_train_speed() -> float:
-	return float(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["speed"]) + speed_upgrade_level * SPEED_PER_UPGRADE
+	return minf(float(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["speed"]) + speed_upgrade_level * SPEED_PER_UPGRADE, Consists.speed_limit(Fleet.assigned(fleet, "passenger")))
 
 func _get_capacity_upgrade_price() -> int:
 	return BASE_CAPACITY_UPGRADE_PRICE * (capacity_upgrade_level + 1)
@@ -2192,6 +2213,9 @@ func _upgrade_capacity() -> void:
 func _upgrade_speed() -> void:
 	if selected_station == FOREST_SITE or selected_station == CARGO_TERMINAL:
 		_upgrade_freight_speed()
+		return
+	if _get_train_speed() >= Consists.speed_limit(Fleet.assigned(fleet, "passenger")):
+		_show_notice("Attached coaches already limit speed. Remove them before buying another speed upgrade.")
 		return
 	if speed_upgrade_level >= MAX_SPEED_LEVEL:
 		_show_notice("Train speed is fully upgraded.")
@@ -2449,6 +2473,9 @@ func _upgrade_freight_capacity() -> void:
 
 
 func _upgrade_freight_speed() -> void:
+	if freight_train.get_speed() >= Consists.speed_limit(Fleet.assigned(fleet, "freight")):
+		_show_notice("Attached wagons already limit speed. Remove them before buying another speed upgrade.")
+		return
 	if freight_train.speed_level >= FreightTrain.MAX_SPEED_LEVEL:
 		_show_notice("Freight speed is fully upgraded.")
 		return
@@ -3489,6 +3516,9 @@ func apply_service_routes(configuration: Dictionary) -> String:
 		return "Pause before changing routes."
 	configuration = ServiceRoutes.from_save(configuration)
 	if not _valid_service_assignments(configuration, fleet): return "Create or remove additional services in Fleet before editing their routes."
+	for key in configuration:
+		var fit := _consist_service_fit(Fleet.assigned(fleet, key), configuration[key])
+		if not fit.is_empty(): return str(configuration[key].name) + ": " + fit
 	var extra_built: Dictionary = {}
 	for key in additional_service_keys():
 		var current: Dictionary = services[key]
@@ -3571,9 +3601,12 @@ func _apply_fleet_specs() -> void:
 	speed_upgrade_level = int(passenger["speed_level"])
 	var freight: Dictionary = Fleet.assigned(fleet, "freight")
 	var model: Dictionary = Fleet.MODELS[freight["model"]]
-	freight_train.base_capacity = int(model["capacity"])
+	freight_train.base_capacity = int(model["capacity"]) + Consists.extra_capacity(freight)
 	freight_train.base_speed = float(model["speed"])
-	freight_train.running_cost_per_second = int(model["running_cost"])
+	freight_train.running_cost_per_second = Fleet.running_cost(freight)
+	freight_train.wagon_speed_limit = Consists.speed_limit(freight)
+	freight_train.consist_entry = freight
+	freight_train.queue_redraw()
 	freight_train.capacity_level = int(freight["capacity_level"])
 	freight_train.speed_level = int(freight["speed_level"])
 
@@ -3626,6 +3659,13 @@ func assign_fleet_train(id: int, service: String) -> String:
 		return "This train is already assigned."
 	if not _can_replace_service_train(service):
 		return "Withdraw the current train, close this window and resume until it is empty at its first stop. Then pause and assign the replacement."
+	var fit := _consist_service_fit(train, services[service])
+	if not fit.is_empty(): return fit
+	_rebuild_reservations()
+	var old_id := int(Fleet.assigned(fleet, service).id)
+	var origin := _service_body_origin(service)
+	for cell in reservations.footprint(origin.path, origin.distance, float(TILE_SIZE), Fleet.length(train)):
+		if reservations.owners.has(cell) and int(reservations.owners[cell]) != old_id: return "Replacement body overlaps reserved or occupied track. Let the other train clear first."
 	_sync_fleet_upgrades()
 	var old_train: Dictionary = Fleet.assigned(fleet, service)
 	old_train["service"] = ""
@@ -3739,9 +3779,9 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 		reservations.rebuild(trains, tracks, float(TILE_SIZE), request_ends)
 	switch_states.merge(reservations.switches, true)
 
-# Whole-train length in pixels; plain trains are one vehicle until consists exist.
+# Whole-train length is derived from validated fleet composition.
 func _fleet_length(entry: Dictionary) -> float:
-	return maxf(Reservations.VEHICLE_LENGTH, float(entry.get("length", Reservations.VEHICLE_LENGTH)))
+	return Fleet.length(entry)
 
 func _freight_reserved_movement(path: Curve2D, current: float, proposed: float) -> float:
 	return _reserved_movement("freight", path, current, proposed)
@@ -4005,12 +4045,16 @@ func _refresh_directional_routes(notify: bool = true) -> void:
 	var passenger_was_clear := route_connected
 	var next_stop := _next_passenger_stop()
 	route_connected = next_stop >= 0 and next_stop < stop_distances.size() and passenger_travel.is_clear(route_cells, route_path, route_distance, _passenger_target_distance(), tracks, float(TILE_SIZE))
+	if route_connected and Fleet.length(Fleet.assigned(fleet, "passenger")) > Reservations.VEHICLE_LENGTH:
+		route_connected = Consists.stop_clearance(route_path, _passenger_target_distance(), Fleet.length(Fleet.assigned(fleet, "passenger")), tracks, float(TILE_SIZE), track_signals).is_empty()
 	passenger_route_error = "" if route_connected else "Route incomplete ahead — stopped here. Repair the path to the next destination."
 	for key in additional_service_keys(): passenger_services[key].check_route(self, notify)
 	if freight_train == null: return
 	var freight_was_clear: bool = freight_train.route_valid
 	var target: float = freight_train.route_path.get_baked_length() if freight_train.to_terminal else 0.0
 	freight_train.route_valid = freight_travel.is_clear(freight_train.route_cells, freight_train.route_path, freight_train.distance_along_route, target, tracks, float(TILE_SIZE))
+	if freight_train.route_valid and Fleet.length(Fleet.assigned(fleet, "freight")) > Reservations.VEHICLE_LENGTH:
+		freight_train.route_valid = Consists.stop_clearance(freight_train.route_path, target, Fleet.length(Fleet.assigned(fleet, "freight")), tracks, float(TILE_SIZE), track_signals).is_empty()
 	if notify:
 		if passenger_was_clear and not route_connected:
 			_show_notice("Passenger train stopped: track incomplete ahead. Repair its path to continue.")
@@ -4088,6 +4132,8 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	var configuration := {"name": "Passenger Service %d" % id, "stops": [home, "b" if home == "a" else "a"], "mode": "shuttle", "waypoints": {}}
 	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE))
 	if built.cells.is_empty(): return "Complete track from the starting station to %s first." % ServiceRoutes.STATIONS[configuration.stops[1]].name
+	var fit := _consist_service_fit(train, configuration)
+	if not fit.is_empty(): return fit
 	_rebuild_reservations()
 	for cell in reservations.footprint(built.path, 0, float(TILE_SIZE), _fleet_length(train)):
 		if reservations.owners.has(cell): return "Starting platform is occupied or reserved. Let the other train clear it, then pause and try again."
@@ -4129,6 +4175,7 @@ func upgrade_fleet_train(id: int, kind: String) -> String:
 	var train := Fleet.find(fleet, id)
 	if train.is_empty() or kind not in ["capacity", "speed"]: return "Choose an owned train and upgrade."
 	_sync_fleet_upgrades()
+	if kind == "speed" and Fleet.speed(train) >= Consists.speed_limit(train): return "Attached stock already limits speed; remove it before buying another speed upgrade."
 	var field := kind + "_level"
 	var level := int(train[field])
 	if level >= 3: return "This upgrade is already at maximum level."
@@ -4703,3 +4750,89 @@ func locate_object(row: Dictionary) -> bool:
 		_update_inspection()
 	queue_redraw()
 	return true
+
+func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
+	var body := Fleet.length(train)
+	if body <= Reservations.VEHICLE_LENGTH: return ""
+	if service.get("mode", "shuttle") == "loop" or service.stops.size() != 2: return "Long consists currently use two-stop Shuttle routes. Continuous body routing for Loops and intermediate reversals comes later."
+	var path: Curve2D
+	var stops: Array
+	var cells: Array
+	if Fleet.MODELS[train.model].kind == "freight":
+		cells = WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, service.get("waypoints", {}).get("forest>terminal", []))
+		path = RailRouter.make_path(cells, float(TILE_SIZE))
+		stops = [0.0, path.get_baked_length()]
+	else:
+		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), "shuttle")
+		path = built.path
+		stops = built.distances
+		cells = built.cells
+	var seen: Dictionary = {}
+	for cell in cells:
+		if seen.has(cell): return "Long consists need a route that does not revisit track tiles. Repeated-path body routing comes later."
+		seen[cell] = true
+	if path.point_count < 2: return "Complete the service route before running a consist."
+	for distance in stops:
+		var error := Consists.stop_clearance(path, float(distance), body, tracks, float(TILE_SIZE), track_signals)
+		if not error.is_empty(): return error
+	return ""
+
+func _service_body_origin(service: String) -> Dictionary:
+	if service == "passenger": return {"path": _reservation_path(route_path, train_position), "distance": route_distance}
+	if service == "freight": return {"path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route}
+	return {"path": passenger_services[service].path, "distance": passenger_services[service].distance}
+
+func edit_consist(id: int, wagon: String, remove: bool = false) -> String:
+	if not paused: return "Pause before changing a consist."
+	_sync_fleet_upgrades()
+	var train: Dictionary = Fleet.find(fleet, id)
+	if train.is_empty(): return "Choose an existing train."
+	if not Consists.STOCK.has(wagon) or Consists.STOCK[wagon].kind != Fleet.MODELS[train.model].kind: return "Choose stock compatible with this train's passengers or cargo."
+	var service: String = str(train.service)
+	if not service.is_empty() and not _can_replace_service_train(service): return "Withdraw the train and wait until it is empty at its first stop before changing the consist."
+	var candidate := train.duplicate(true)
+	var wagons: Array = candidate.get("wagons", []).duplicate()
+	if remove:
+		var index := wagons.rfind(wagon)
+		if index < 0: return "No matching wagon to remove."
+		wagons.remove_at(index)
+	else:
+		if wagons.size() >= Consists.MAX_WAGONS: return "Maximum four attached vehicles."
+		if money < int(Consists.STOCK[wagon].price): return "Insufficient funds for this wagon."
+		wagons.append(wagon)
+	candidate["wagons"] = wagons
+	if not service.is_empty():
+		var fit := _consist_service_fit(candidate, services[service])
+		if not fit.is_empty(): return fit
+		_rebuild_reservations()
+		var origin := _service_body_origin(service)
+		for cell in reservations.footprint(origin.path, origin.distance, float(TILE_SIZE), Fleet.length(candidate)):
+			if reservations.owners.has(cell) and int(reservations.owners[cell]) != id: return "The longer body would overlap reserved or occupied track. Let the other train clear first."
+	var cost := int(Consists.STOCK[wagon].price)
+	if remove: cost = -int(cost / 2)
+	train["wagons"] = wagons
+	money -= cost
+	total_vehicle_cost += cost
+	_apply_fleet_specs()
+	_rebuild_reservations()
+	_update_station_inspector()
+	queue_redraw()
+	return "%s %s. Capacity %d, length %.0f px, speed %.0f px/s, running £%d/s." % ["Removed" if remove else "Attached", Consists.STOCK[wagon].name, Fleet.capacity(train), Fleet.length(train), Fleet.speed(train), Fleet.running_cost(train)]
+
+func _draw_passenger_consist(service: String, path: Curve2D, distance: float, position_at: Vector2, heading: float, forward: bool) -> void:
+	var train := Fleet.assigned(fleet, service)
+	var offsets := Consists.offsets(train)
+	if offsets.size() == 1 or path.point_count < 2:
+		_draw_passenger_vehicle(position_at, heading, int(train.id))
+		return
+	for index in range(offsets.size()):
+		var pose := Consists.pose(path, distance + offsets[index])
+		var angle: float = pose.angle + (0.0 if forward else PI)
+		if index == 0:
+			_draw_passenger_vehicle(pose.position, angle, int(train.id))
+		else:
+			draw_set_transform(pose.position, angle)
+			draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Palette.get_color(Palette.Role.TRAIN_PASSENGER))
+			draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Color.WHITE, false, 1.0)
+			for x in [-8, -2, 4]: draw_rect(Rect2(Vector2(x, -4), Vector2(4, 8)), Color(0.65, 0.85, 0.95))
+			draw_set_transform(Vector2.ZERO, 0.0)

@@ -63,7 +63,7 @@ must not claim to predict traffic conflicts without the reservation layer.
 | Planned feature | Intended gameplay or visual benefit | Dependencies and scope |
 | --- | --- | --- |
 | Expanded fleet and route assignment | Extend the existing purchases and replacement assignments to more services and multiple running trains. Retain separate speed and capacity purchases. | Permanent IDs, model choices, stored spares and Shuttle/Loop routes are implemented. Implemented: up to eight independent active passenger services (e.g. A–B and A–C), each with its own assigned train, route, mode, directives and saved runtime. Shared switches, no overlaps, physical recovery, withdrawal/storage and save/load are checked. Multiple trains per service and multiple platforms remain later work. |
-| Train consists and rolling stock (Phase 2, after safe train-length handling) | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Extend the fleet model with vehicle composition, cargo compatibility and total train length. Account for platform and block lengths before running long consists. Introduce stock types as their passenger classes or cargo types become available. |
+| Train consists and rolling stock (Phase 2, after safe train-length handling) | Assemble locomotives with passenger coaches of different classes, boxcars, tankers, hoppers and flatcars. Give each vehicle its own capacity, loading speed and cargo suitability. | Implemented: up to four passenger coaches or log wagons per locomotive, capacity/cost/speed/length effects, visible vehicles, safe empty-home edits, straight signal-free stop clearance and full-body load validation. First consists use two-stop Shuttle routes without revisiting tiles; continuous body routing for Loops/intermediate reversals, formal platform extensions and other stock types remain later work. See [consists](CONSISTS.md). |
 | Junctions and switches | Build branching networks and share infrastructure between services. | Implemented: port-aware routing, locked switches, crossings and a switch tool. Further construction conveniences remain planned. |
 | Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Basic tile reservations, switch/selected-port locking, safe waiting events and a hatched ownership overlay are implemented. Shared passenger/freight routing is enabled. Basic deadlock detection, physical reversal, bidirectional automatic block signals and manual holds are implemented; reservations do not select alternate passing-loop paths. |
 | Priority and pathfinding rules | Offer simple dispatch priorities, initially express > local passenger > freight, so players can influence junction behaviour without configuring complex signalling. | Priorities choose between safe movements; they never override reservations. Allow player overrides, explain why a train is waiting, and prevent low-priority services from waiting indefinitely. Respect waypoint directives when choosing paths. |
@@ -240,6 +240,12 @@ Reusable track blueprints, a searchable local browser and versioned JSON sharing
 are implemented; see [track blueprints](TRACK_BLUEPRINTS.md).
 Global object search, current map location, route highlighting and session
 watchlists are implemented; see [object search](OBJECT_SEARCH.md).
-Train-length-aware occupancy (body footprints, switch and block locks held until the tail clears, platform-fit footprints) is implemented and verified headlessly in Godot 4.7; see `tests/test_train_length.gd`. Next: consist composition on top of it, before multiple trains per service.
+Train-length-aware occupancy is implemented, with body footprints and switch/block
+locks held until the tail clears. Passenger coaches and log wagons are now
+player-accessible, with stop clearance, full-body load validation and safe
+composition edits; see [consists](CONSISTS.md). Headless checks use Godot 4.6.3
+in this environment (the project declares 4.7). Next: formation templates and
+vehicle comparison; continuous body routing must precede longer stop lists and
+Loop consists. Multiple trains per service follows those safety foundations.
 Predictive traffic advice waits for timetable/demand data; multiple trains per
 service follow the independent-service model. See [reservation behaviour and checks](RESERVATIONS.md).

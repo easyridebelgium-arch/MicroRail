@@ -4,6 +4,9 @@ signal delivered(amount: int)
 signal operating_expense(amount: int)
 signal departed(stop: String, cargo: int)
 signal arrived(stop: String, cargo: int)
+const Consists = preload("res://scripts/core/consists.gd")
+var wagon_speed_limit := INF
+var consist_entry: Dictionary = {}
 const Router = preload("res://scripts/rail_router.gd")
 const Palette = preload("res://scripts/core/palette.gd")
 
@@ -130,6 +133,7 @@ func advance(delta: float, available_logs: int) -> int:
 
 
 func _update_transform() -> void:
+	queue_redraw()
 	if route_cells.is_empty():
 		position = home_position
 		rotation = 0.0
@@ -155,6 +159,20 @@ func _update_transform() -> void:
 
 
 func _draw() -> void:
+	var offsets := Consists.offsets(consist_entry)
+	if offsets.size() > 1 and route_path.point_count >= 2:
+		for index in range(offsets.size()):
+			var pose := Consists.pose(route_path, distance_along_route + offsets[index])
+			draw_set_transform(to_local(pose.position), pose.angle - global_rotation + (0.0 if to_terminal else PI))
+			if index == 0: _draw_locomotive()
+			else:
+				draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Palette.get_color(Palette.Role.TRAIN_FREIGHT))
+				draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Color.WHITE, false, 1.0)
+				for y in [-4, 0, 4]: draw_line(Vector2(-9, y), Vector2(9, y), Color(0.55, 0.32, 0.15), 2.0)
+			draw_set_transform(Vector2.ZERO, 0.0)
+	else: _draw_locomotive()
+
+func _draw_locomotive() -> void:
 	var body := Rect2(Vector2(-14, -8), Vector2(28, 16))
 
 	draw_rect(body, Palette.get_color(Palette.Role.TRAIN_FREIGHT))
@@ -329,7 +347,7 @@ func get_capacity() -> int:
 
 
 func get_speed() -> float:
-	return base_speed + speed_level * SPEED_PER_UPGRADE
+	return minf(base_speed + speed_level * SPEED_PER_UPGRADE, wagon_speed_limit)
 
 
 func get_capacity_upgrade_price() -> int:

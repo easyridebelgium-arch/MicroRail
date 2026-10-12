@@ -1,5 +1,6 @@
 extends RefCounted
 
+const Consists = preload("res://scripts/core/consists.gd")
 const Services = preload("res://scripts/service_routes.gd")
 
 const MODELS: Dictionary = {
@@ -11,7 +12,7 @@ const MODELS: Dictionary = {
 const MAX_TRAINS: int = 100
 
 static func make_train(id: int, model: String, service: String = "") -> Dictionary:
-	return {"id": id, "model": model, "name": "%s %d" % [MODELS[model]["name"], id], "service": service, "capacity_level": 0, "speed_level": 0}
+	return {"id": id, "model": model, "name": "%s %d" % [MODELS[model]["name"], id], "service": service, "capacity_level": 0, "speed_level": 0, "wagons": []}
 
 static func defaults() -> Dictionary:
 	return {"next_id": 3, "trains": [make_train(1, "passenger_standard", "passenger"), make_train(2, "freight_standard", "freight")]}
@@ -64,6 +65,7 @@ static func is_valid(value: Variant) -> bool:
 			return false
 		if not _whole(train.get("capacity_level"), 0, 3) or not _whole(train.get("speed_level"), 0, 3):
 			return false
+		if not Consists.valid(train.get("wagons", []), MODELS[train.model].kind): return false
 		var service: Variant = train.get("service")
 		if not service is String or not (service == "" or service == "freight" or Services.is_passenger_key(service)):
 			return false
@@ -74,10 +76,10 @@ static func is_valid(value: Variant) -> bool:
 	return assignments.has("passenger") and assignments.has("freight")
 
 static func capacity(train: Dictionary) -> int:
-	return int(MODELS[train["model"]]["capacity"]) + int(train["capacity_level"]) * 10
+	return int(MODELS[train["model"]]["capacity"]) + int(train["capacity_level"]) * 10 + Consists.extra_capacity(train)
 
 static func speed(train: Dictionary) -> float:
-	return float(MODELS[train["model"]]["speed"]) + int(train["speed_level"]) * 20.0
+	return minf(float(MODELS[train["model"]]["speed"]) + int(train["speed_level"]) * 20.0, Consists.speed_limit(train))
 
 static func sale_price(train: Dictionary) -> int:
 	var model: Dictionary = MODELS[train["model"]]
@@ -86,4 +88,11 @@ static func sale_price(train: Dictionary) -> int:
 	var capacity_level: int = int(train["capacity_level"])
 	var speed_level: int = int(train["speed_level"])
 	var invested: int = int(model["price"]) + capacity_base * capacity_level * (capacity_level + 1) / 2 + speed_base * speed_level * (speed_level + 1) / 2
+	for wagon in train.get("wagons", []): invested += int(Consists.STOCK[wagon].price)
 	return invested / 2
+
+static func length(train: Dictionary) -> float:
+	return Consists.length(train)
+
+static func running_cost(train: Dictionary) -> int:
+	return int(MODELS[train.model].running_cost) + Consists.running_cost(train)

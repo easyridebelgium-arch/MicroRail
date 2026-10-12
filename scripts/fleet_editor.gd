@@ -20,6 +20,10 @@ var start_button: Button
 var store_button: Button
 var capacity_button: Button
 var speed_button: Button
+var wagon_choice: OptionButton
+var wagon_details: Label
+var attach_button: Button
+var detach_button: Button
 var selected_id: int = 1
 
 func configure(owner_game: Node) -> void:
@@ -90,6 +94,18 @@ func configure(owner_game: Node) -> void:
 	box.add_child(upgrades)
 	capacity_button = _button(upgrades, "Upgrade capacity", _upgrade.bind("capacity"))
 	speed_button = _button(upgrades, "Upgrade speed", _upgrade.bind("speed"))
+	var consist_row := HFlowContainer.new()
+	box.add_child(consist_row)
+	wagon_choice = OptionButton.new()
+	wagon_choice.clip_text = true
+	wagon_choice.custom_minimum_size.x = 180
+	consist_row.add_child(wagon_choice)
+	attach_button = _button(consist_row, "Attach wagon", _edit_consist.bind(false))
+	detach_button = _button(consist_row, "Remove last of type", _edit_consist.bind(true))
+	wagon_choice.item_selected.connect(func(_index: int) -> void: _describe_wagon())
+	wagon_details = Label.new()
+	wagon_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(wagon_details)
 	status = Label.new()
 	status.custom_minimum_size = Vector2(0, 70)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -137,7 +153,7 @@ func _select_train(index: int) -> void:
 	var model: Dictionary = Fleet.MODELS[train["model"]]
 	var service: String = train["service"]
 	name_field.text = train["name"]
-	details.text = "%s | %d %s | %.0f px/s | £%d/s\nUpgrades: capacity %d/3, speed %d/3\n%s" % [model["name"], Fleet.capacity(train), "seats" if model["kind"] == "passenger" else "logs", Fleet.speed(train), model["running_cost"], train["capacity_level"], train["speed_level"], game.fleet_train_status(selected_id)]
+	details.text = "%s | %d %s | %.0f px/s | £%d/s\nUpgrades: capacity %d/3, speed %d/3\n%s" % [model["name"], Fleet.capacity(train), "seats" if model["kind"] == "passenger" else "logs", Fleet.speed(train), Fleet.running_cost(train), train["capacity_level"], train["speed_level"], game.fleet_train_status(selected_id)]
 	var previous: String = str(assignment_choice.get_selected_metadata()) if assignment_choice.item_count > 0 else ""
 	assignment_choice.clear()
 	for key in game.service_keys():
@@ -156,6 +172,16 @@ func _select_train(index: int) -> void:
 		var price := base * (level + 1)
 		button.text = "%s: maximum" % kind.capitalize() if level >= 3 else "Upgrade %s (£%d)" % [kind, price]
 		button.disabled = level >= 3 or game.money < price
+		if kind == "speed" and Fleet.speed(train) >= Fleet.Consists.speed_limit(train):
+			button.disabled = true
+			button.tooltip_text = "Attached stock already limits speed; remove it before buying another speed upgrade."
+	details.text += "\nConsist: locomotive + %d vehicles | Length %.0f px" % [train.get("wagons", []).size(), Fleet.length(train)]
+	wagon_choice.clear()
+	for stock in Fleet.Consists.STOCK:
+		if Fleet.Consists.STOCK[stock].kind != model.kind: continue
+		wagon_choice.add_item(Fleet.Consists.STOCK[stock].name)
+		wagon_choice.set_item_metadata(wagon_choice.item_count - 1, stock)
+	_describe_wagon()
 	assign_button.disabled = service != ""
 	sell_button.text = "Sell (£%d)" % Fleet.sale_price(train)
 	sell_button.disabled = service != ""
@@ -200,4 +226,17 @@ func _store_service() -> void:
 
 func _upgrade(kind: String) -> void:
 	status.text = game.upgrade_fleet_train(selected_id, kind)
+	refresh()
+
+func _describe_wagon() -> void:
+	if wagon_choice.item_count == 0: return
+	var stock: String = wagon_choice.get_selected_metadata()
+	var wagon: Dictionary = Fleet.Consists.STOCK[stock]
+	var train := Fleet.find(game.fleet, selected_id)
+	wagon_details.text = "%s: £%d | +%d %s | +32 px | Speed limit %.0f px/s | +£%d/s\nRemoval refunds £%d. Edit stored trains or empty trains at their first stop. Long consists need straight clearance on both sides of every stop and use two-stop Shuttle mode." % [wagon.name, wagon.price, wagon.capacity, "seats" if wagon.kind == "passenger" else "logs", wagon.speed, wagon.cost, int(wagon.price / 2)]
+	attach_button.disabled = train.get("wagons", []).size() >= Fleet.Consists.MAX_WAGONS or game.money < int(wagon.price)
+	detach_button.disabled = not train.get("wagons", []).has(stock)
+
+func _edit_consist(remove: bool) -> void:
+	status.text = game.edit_consist(selected_id, wagon_choice.get_selected_metadata(), remove)
 	refresh()

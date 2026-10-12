@@ -81,5 +81,11 @@ func _initialize() -> void:
 	manager.update([holder, approaching], occupied(table, [holder, approaching]), 32)
 	var result := manager.limit(approaching, 200.0, 32)
 	check(result.distance < 200.0, "long train waits at a signal into a held block")
+	# Do not count the body offset twice when granting future blocks.
+	manager.configure(line_tracks, {Vector2i(3, 0): "auto", Vector2i(7, 0): "auto"})
+	var very_long := train(2, main, 0.0, 156.0)
+	manager.update([very_long], occupied(table, [very_long]), 32)
+	var distant_block: int = manager.cell_blocks[Vector2i(9, 0)]
+	check(not manager.block_owners.get(distant_block, {}).has(2), "long nose lookahead must not grab a block beyond the actual three-tile body request")
 	print("Train length tests: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)

@@ -52,8 +52,8 @@ func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
 		var direction := 1 if train.forward else -1
 		var distance: float = train.distance
 		var half := (Reservations.train_length(train) - Reservations.VEHICLE_LENGTH) * 0.5
-		# The nose leads the centre by half the body, so look that much further.
-		var end := clampf(distance + direction * (tile_size * Reservations.LOOKAHEAD_TILES + half), 0, train.path.get_baked_length())
+		# Scan centre lookahead once; the occurrence index below shifts it to the nose.
+		var end := clampf(distance + direction * tile_size * Reservations.LOOKAHEAD_TILES, 0, train.path.get_baked_length())
 		var requested: Dictionary = {}
 		while true:
 			var index := _helper._index_at(spans, distance + direction * half)

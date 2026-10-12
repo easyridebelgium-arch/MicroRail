@@ -55,6 +55,9 @@ func active() -> bool:
 func check_route(game: Node, notify: bool = true) -> void:
 	var was_clear := connected
 	connected = not cells.is_empty() and travel.is_clear(cells, path, distance, target_distance(), game.tracks, float(game.TILE_SIZE))
+	var body := FleetData.length(FleetData.assigned(game.fleet, key))
+	if connected and body > 28.0:
+		connected = FleetData.Consists.stop_clearance(path, target_distance(), body, game.tracks, float(game.TILE_SIZE), game.track_signals).is_empty()
 	if notify and was_clear and not connected:
 		game._show_notice("%s stopped: track incomplete ahead. Repair its path to continue." % configuration.name)
 
@@ -71,7 +74,7 @@ func advance(game: Node, delta: float) -> void:
 	operating_timer += delta
 	while operating_timer >= 1.0:
 		operating_timer -= 1.0
-		var cost := int(FleetData.MODELS[train.model].running_cost)
+		var cost := FleetData.running_cost(train)
 		game.money -= cost
 		game.total_operating_cost += cost
 	if dwell > 0:

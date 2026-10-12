@@ -79,3 +79,8 @@ Manual play check:
 Additional passenger services participate in the same stable-ID reservation table.
 Red signals cap lookahead requests so a waiting arrival cannot lock a switch
 needed by a departing train. See [multiple-service layouts](MULTIPLE_SERVICES.md).
+
+Player-accessible passenger coaches and log wagons now set reservation length
+from fleet composition. Startup checks real straight, signal-free stopping
+clearance, and load-time overlap checks include the full body for every service.
+See [consists and manual checks](CONSISTS.md).

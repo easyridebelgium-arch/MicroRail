@@ -131,3 +131,5 @@ later. Preserve the intended silhouette and native sizes above. The current disp
 adapter already handles transparent padding and the original pressed-button white
 surround. Large replacements with changed bounds need their BOUNDS entry updated;
 compact native-size replacements are detected automatically.
+
+Step-by-step refinement/export instructions: [Krita guide](KRITA_GUIDE.md).

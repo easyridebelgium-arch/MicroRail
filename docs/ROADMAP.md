@@ -16,6 +16,11 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; waiting-area/amenity upgrades, transfers, satisfaction, processing chains and growth/scenario rules remain. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
+**Latest usability update:** four independent manual game slots with separate backups,
+a slot chooser and fresh-game action are implemented; the existing save is Slot 1.
+See [save slots](SAVE_SLOTS.md). Periodic autosaves remain Phase 2C work.
+Toolbar refinement instructions are in the [Krita guide](../assets/ui/toolbar/KRITA_GUIDE.md).
+
 **Next implementation:** Phase 2A station waiting-area capacity upgrades and demand/
 amenity foundations, then passenger transfers and satisfaction. Direct passenger
 origins/destinations, per-destination queues, through riders and destination-only
@@ -32,10 +37,10 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation passed all 72 headless suites in Godot 4.6.3,
+complete. The latest cloud validation passed all 73 headless suites in Godot 4.6.3,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
-departures, blocked-departure accounting and version-25 destination/dispatch save/load and passenger conservation. Earlier gameplay
+departures, blocked-departure accounting and version-25 destination/dispatch save/load, passenger conservation and four independent manual slots. Earlier gameplay
 updates were also tested in Godot 4.7.stable.
 Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
@@ -290,7 +295,7 @@ history may land earlier once their foundations are reliable.
 | Operating budgets | Break costs down into maintenance, fuel/energy, workforce, vehicles, construction, interest, station upkeep and penalties. | Expand the company dashboard as each cost system arrives; avoid double-counting the same expense across categories. |
 | Leasing and second-hand stock | Offer low-upfront-cost leases and cheaper used vehicles with clear running-cost or reliability trade-offs. | Build on fleet identities, contracts and vehicle condition. Add simple purchase/lease terms before resale-market simulation. |
 | Incident log, journal and lightweight narratives | Generate factual headlines and selected passenger/cargo stories with destinations and senders/recipients. | Consume bounded simulation events and real shipment data. Cap visible stories; keep logs useful even with flavour text disabled. |
-| Rotating autosaves and recovery | Keep a bounded quick-save roster, configurable periodic autosaves and recovery from the last valid save. | Build on atomic versioned saves. In-game-hour autosaves are a proposed default, not a real-time guarantee. Never overwrite the only valid save when a write fails. |
+| Rotating autosaves and recovery | Keep a bounded quick-save roster, configurable periodic autosaves and recovery from the last valid save. | Four independent manual slots with per-slot backups and a fresh-game chooser are implemented ([save slots](SAVE_SLOTS.md)). Periodic rotating autosaves remain planned. Build on atomic versioned saves. In-game-hour autosaves are a proposed default, not a real-time guarantee. Never overwrite the only valid save when a write fails. |
 | Recent visual replay | Watch approximately the last ten simulation minutes and jump to incidents. | Combine the event stream with a small ring buffer of sampled train positions, headings, identities and relevant visual/map changes. Set explicit sample-rate and memory limits. This is visual history, not rollback, a save replacement or deterministic input replay. |
 
 ## Phase 3 — Infrastructure, maintenance and business decisions

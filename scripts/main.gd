@@ -78,6 +78,11 @@ const TRAIN_SPEED: float = 80.0
 const STATION_WAIT: float = 2.0
 const DAY_GAP_LIMIT := 1440
 
+const SaveSlots = preload("res://scripts/core/save_slots.gd")
+const SaveSlotsDialog = preload("res://scripts/save_slots_dialog.gd")
+var active_save_slot: int = 1
+var save_slots_dialog: AcceptDialog
+
 const SAVE_PATH: String = "user://trainz_save.json"
 const SAVE_TEMP_PATH: String = "user://trainz_save.tmp"
 const RailRouter = preload("res://scripts/rail_router.gd")
@@ -1247,13 +1252,46 @@ func _build_plan_cost() -> int:
 	return int(build_plan.get("new_count", 0)) * TRACK_BUILD_COST + int(build_plan.get("switch_count", 0)) * SWITCH_COST
 
 
-func _save_game() -> void:
+func _open_save_slots(operation: String) -> void:
+	if is_dragging: return
+	paused = true
+	_cancel_right_gesture()
+	_update_toolbar()
+	save_slots_dialog.open_dialog(operation)
+
+
+func _load_slot(slot: int, backup: bool = false) -> bool:
+	if slot < 1 or slot > SaveSlots.COUNT: return false
+	if not _load_game(SaveSlots.path(slot, "backup" if backup else "save")): return false
+	active_save_slot = slot
+	_show_notice(notice + " Slot %d." % slot)
+	return true
+
+
+func _start_new_game(slot: int) -> void:
+	if slot < 1 or slot > SaveSlots.COUNT: return
+	var scene: PackedScene = load("res://scenes/main/main.tscn")
+	var fresh = scene.instantiate()
+	fresh.active_save_slot = slot
+	var tree := get_tree()
+	tree.root.add_child(fresh)
+	if tree.current_scene == self: tree.current_scene = fresh
+	fresh._show_notice("Fresh game in slot %d. Save when ready; its existing saved game has not been replaced." % slot)
+	queue_free()
+
+
+func _save_game(slot: int = 0) -> bool:
+	if slot == 0: slot = active_save_slot
+	if slot < 1 or slot > SaveSlots.COUNT: return false
+	var save_path := SaveSlots.path(slot)
+	var backup_path := SaveSlots.path(slot, "backup")
+	var temp_path := SaveSlots.path(slot, "temp")
 	if not construction_plan.is_empty():
 		_show_notice("Apply or discard the construction draft before saving.")
-		return
+		return false
 	if is_dragging:
 		_show_notice("Finish or cancel track placement before saving.")
-		return
+		return false
 
 	# Commands still waiting for the next step would otherwise be lost.
 	for command in command_queue.drain(sim_clock.tick + 1):
@@ -1298,11 +1336,11 @@ func _save_game() -> void:
 	}
 
 	# Prepare the new save before touching the existing one.
-	var file := FileAccess.open(SAVE_TEMP_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(temp_path, FileAccess.WRITE)
 
 	if file == null:
 		_show_notice("Could not open the temporary save file.")
-		return
+		return false
 
 	file.store_string(JSON.stringify(data, "\t", true, true))
 	file.flush()
@@ -1312,30 +1350,32 @@ func _save_game() -> void:
 
 	if write_error != OK:
 		_show_notice("Saving failed while writing the file.")
-		return
+		return false
 
 	# Preserve the previous manual save.
-	if FileAccess.file_exists(SAVE_PATH):
+	if FileAccess.file_exists(save_path):
 		var backup_error: Error = DirAccess.copy_absolute(
-			ProjectSettings.globalize_path(SAVE_PATH),
-			ProjectSettings.globalize_path(SAVE_BACKUP_PATH)
+			ProjectSettings.globalize_path(save_path),
+			ProjectSettings.globalize_path(backup_path)
 		)
 
 		if backup_error != OK:
 			_show_notice("Could not create a backup. Save cancelled.")
-			return
+			return false
 
 	# Replace the main save only after writing and backup succeed.
 	var rename_error: Error = DirAccess.rename_absolute(
-		ProjectSettings.globalize_path(SAVE_TEMP_PATH),
-		ProjectSettings.globalize_path(SAVE_PATH)
+		ProjectSettings.globalize_path(temp_path),
+		ProjectSettings.globalize_path(save_path)
 	)
 
 	if rename_error != OK:
 		_show_notice("Could not replace the previous save.")
-		return
+		return false
 
-	_show_notice("Game saved.")
+	active_save_slot = slot
+	_show_notice("Game saved to slot %d." % slot)
+	return true
 	
 # [[x, y, state], ...] for every switch tile.
 func _saved_switches() -> Array:
@@ -1580,34 +1620,35 @@ func _is_valid_save(data: Dictionary) -> bool:
 		return false
 	return true
 	
-func _load_game(save_path: String = SAVE_PATH) -> void:
+func _load_game(save_path: String = "") -> bool:
+	if save_path.is_empty(): save_path = SaveSlots.path(active_save_slot)
 	if not FileAccess.file_exists(save_path):
 		_show_notice("No saved game at this location yet.")
-		return
+		return false
 	var file := FileAccess.open(save_path, FileAccess.READ)
 	if file == null:
 		_show_notice("Could not open the saved game.")
-		return
+		return false
 	var parser := JSON.new()
 	var contents: String = file.get_as_text()
 	file.close()
 	if parser.parse(contents) != OK or not parser.data is Dictionary:
 		_show_notice("The save file could not be read.")
-		return
+		return false
 	var migration: Dictionary = SaveMigrations.migrate(parser.data)
 	if not migration["ok"]:
 		_show_notice(migration["error"])
-		return
+		return false
 	var data: Dictionary = migration["data"]
 	if not _is_valid_save(data):
 		_show_notice("The save file is damaged or incompatible.")
-		return
+		return false
 	var loaded_tracks: Dictionary = {}
 	for entry in data["tracks"]:
 		var cell := Vector2i(int(entry[0]), int(entry[1]))
 		if not _is_inside_map(cell) or _is_station_space(cell):
 			_show_notice("Save contains track outside buildable ground.")
-			return
+			return false
 		loaded_tracks[cell] = entry[2]
 	var runtime: Dictionary = data["runtime"]
 	var saved_passenger := RuntimeRoutes.decode(runtime["passenger_cells"])
@@ -1621,35 +1662,35 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	if loaded_cells.is_empty():
 		if loaded_distance > 0.001 or int(state["passengers_on_train"]) > 0 or stop_index != 0:
 			_show_notice("Save contains a train without a valid route.")
-			return
+			return false
 	else:
 		var distances: Array = built["distances"]
 		var returning: bool = runtime["passenger_returning"]
 		if returning and int(runtime["passenger_return_stop"]) != stop_index:
 			_show_notice("Invalid recovery origin.")
-			return
+			return false
 		var original_forward: bool = not state["travelling_to_b"] if returning else state["travelling_to_b"]
 		if data["services"]["passenger"].get("mode", "shuttle") == "loop" and not original_forward:
 			_show_notice("Saved loop train direction is invalid.")
-			return
+			return false
 		var next_stop: int = stop_index + (1 if original_forward else -1)
 		if next_stop < 0 or next_stop >= distances.size():
 			_show_notice("Saved train stop direction is invalid.")
-			return
+			return false
 		var lower: float = minf(distances[stop_index], distances[next_stop])
 		var upper: float = maxf(distances[stop_index], distances[next_stop])
 		if loaded_distance < lower - 0.001 or loaded_distance > upper + 0.001:
 			_show_notice("Saved train position is outside its current leg.")
-			return
+			return false
 		if (state["train_needs_boarding"] or float(state["wait_remaining"]) > 0.0) and absf(loaded_distance - distances[stop_index]) > 0.001:
 			_show_notice("Saved train is waiting away from a station.")
-			return
+			return false
 	var loaded_freight_cells: Array[Vector2i] = RuntimeRoutes.decode(runtime["freight_cells"])
 	if loaded_freight_cells.is_empty(): loaded_freight_cells = WaypointRouter.find_route(loaded_tracks, FOREST_SITE, CARGO_TERMINAL, data["services"]["freight"].get("waypoints", {}).get("forest>terminal", []))
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
 	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"]) + Consists.extra_capacity(Fleet.assigned(data["fleet"], "freight"))):
 		_show_notice("Saved freight train state is invalid.")
-		return
+		return false
 	var loaded_services := ServiceRoutes.from_save(data["services"])
 	var loaded_extra: Dictionary = {}
 	for key in data["passenger_services"]:
@@ -1666,11 +1707,11 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		var shape_error := Consists.route_shape_error(train.path, train.cells, train.length, train.get("mode", "shuttle"), loaded_tracks)
 		if not shape_error.is_empty():
 			_show_notice(shape_error)
-			return
+			return false
 		for cell in helper.footprint(train.path, train.distance, float(TILE_SIZE), train.length):
 			if footprints.has(cell):
 				_show_notice("Save contains overlapping train bodies.")
-				return
+				return false
 			footprints[cell] = true
 	# Commit only after validating every service and train.
 	tracks = loaded_tracks
@@ -1734,7 +1775,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 		command_queue.restore_state(data["sim"]["commands"])
 	else:
 		command_queue.clear()
-	var loaded_notice: String = "Previous save loaded." if save_path == SAVE_BACKUP_PATH else "Game loaded."
+	var loaded_notice: String = "Previous save loaded." if save_path.ends_with(".backup.json") else "Game loaded."
 	if migration["migrated"]:
 		loaded_notice += " Upgraded from save version %d; saving again keeps the new format." % int(migration["from_version"])
 	_show_notice(loaded_notice)
@@ -1743,6 +1784,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	_update_history_controls()
 	queue_redraw()
 
+	return true
 
 func _is_valid_track_type(value: Variant) -> bool:
 	var port_count: int = TrackGeometry.connections(value).size()
@@ -1773,15 +1815,18 @@ func _update_train_transform() -> void:
 
 	train_heading = direction.angle()
 func _setup_toolbar() -> void:
+	save_slots_dialog = SaveSlotsDialog.new()
+	save_slots_dialog.configure(self)
+	$Interface.add_child(save_slots_dialog)
 	straight_button.pressed.connect(_select_straight_track)
 	curve_button.pressed.connect(_select_curved_track)
 	rotate_button.hide()
 	pause_button.pressed.connect(_toggle_pause)
-	save_button.pressed.connect(_save_game)
-	load_button.pressed.connect(_load_game)
+	save_button.pressed.connect(_open_save_slots.bind("save"))
+	load_button.pressed.connect(_open_save_slots.bind("load"))
 	folder_button.pressed.connect(_open_save_folder)
 	inspect_button.pressed.connect(_toggle_inspect_mode)
-	backup_button.pressed.connect(_load_game.bind(SAVE_BACKUP_PATH))
+	backup_button.pressed.connect(_open_save_slots.bind("backup"))
 	for button in [straight_button, curve_button, pause_button, save_button, load_button, folder_button, inspect_button, backup_button]:
 		button.focus_mode = Control.FOCUS_NONE
 
@@ -3931,7 +3976,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
+	return (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()

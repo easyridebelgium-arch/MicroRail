@@ -55,7 +55,7 @@ func configure(owner_game: Node) -> void:
 	accounts_button = Button.new()
 	accounts_button.text = "Accounts"
 	accounts_button.accessibility_name = "Company accounts"
-	accounts_button.tooltip_text = "View company income, running costs, purchases and station queues"
+	accounts_button.tooltip_text = "View company income, running costs, purchases, station queues and waiting satisfaction"
 	accounts_button.pressed.connect(open_accounts)
 	status_bar.add_child(accounts_button)
 	accounts_dialog = AcceptDialog.new()
@@ -116,6 +116,8 @@ func refresh() -> void:
 
 	accounts_text.text += "\n\nBank principal outstanding: £%d\nAccrued interest: £%d (early payoff £%d)\nLoan payments overdue: £%d\nLoan interest paid: £%d\nLoan principal repaid: £%d" % [game.loans.state.principal, game.loans.state.interest, game.loans.payoff(), game.loans.overdue(), game.loans.state.interest_paid, game.loans.state.principal_paid]
 
+	accounts_text.text += "\n\n" + waiting_summary()
+
 func open_accounts() -> void:
 	game._cancel_right_gesture()
 	game.is_dragging = false
@@ -127,3 +129,10 @@ func open_accounts() -> void:
 	game._update_toolbar()
 	accounts_dialog.popup_centered_clamped(Vector2i(560, 500), 0.95)
 	refresh()
+
+func waiting_summary() -> String:
+	var company: Dictionary = game.satisfaction.company(game.passenger_demand, game.sim_clock.tick, game.amenities)
+	var lines: PackedStringArray = ["Passenger waiting satisfaction: no data yet" if company.rating < 0 else "Passenger waiting satisfaction: %d / 100" % company.rating]
+	for station in game.PassengerDemand.STATIONS:
+		lines.append("\n" + game.ServiceRoutes.STATIONS[station].name + "\n" + game.satisfaction.describe(station, game.passenger_demand, game.sim_clock.tick, game.amenities))
+	return "\n".join(lines)

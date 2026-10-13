@@ -4,6 +4,7 @@ extends RefCounted
 const STATIONS: Array[String] = ["a", "b", "c"]
 var queues: Dictionary = {}
 var batches: Dictionary = {}
+var last_boarding: Array = []
 
 func _init() -> void:
 	for station in STATIONS:
@@ -53,6 +54,7 @@ static func future_stops(stops: Array, index: int, forward: bool, mode: String) 
 	return result
 
 func board(station: String, destinations: Array, capacity: int, manifest: Dictionary, tick: int = 0) -> int:
+	last_boarding.clear()
 	_sync_batches(station, tick)
 	var room := maxi(0, capacity - total(manifest))
 	var candidates: Array = []
@@ -67,6 +69,7 @@ func board(station: String, destinations: Array, capacity: int, manifest: Dictio
 		var take := mini(room, int(batch.count))
 		if take == 0: break
 		var destination: String = batch.destination
+		last_boarding.append({"count": take, "wait": maxi(0, tick - int(batch.tick))})
 		batch.count -= take
 		queues[station][destination] -= take
 		if queues[station][destination] == 0: queues[station].erase(destination)
@@ -154,12 +157,16 @@ static func make_batches(counts: Dictionary, tick: int) -> Array:
 		if int(counts.get(destination, 0)) > 0: result.append({"destination": destination, "count": int(counts[destination]), "tick": tick})
 	return result
 
-func _sync_batches(station: String, tick: int) -> void:
+func waiting_groups(station: String, tick: int) -> Array:
 	# Aggregate setters/legacy fixtures have no arrival times: initialize only
 	# changed queues at the supplied tick. Normal gameplay always updates both.
 	var counts: Dictionary = {}
 	for batch in batches.get(station, []): counts[batch.destination] = int(counts.get(batch.destination, 0)) + int(batch.count)
-	if normalize(counts) != normalize(queues[station]): batches[station] = make_batches(queues[station], tick)
+	if normalize(counts) != normalize(queues[station]): return make_batches(queues[station], tick)
+	return batches[station]
+
+func _sync_batches(station: String, tick: int) -> void:
+	batches[station] = waiting_groups(station, tick)
 
 func _add_batch(station: String, destination: String, count: int, tick: int) -> void:
 	if count <= 0: return

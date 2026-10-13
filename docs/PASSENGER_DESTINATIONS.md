@@ -19,7 +19,8 @@ New arrivals use the owned simulation RNG; its state is saved and restored.
   order. Transfer riders board only when a forward stop makes progress along a
   journey with the fewest changes. Unserved demand remains queued.
 - Fares and the delivered counter increase only when the destination is reached.
-  Flat £5 fares remain; distance pricing, classes and satisfaction are later work.
+  Flat £5 fares remain; distance pricing, classes and broader satisfaction are later work. Waiting-experience scores are now
+  visible; see [satisfaction](PASSENGER_SATISFACTION.md).
 - Withdrawal stops taking new riders and completes accepted journeys. A Loop may
   need to continue past its first stop once more to deliver through passengers,
   then return empty before storage/replacement/route edits.
@@ -66,7 +67,7 @@ destinations to the physically reached departure queue, as before.
 
 Click a station for destination counts and **direct service**, **change at Station B**
 or **no enabled connection**. Train inspectors mark off-route final destinations
-with **change trains**. Transfer events enter the existing event log. Crowding/punctuality satisfaction, larger-map journey leg assignment and
+with **change trains**. Transfer events enter the existing event log. Waiting-experience scores are implemented. Crowding/punctuality satisfaction, larger-map journey leg assignment and
 protected timed connections remain later Phase 2A work.
 
 ## Persistence and invariants
@@ -112,11 +113,15 @@ It grows with the fixed simulation clock, including accelerated play, and stops
 while paused. Arrival groups are saved, so reloading does not reset priority.
 Passengers reaching an interchange or physically returning after recovery join
 that station's queue at the current tick, behind its existing older groups. This
-measures the current station wait, not total journey time; satisfaction and
-end-to-end passenger-history tracking follow separately.
+measures the current station wait, not total journey time; waiting-experience satisfaction is now measured; end-to-end passenger-history
+tracking follows separately.
 
 Counts remain aggregated; no individual passenger nodes or RNG draws are added.
 `test_passenger_age.gd` covers older versus newer demand, partial boarding,
 unserved demand, equal-age ties, interchange ordering, age-preserving saves,
 invalid/duplicate/future cohorts, legacy migration, station wording and equal
 30/60/120 FPS outcomes (21 checks).
+
+Waiting satisfaction now uses these arrival groups and actual boarded counts;
+click a station or open Accounts for its score and explanation. See
+[passenger waiting satisfaction](PASSENGER_SATISFACTION.md).

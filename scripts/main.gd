@@ -24,6 +24,8 @@ const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerJourneys = preload("res://scripts/core/passenger_journeys.gd")
+const Satisfaction = preload("res://scripts/core/passenger_satisfaction.gd")
+var satisfaction = Satisfaction.new()
 const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
 const Amenities = preload("res://scripts/core/amenities.gd")
 const Presentation = preload("res://scripts/core/presentation.gd")
@@ -1299,12 +1301,17 @@ func _transfer_passengers(key: String, station: String, manifest: Dictionary) ->
 		_record_event(EventLog.PASSENGERS_TRANSFERRED, key, {"stop": station, "passengers": changed})
 	return changed
 
+func _board_waiting(station: String, destinations: Array, capacity: int, manifest: Dictionary) -> int:
+	var boarded: int = passenger_demand.board(station, destinations, capacity, manifest, sim_clock.tick)
+	satisfaction.record(station, passenger_demand.last_boarding, sim_clock.tick, amenities.owned[station])
+	return boarded
+
 func _board_passengers() -> void:
 	if not passenger_service_enabled or passenger_returning: return
 	var config: Dictionary = services.passenger
 	var station: String = config.stops[passenger_stop_index]
 	var future := PassengerDemand.future_stops(config.stops, passenger_stop_index, travelling_to_b, config.get("mode", "shuttle"))
-	passenger_demand.board(station, PassengerJourneys.boarding(_passenger_network(), station, future), _get_train_capacity(), passenger_destinations, sim_clock.tick)
+	_board_waiting(station, PassengerJourneys.boarding(_passenger_network(), station, future), _get_train_capacity(), passenger_destinations)
 
 func _unload_passengers(station: String) -> int:
 	var arrived := PassengerDemand.alight(passenger_destinations, station)
@@ -1401,6 +1408,7 @@ func _save_game(slot: int = 0) -> bool:
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
+		"satisfaction": satisfaction.save_state(),
 		"presentation": _saved_presentation(),
 		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
@@ -1577,6 +1585,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 		if train_x > _cell_center(STATION_B).x:
 			return false
 
+	if not Satisfaction.valid_state(data.get("satisfaction"), int(sim.clock.tick)): return false
 	if not Amenities.valid_save(data.get("amenities")): return false
 	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
 	if not Presentation.valid(data.get("presentation"), data.services): return false
@@ -1831,6 +1840,7 @@ func _load_game(save_path: String = "") -> bool:
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
 	amenities.load_save(data.amenities)
 	loans.restore_state(data.loans)
+	satisfaction.restore_state(data.satisfaction)
 	presentation = Presentation.normalize(data.presentation)
 	route_distance = loaded_distance
 	is_dragging = false
@@ -2401,7 +2411,9 @@ func _update_station_inspector() -> void:
 			if service != "freight" and services[service].stops.has(key):
 				count += 1
 				incoming += _incoming_passengers(service, key)
-		station_summary.text = "Waiting passengers: %d / %d\nPassengers aboard for here: %d\nServing routes: %d\nPause to build amenities; manage trains in Fleet." % [_waiting(key), amenities.queue_limit(key), incoming, count]
+		var experience: Dictionary = satisfaction.station(key, passenger_demand.waiting_groups(key, sim_clock.tick), sim_clock.tick, amenities.owned[key])
+		var rating_text := "%d / 100" % experience.rating if experience.rating >= 0 else "no data yet"
+		station_summary.text = "Waiting passengers: %d / %d\nPassengers aboard for here: %d\nServing routes: %d\nWaiting satisfaction: %s\nPause to build amenities; manage trains in Fleet." % [_waiting(key), amenities.queue_limit(key), incoming, count, rating_text]
 
 func _update_station_details() -> void:
 	if not station_panel.visible:
@@ -3865,6 +3877,7 @@ func _destination_queue_text(station: String) -> String:
 		if journey.size() == 2: connection = " — direct service"
 		elif journey.size() > 2: connection = " — change at " + ServiceRoutes.STATIONS[journey[1]].name
 		lines.append("To %s: %d%s | Oldest wait %.1fs" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), connection, passenger_demand.oldest_seconds(station, sim_clock.tick, destination)])
+	lines.append(satisfaction.describe(station, passenger_demand, sim_clock.tick, amenities))
 	lines.append("Connections use enabled, unheld services with complete track; departure times and free seats are not guaranteed.")
 	return "\n".join(lines)
 

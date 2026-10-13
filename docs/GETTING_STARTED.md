@@ -30,7 +30,9 @@ already on the map in a row, and each ticket pays £5. You start with £1,000 an
 2. Click a station and make sure passenger service is enabled. Click a train to inspect where it is going.
 3. Passengers wait per final destination. A–B plus B–C lets C-bound passengers
    change at B; a direct A–C service is preferred. The oldest eligible riders board
-   first. Click a station to see connections and the oldest wait per destination.
+   first. Click a station to see connections, oldest waits and **Waiting satisfaction**.
+   **Accounts** explains the company score; more useful service reduces waits, and
+   amenities add a small comfort bonus.
 4. If a train stops, open **Problems** (toolbar) to see why, or use the alert banner's **Inspect**. **Acknowledge** hides that alert while keeping the problem visible.
 5. Signal letters mean S = manual stop, H = current held request, R = reserved tile, A = automatic/unrequested. The train inspector explains actual permission to move.
 

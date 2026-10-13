@@ -84,7 +84,7 @@ func run() -> void:
 	payload.version = 29
 	payload.demand.erase("batches")
 	var old := Migrations.migrate(payload)
-	check(old.ok and old.data.version == 30 and old.data.demand.batches.a[0].tick == 600 and game._is_valid_save(old.data), "v29 starts unknown legacy waiting ages at its saved tick")
+	check(old.ok and old.data.version == Migrations.CURRENT_VERSION and old.data.demand.batches.a[0].tick == 600 and game._is_valid_save(old.data), "v29 starts unknown legacy waiting ages at its saved tick")
 	check(not payload.demand.has("batches"), "migration does not mutate original save")
 	game.queue_free()
 	await process_frame

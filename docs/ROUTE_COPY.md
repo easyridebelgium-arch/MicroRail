@@ -48,3 +48,7 @@ independent service. Because each linked train still follows the same single-tra
 Auto platform rules, trains sharing a route take turns instead of colliding. A source edit
 is refused for the whole Apply while any linked train is away from its first stop, like any
 other route edit. Tests: `tests/test_linked_services.gd`.
+
+Passenger route copying also carries the source's first/later directional departure
+timetables. The target retains its own name, train and independent headway setting;
+linked trains use their source's headway and departure tables.

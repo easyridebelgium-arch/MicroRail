@@ -96,6 +96,10 @@ static func snapshot(game: Node, id: int) -> Dictionary:
 		result.state = "Loading"
 		result.reason = "Loaded %d/%d logs needed for the departure rule; %d logs remain in forest storage." % [game.freight_train.cargo, game.freight_train.get_minimum_load(), game.forest_stock]
 		result.advice = "Allow production/loading to continue, or change the departure rule in the forest/terminal inspector. Adding a passing loop will not supply cargo."
+	elif str(game.reservation_waits.get(key, "")).begins_with("Holding for"):
+		result.state = "Scheduled departure hold"
+		result.reason = str(game.reservation_waits[key])
+		result.advice = "Let the game clock reach the departure time, or edit the source route's timetable/headway in Routes. This intentional hold is not traffic congestion."
 	elif boarding:
 		result.state = "Boarding"
 		result.reason = "The train is at a stop and will board before its next movement."

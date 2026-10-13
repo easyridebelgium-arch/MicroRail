@@ -188,9 +188,9 @@ var signal_button: Button
 var reservation_trains: Dictionary = {}
 ## Train id -> {"corridor", "target"}: plain track claimed on the current leg.
 var section_claims: Dictionary = {}
-## Group (source service key) -> recent first-stop departure ticks. Not saved.
+## Group (source service key) -> recent actual first-stop departure ticks; saved in v24.
 var headway_log: Dictionary = {}
-## Group -> {"last", "served", "missed", "delays"} for timetables. Not saved.
+## Source/leg -> timetable cursor and measured departure history; saved in v24.
 var timetable_state: Dictionary = {}
 var clock_label: Label
 ## Train ids currently held at a stop by a single-track claim; they reserve no lookahead.
@@ -601,16 +601,19 @@ func _move_train(delta: float) -> void:
 	if wait_remaining > 0.0:
 		wait_remaining = maxf(0.0, wait_remaining - delta)
 		return
-	if train_needs_boarding and passenger_stop_index == 0 and _headway_hold("passenger"): return
+	if _scheduled_departure_hold("passenger"): return
 	if train_needs_boarding:
-		if passenger_stop_index == 0: _record_departure("passenger")
 		_board_passengers()
 		train_needs_boarding = false
-		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"]["stops"][passenger_stop_index], "passengers": passengers_on_train})
 	_maybe_reroute_platform("passenger")
+	var departure := _departure_context("passenger")
+	var before_movement := route_distance
 	var next_stop: int = _next_passenger_stop()
 	var target_distance: float = _passenger_target_distance()
 	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta), target_distance)
+	if departure.at_stop and not departure.returning and absf(route_distance - before_movement) > 0.001:
+		_record_departure("passenger")
+		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"].stops[passenger_stop_index], "passengers": passengers_on_train})
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
 		if passenger_returning:
@@ -1248,6 +1251,7 @@ func _save_game() -> void:
 	for command in command_queue.drain(sim_clock.tick + 1):
 		_execute_command(command)
 	_sync_fleet_upgrades()
+	_sync_timetables()
 	var saved_tracks: Array = []
 
 	for cell in tracks:
@@ -1265,6 +1269,7 @@ func _save_game() -> void:
 	var data: Dictionary = {
 		"version": SAVE_VERSION,
 		"runtime": _saved_runtime_routes(),
+		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
 		"passenger_services": _saved_passenger_services(),
 		"signals": _saved_signals(),
 		"tracks": saved_tracks,
@@ -1386,6 +1391,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 		return false
 	if not SimClock.is_valid_state(sim.get("clock")):
 		return false
+	if not Timetable.valid_dispatch(data.get("dispatch"), data.services, int(sim.clock.tick)): return false
 	if not SimRng.is_valid_state(sim.get("rng")):
 		return false
 	if not EventLog.is_valid_state(sim.get("events")):
@@ -1693,6 +1699,11 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	_rebuild_reservations()
 	scenario_goals.current_index = int(data["scenario_stage"])
 	sim_clock.restore_state(data["sim"]["clock"])
+	var dispatch := Timetable.normalize_dispatch(data.dispatch)
+	timetable_state = dispatch.timetables
+	headway_log = dispatch.headways
+	_sync_timetables()
+	_rebuild_reservations()
 	sim_rng.restore_state(data["sim"]["rng"])
 	event_log.restore_state(data["sim"]["events"])
 	notifications.reset()
@@ -3882,6 +3893,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 		passenger_stop_index = 0
 		passenger_return_stop = 0
 	services = configuration.duplicate(true)
+	_sync_timetables()
 	for key in additional_service_keys():
 		if extra_built.has(key): passenger_services[key].configure(key, services[key], extra_built[key])
 		else: passenger_services[key].configuration = services[key].duplicate(true)
@@ -4088,17 +4100,18 @@ func _reservation_path(path: Curve2D, home: Vector2) -> Curve2D:
 func _rebuild_reservations(allow_movement: bool = false) -> void:
 	if freight_train == null:
 		return
+	_sync_timetables()
 	authority_revision += 1
 	authority_tick = sim_clock.tick
 	var passenger := Fleet.assigned(fleet, "passenger")
 	var freight := Fleet.assigned(fleet, "freight")
 	var trains: Array = [
-		{"id": int(passenger["id"]), "length": _fleet_length(passenger), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0 and not section_held.has(int(passenger["id"]))},
+		{"id": int(passenger["id"]), "length": _fleet_length(passenger), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0 and not section_held.has(int(passenger["id"])) and not _scheduled_departure_hold("passenger")},
 		{"id": int(freight["id"]), "length": _fleet_length(freight), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.service_is_active() and freight_train.dwell <= 0.0 and (not freight_train.to_terminal or freight_train.distance_along_route > 0.001 or freight_train.cargo + forest_stock >= freight_train.get_minimum_load())}
 	]
 	for key in additional_service_keys():
 		var running = passenger_services[key]
-		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0 and not section_held.has(int(Fleet.assigned(fleet, key).id))})
+		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0 and not section_held.has(int(Fleet.assigned(fleet, key).id)) and not _scheduled_departure_hold(key)})
 	reservation_trains.clear()
 	for train in trains: reservation_trains[int(train.id)] = train
 	reservations.rebuild(trains, tracks, float(TILE_SIZE))
@@ -4218,22 +4231,56 @@ func _headway_group(service: String) -> String:
 func _headway_target(service: String) -> int:
 	return int(services.get(_headway_group(service), {}).get("headway", 0))
 
-func _timetable_times(service: String) -> Array:
-	return services.get(_headway_group(service), {}).get("timetable", [])
+func _departure_context(service: String) -> Dictionary:
+	var config: Dictionary = services.get(service, {})
+	var index := passenger_stop_index if service == "passenger" else int(passenger_services[service].stop_index)
+	var following := _next_passenger_stop() if service == "passenger" else int(passenger_services[service].next_stop())
+	var distances: Array = stop_distances if service == "passenger" else passenger_services[service].distances
+	var distance: float = route_distance if service == "passenger" else passenger_services[service].distance
+	var returning: bool = passenger_returning if service == "passenger" else passenger_services[service].returning
+	return {"index": index, "leg": "%s>%s" % [config.stops[index], config.stops[following]], "returning": returning, "at_stop": index < distances.size() and absf(distance - float(distances[index])) <= 0.001}
 
-## Timetable hold: the train may leave once a scheduled time has passed that no
-## departure has used yet.
+func _sync_timetables() -> void:
+	var schedules := Timetable.schedule_map(services)
+	for key in timetable_state.keys():
+		if not schedules.has(key): timetable_state.erase(key)
+	for key in schedules:
+		var group: String = str(key).get_slice(":", 0)
+		var leg: String = str(key).get_slice(":", 1) if str(key).contains(":") else "%s>%s" % [services[group].stops[0], services[group].stops[1]]
+		if not timetable_state.has(key) or timetable_state[key].get("times", []) != schedules[key] or timetable_state[key].get("leg", "") != leg:
+			timetable_state[key] = {"last": Timetable.absolute_minute(sim_clock.tick) - 1, "served": 0, "missed": 0, "delays": [], "times": schedules[key].duplicate(), "leg": leg}
+	for key in headway_log.keys():
+		if not services.has(key) or services[key].has("link"): headway_log.erase(key)
+
+func _timetable_key(service: String) -> String:
+	var group := _headway_group(service)
+	var context := _departure_context(service)
+	return group if context.index == 0 else group + ":" + str(context.leg)
+
+func _timetable_times(service: String) -> Array:
+	var group := _headway_group(service)
+	var context := _departure_context(service)
+	return services[group].get("timetable", []) if context.index == 0 else services[group].get("stop_timetables", {}).get(context.leg, [])
+
+func _scheduled_departure_hold(service: String) -> bool:
+	var source: Dictionary = services[_headway_group(service)]
+	if int(source.get("headway", 0)) <= 0 and source.get("timetable", []).is_empty() and source.get("stop_timetables", {}).is_empty(): return false
+	var context := _departure_context(service)
+	if context.returning or not context.at_stop: return false
+	return _headway_hold(service) if context.index == 0 else _timetable_hold(service)
+
+## No slot is consumed until the train physically leaves its departure stop.
 func _timetable_hold(service: String) -> bool:
 	var times := _timetable_times(service)
 	if times.is_empty(): return false
-	var group := _headway_group(service)
+	_sync_timetables()
+	var key := _timetable_key(service)
+	var state: Dictionary = timetable_state[key]
 	var now := Timetable.absolute_minute(sim_clock.tick)
-	if not timetable_state.has(group): timetable_state[group] = {"last": now - 1, "served": 0, "missed": 0, "delays": []}
-	var state: Dictionary = timetable_state[group]
 	if not Timetable.slots_between(times, int(state.last), now).is_empty():
 		if str(reservation_waits.get(service, "")).begins_with("Holding for timetable"): reservation_waits.erase(service)
 		return false
-	reservation_waits[service] = "Holding for timetable: next departure %s" % Timetable.format(Timetable.next_slot(times, int(state.last)))
+	reservation_waits[service] = "Holding for timetable %s: next departure %s" % [str(_departure_context(service).leg).replace(">", " → ").to_upper(), Timetable.clock_text(Timetable.next_slot(times, int(state.last)))]
 	return true
 
 ## True (and the reason is set) while this service must wait at its first stop.
@@ -4250,10 +4297,11 @@ func _headway_hold(service: String) -> bool:
 
 func _record_departure(service: String) -> void:
 	var group := _headway_group(service)
-	headway_log[group] = Headway.record(headway_log.get(group, []), sim_clock.tick)
+	if _departure_context(service).index == 0: headway_log[group] = Headway.record(headway_log.get(group, []), sim_clock.tick)
 	var times := _timetable_times(service)
-	if times.is_empty() or not timetable_state.has(group): return
-	var state: Dictionary = timetable_state[group]
+	var key := _timetable_key(service)
+	if times.is_empty() or not timetable_state.has(key): return
+	var state: Dictionary = timetable_state[key]
 	var now := Timetable.absolute_minute(sim_clock.tick)
 	var slots := Timetable.slots_between(times, int(state.last), now)
 	if slots.is_empty(): return
@@ -4267,17 +4315,22 @@ func game_clock_text() -> String:
 
 ## Plain-text timetable report for a source service.
 func timetable_report(group: String) -> String:
-	var times: Array = services.get(group, {}).get("timetable", [])
-	if times.is_empty(): return ""
-	var lines: PackedStringArray = ["Timetable: " + Timetable.to_text(times)]
-	var state: Dictionary = timetable_state.get(group, {})
-	if not state.is_empty():
+	var lines: PackedStringArray = []
+	var schedules := Timetable.schedule_map(services)
+	for leg in Timetable.departure_legs(services[group].stops, services[group].get("mode", "shuttle")):
+		var first: bool = leg == "%s>%s" % [services[group].stops[0], services[group].stops[1]]
+		var key: String = group if first else group + ":" + leg
+		if not schedules.has(key): continue
+		var times: Array = schedules[key]
+		lines.append("Timetable %s: %s" % [leg.replace(">", " → ").to_upper(), Timetable.to_text(times)])
+		var state: Dictionary = timetable_state.get(key, {})
+		if state.is_empty(): continue
 		lines.append("Next departure: %s" % Timetable.clock_text(Timetable.next_slot(times, int(state.last))))
 		var delays: Array = state.delays
 		var average := 0.0
 		for delay in delays: average += float(delay)
 		if not delays.is_empty(): average /= float(delays.size())
-		lines.append("Served %d, missed %d%s" % [state.served, state.missed, ", average delay %.1f min, last %d min" % [average, delays.back()] if not delays.is_empty() else ""])
+		lines.append("Served %d, missed %d%s" % [state.served, state.missed, ", recent average delay %.1f min (%d departures), last %d min" % [average, delays.size(), delays.back()] if not delays.is_empty() else ""])
 	return "\n".join(lines)
 
 ## Group members: the source and every service linked to it.
@@ -4460,7 +4513,7 @@ func _reset_traffic_state(reason: String = "") -> void:
 	if freight_train != null:
 		freight_train.reservation_wait = ""
 	if traffic_button != null:
-		traffic_button.text = "Traffic"
+		traffic_button.text = "" if traffic_button.has_meta("toolbar_action") else "Traffic"
 
 func _update_deadlocks() -> void:
 	deadlocks.update(movement_blocks, sim_clock.tick)
@@ -4469,7 +4522,7 @@ func _update_deadlocks() -> void:
 	for cycle in deadlocks.cleared_cycles:
 		_record_event(EventLog.DEADLOCK_CLEARED, "network", {"trains": cycle.duplicate()})
 	if traffic_button != null:
-		traffic_button.text = "Traffic (%d)" % deadlocks.cycles.size() if not deadlocks.cycles.is_empty() else "Traffic"
+		traffic_button.text = (str(deadlocks.cycles.size()) if not deadlocks.cycles.is_empty() else "") if traffic_button.has_meta("toolbar_action") else ("Traffic (%d)" % deadlocks.cycles.size() if not deadlocks.cycles.is_empty() else "Traffic")
 
 func traffic_summary() -> String:
 	var lines: PackedStringArray = []
@@ -4556,7 +4609,7 @@ func reverse_train(id: int) -> String:
 	traffic_wait_samples.erase(id)
 	deadlocks.update(movement_blocks, sim_clock.tick)
 	freight_train.reservation_wait = str(reservation_waits.get("freight", ""))
-	traffic_button.text = "Traffic (%d)" % deadlocks.cycles.size() if not deadlocks.cycles.is_empty() else "Traffic"
+	traffic_button.text = (str(deadlocks.cycles.size()) if not deadlocks.cycles.is_empty() else "") if traffic_button.has_meta("toolbar_action") else ("Traffic (%d)" % deadlocks.cycles.size() if not deadlocks.cycles.is_empty() else "Traffic")
 	_rebuild_reservations()
 	_record_event(EventLog.TRAIN_REVERSED, str(id), {"service": service, "action": "return to departure stop"})
 	for cycle in deadlocks.cleared_cycles:

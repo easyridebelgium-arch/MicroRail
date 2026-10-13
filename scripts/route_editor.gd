@@ -28,6 +28,7 @@ var headway_controls: HFlowContainer
 var headway_spin: SpinBox
 var headway_label: Label
 var timetable_field: LineEdit
+var timetable_leg: OptionButton
 var link_controls: HFlowContainer
 var link_label: Label
 var unlink_button: Button
@@ -108,10 +109,15 @@ func configure(owner_game: Node) -> void:
 	var timetable_title := Label.new()
 	timetable_title.text = "Timetable"
 	headway_controls.add_child(timetable_title)
+	timetable_leg = OptionButton.new()
+	timetable_leg.clip_text = true
+	timetable_leg.custom_minimum_size.x = 180
+	timetable_leg.item_selected.connect(_select_timetable_leg)
+	headway_controls.add_child(timetable_leg)
 	timetable_field = LineEdit.new()
 	timetable_field.placeholder_text = "Departures HH:MM, e.g. 07:00, 07:30, 18:15"
 	timetable_field.custom_minimum_size.x = 260
-	timetable_field.tooltip_text = "Exact departure times from the first stop each day (one game day = 24 minutes at 1×). Empty = no timetable. Trains never leave early; late trains leave at once."
+	timetable_field.tooltip_text = "Exact departure times for the selected direction each day (one game day = 24 minutes at 1×). Empty = no timetable. Trains never leave early; late trains leave at once."
 	timetable_field.text_submitted.connect(func(_text: String) -> void: _set_timetable())
 	timetable_field.focus_exited.connect(_set_timetable)
 	headway_controls.add_child(timetable_field)
@@ -225,6 +231,10 @@ func _capture_name(key: String) -> void:
 	draft[key]["name"] = name_field.text.strip_edges()
 
 func _select_service(index: int) -> void:
+	if not _set_timetable():
+		for item in range(service_choice.item_count):
+			if service_choice.get_item_metadata(item) == _key(): service_choice.select(item)
+		return
 	_capture_name(_key())
 	selected_service_key = service_choice.get_item_metadata(index)
 	_show_service()
@@ -240,11 +250,51 @@ func _set_timetable() -> bool:
 	if not parsed.ok:
 		status.text = str(parsed.error)
 		return false
-	if parsed.times.is_empty(): draft[_key()].erase("timetable")
-	else: draft[_key()]["timetable"] = parsed.times
+	if timetable_leg.selected <= 0:
+		if parsed.times.is_empty(): draft[_key()].erase("timetable")
+		else: draft[_key()]["timetable"] = parsed.times
+	else:
+		var leg: String = timetable_leg.get_selected_metadata()
+		var later: Dictionary = draft[_key()].get("stop_timetables", {}).duplicate(true)
+		if parsed.times.is_empty(): later.erase(leg)
+		else: later[leg] = parsed.times
+		if later.is_empty(): draft[_key()].erase("stop_timetables")
+		else: draft[_key()]["stop_timetables"] = later
 	timetable_field.text = Timetable.to_text(parsed.times)
 	status.text = "Timetable updated in draft. Apply to use it."
 	return true
+
+func _select_timetable_leg(_index: int) -> void:
+	# The text field's focus-exit captures the previous leg before this click.
+	_show_timetable_times()
+
+func _show_timetable_times() -> void:
+	if timetable_leg.item_count == 0: return
+	var times: Array = draft[_key()].get("timetable", []) if timetable_leg.selected == 0 else draft[_key()].get("stop_timetables", {}).get(timetable_leg.get_selected_metadata(), [])
+	timetable_field.text = Timetable.to_text(times)
+
+func _refresh_timetable_legs() -> void:
+	if not Services.is_passenger_key(_key()): return
+	var previous: String = str(timetable_leg.get_selected_metadata()) if timetable_leg.item_count > 0 else ""
+	var legs := Timetable.departure_legs(draft[_key()].stops, draft[_key()].get("mode", "shuttle"))
+	timetable_leg.clear()
+	for leg in legs:
+		timetable_leg.add_item("Depart " + leg.replace(">", " → ").to_upper())
+		timetable_leg.set_item_metadata(timetable_leg.item_count - 1, leg)
+		if leg == previous: timetable_leg.select(timetable_leg.item_count - 1)
+	var later: Dictionary = draft[_key()].get("stop_timetables", {}).duplicate(true)
+	var removed: PackedStringArray = []
+	for leg in later.keys():
+		if not legs.has(leg) or leg == legs[0]:
+			if not later[leg].is_empty(): removed.append(str(leg).replace(">", " → ").to_upper())
+			later.erase(leg)
+	if later.is_empty(): draft[_key()].erase("stop_timetables")
+	else: draft[_key()]["stop_timetables"] = later
+	if not removed.is_empty():
+		var warning := "Timetables removed from draft for changed legs: %s. Review departure times before Apply." % ", ".join(removed)
+		removed_waypoint_legs[_key()] = str(removed_waypoint_legs.get(_key(), "")) + "\n" + warning
+		directive_warning.text = removed_waypoint_legs[_key()]
+	_show_timetable_times()
 
 func _unlink() -> void:
 	draft[_key()].erase("link")
@@ -262,7 +312,7 @@ func _show_service() -> void:
 		headway_spin.set_value_no_signal(float(draft[_key()].get("headway", 0)))
 		timetable_field.text = Timetable.to_text(draft[_key()].get("timetable", []))
 		headway_label.text = game.headway_report(_key())
-	if linked: link_label.text = "Linked to %s — its stops, mode, waypoints and platforms follow that route." % draft[str(draft[_key()]["link"])].name
+	if linked: link_label.text = "Linked to %s — its route, headway and departure timetables follow that source." % draft[str(draft[_key()]["link"])].name
 	directive_warning.text = str(removed_waypoint_legs.get(_key(), ""))
 	name_field.text = draft[_key()]["name"]
 	editing_controls.visible = Services.is_passenger_key(_key())
@@ -327,6 +377,7 @@ func _refresh_stops(selected: int = -1) -> void:
 	for stop in itinerary: names.append(str(stop).to_upper())
 	heading.text = "Stop sequence: " + " → ".join(names)
 	_refresh_legs()
+	_refresh_timetable_legs()
 
 func _show_platform(index: int) -> void:
 	var stops: Array = draft[_key()]["stops"]

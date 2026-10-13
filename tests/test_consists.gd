@@ -44,7 +44,7 @@ func _initialize() -> void:
 	tracks[Vector2i(3, 8)] = "junction_6_2_4"
 	check(not Stock.stop_clearance(path, 0, 60, tracks, 32).is_empty(), "switches must not count as straight platform clearance")
 	var migrated := Migrations.migrate({"version": 22, "fleet": Fleet.defaults()})
-	check(migrated.ok and migrated.data.version == 23 and migrated.data.fleet.trains[0].wagons.is_empty(), "version 22 must upgrade to single-vehicle consists without altering ownership")
+	check(migrated.ok and migrated.data.version == Migrations.CURRENT_VERSION and migrated.data.fleet.trains[0].wagons.is_empty(), "version 22 must upgrade to single-vehicle consists without altering ownership")
 	var thirty := simulate(30)
 	check(thirty == simulate(60) and thirty == simulate(120), "long-body movement and ownership must be identical at 30, 60 and 120 FPS")
 	print("Consists: %d checks, %d failures" % [checks, failures])

@@ -80,19 +80,22 @@ func advance(game: Node, delta: float) -> void:
 	if dwell > 0:
 		dwell = maxf(0, dwell - delta)
 		return
-	if boarding and stop_index == 0 and game._headway_hold(key): return
+	if game._scheduled_departure_hold(key): return
 	if boarding:
-		if stop_index == 0: game._record_departure(key)
 		var origin: String = configuration.stops[stop_index]
 		var count: int = mini(game._waiting(origin), FleetData.capacity(train) - passengers)
 		game._set_waiting(origin, game._waiting(origin) - count)
 		passengers += count
 		boarding = false
-		game._record_event(game.EventLog.TRAIN_DEPARTED, id, {"service": key, "stop": origin, "passengers": passengers})
 	game._maybe_reroute_platform(key)
+	var departure: Dictionary = game._departure_context(key)
+	var before_movement := distance
 	var destination := next_stop()
 	var target := target_distance()
 	distance = game._reserved_movement(key, path, distance, move_toward(distance, target, FleetData.speed(train) * delta), target)
+	if departure.at_stop and not departure.returning and absf(distance - before_movement) > 0.001:
+		game._record_departure(key)
+		game._record_event(game.EventLog.TRAIN_DEPARTED, id, {"service": key, "stop": configuration.stops[stop_index], "passengers": passengers})
 	if absf(distance - target) < 0.001:
 		distance = target
 		if returning:

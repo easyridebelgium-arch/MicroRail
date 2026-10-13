@@ -123,3 +123,12 @@ content position, update its BOUNDS entry in the helper; compact native-size
 replacements are detected automatically. Restart Godot after replacing artwork.
 The old `assets/ui/icons/toolbar.svg` remains available but is no longer used by
 the toolbar. Tests: `tests/test_toolbar_art.gd` plus existing UI/control suites.
+
+## Artwork refinement checkpoint
+
+The current pack is usable during continued gameplay work. The artist is refining
+margins/button-state alignment in Krita; final PNGs can replace the current sources
+later. Preserve the intended silhouette and native sizes above. The current display
+adapter already handles transparent padding and the original pressed-button white
+surround. Large replacements with changed bounds need their BOUNDS entry updated;
+compact native-size replacements are detected automatically.

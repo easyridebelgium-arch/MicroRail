@@ -9,8 +9,9 @@ shares it; linked services show no field of their own.
   since the last departure of *any* train in its group. The wait is shown as "Holding for
   headway: N s until the next departure" in the train status and inspector.
 - **Measurement:** departures are logged per group (`Main.headway_log`, last 24); Routes shows
-  the last and average actual interval (`Main.headway_report`). The log is not saved; after
-  loading, the first departure is free and measurement starts again.
+  the last and average actual interval (`Main.headway_report`). Save version 24 retains the log; loading preserves the remaining headway.
+  Departures are recorded on actual movement, not boarding. Supported older saves
+  start with empty history when migrated.
 - **Infeasible targets:** `Headway.infeasible_reason` estimates one round trip (out and back for
   Shuttle, once round for Loop, plus every station wait) and compares the target with
   round trip / number of trains. A target below that is explained in Routes ("needs about N

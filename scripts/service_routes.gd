@@ -2,6 +2,7 @@ extends RefCounted
 
 const WaypointRouter = preload("res://scripts/waypoint_router.gd")
 const Router = preload("res://scripts/rail_router.gd")
+const Timetable = preload("res://scripts/core/timetable.gd")
 const STATIONS: Dictionary = {
 	"a": {"name": "Station A", "cell": Vector2i(4, 8)},
 	"b": {"name": "Station B", "cell": Vector2i(20, 8)},
@@ -49,12 +50,12 @@ static func valid_headway(service: Dictionary) -> bool:
 
 ## Departure minutes after midnight (sorted, unique), kept on the source service.
 static func valid_timetable(service: Dictionary) -> bool:
-	var value: Variant = service.get("timetable", [])
-	if not value is Array or value.size() > 48: return false
-	var previous := -1
-	for minute in value:
-		if typeof(minute) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(minute)) or float(minute) != floor(float(minute)) or minute < 0 or minute > 1439 or int(minute) <= previous: return false
-		previous = int(minute)
+	if not Timetable.valid_times(service.get("timetable", [])): return false
+	var later: Variant = service.get("stop_timetables", {})
+	if not later is Dictionary: return false
+	var legs := Timetable.departure_legs(service.stops, service.get("mode", "shuttle"))
+	for leg in later:
+		if not leg is String or leg == legs[0] or not legs.has(leg) or not Timetable.valid_times(later[leg]): return false
 	return true
 
 static func is_passenger_key(key: Variant) -> bool:
@@ -78,6 +79,10 @@ static func copy_route(source: Dictionary, target: Dictionary) -> Dictionary:
 	result["mode"] = instructions.get("mode", "shuttle")
 	result["waypoints"] = instructions.get("waypoints", {})
 	result["platforms"] = instructions.get("platforms", {})
+	result.erase("timetable")
+	if instructions.has("timetable"): result["timetable"] = instructions.timetable
+	result.erase("stop_timetables")
+	if instructions.has("stop_timetables"): result["stop_timetables"] = instructions.stop_timetables
 	return result
 
 ## A linked service follows another passenger service's route ("link": key of
@@ -138,6 +143,7 @@ static func is_valid(value: Variant) -> bool:
 		if title != title.strip_edges() or title.is_empty() or title.length() > 40 or "\n" in title or "\r" in title: return false
 		if key == "freight":
 			if service.stops != ["forest", "terminal"]: return false
+			if service.get("stop_timetables", {}) != {}: return false
 		else:
 			var stops: Array = service.stops
 			if stops.size() < 2 or stops.size() > STATIONS.size(): return false
@@ -222,6 +228,13 @@ static func from_save(value: Dictionary) -> Dictionary:
 		for minute in result[service].get("timetable", []): times.append(int(minute))
 		if times.is_empty(): result[service].erase("timetable")
 		else: result[service]["timetable"] = times
+		var later: Dictionary = {}
+		for leg in result[service].get("stop_timetables", {}):
+			var normalized: Array = []
+			for minute in result[service].stop_timetables[leg]: normalized.append(int(minute))
+			if not normalized.is_empty(): later[leg] = normalized
+		if later.is_empty(): result[service].erase("stop_timetables")
+		else: result[service]["stop_timetables"] = later
 		if int(result[service].get("headway", 0)) <= 0: result[service].erase("headway")
 		else: result[service]["headway"] = int(result[service]["headway"])
 		var marks: Dictionary = {}

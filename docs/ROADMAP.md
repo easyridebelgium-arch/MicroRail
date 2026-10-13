@@ -421,6 +421,8 @@ readability and mechanical technology progression.
 
 ## Tutorial coverage
 
+A written first-15-minutes guide and controls reference exists: [getting started](GETTING_STARTED.md). The in-game tutorial below is still planned.
+
 Teach one operational concept at a time as it becomes available:
 
 1. Track building, stations and reading block/reservation/signal congestion.

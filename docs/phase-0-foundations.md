@@ -35,7 +35,7 @@ copy them over the current scripts.
   in 1/60-second ticks. Long stalls deliberately drop excess catch-up time; this is not yet
   a full deterministic command/replay system. Rendering, camera, notices and UI
   still use real frame time.
-- **Saves are version 24**, defined only by `SaveMigrations.CURRENT_VERSION`.
+- **Saves are version 25**, defined only by `SaveMigrations.CURRENT_VERSION`.
   Version 14 route saves and both version 15 variants (fleet-only and
   simulation-only) migrate in memory. The v16→v17 migration adds the command queue; v17→v18 adds switch positions; v18→v19 adds retained runtime paths,
   physical recovery/dispatch state and signal modes; v19→v20 adds waypoint directives; v20→v21 adds route modes, defaulting existing
@@ -45,9 +45,11 @@ copy them over the current scripts.
   The v22→v23 step adds empty wagon lists for the new coach/log-wagon consists.
   The v23→v24 step adds empty dispatch history; current saves retain directional
   timetable cursors, bounded punctuality history and actual origin departure ticks.
+  The v24→v25 step splits existing station totals by destination and assigns old
+  onboard riders to their next stop, preserving counts and physical positions.
   Existing data is preserved; missing systems receive defaults. Pre-fleet saves
   reconstruct starter-train upgrades and their purchase costs. Validation
-  completes before the live game changes. Saving again writes v24 and retains
+  completes before the live game changes. Saving again writes v25 and retains
   the previous save as a backup. Saves older than 14, future versions and
   invalid current-format data are rejected.
 - **Keys go through the InputMap.** Defaults match the old keys (Space, M, G,

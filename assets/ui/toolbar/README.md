@@ -116,9 +116,8 @@ Buttons display at 64 × 64 logical pixels, with icons up to 48 × 48; Undo/Redo
 40 × 40 buttons. Speed and Problems retain live text. The ribbon panel is drawn
 behind the flow layout; the separator asset is retained for future grouped layouts.
 
-`backgrounds/button_pressed.png` currently has an opaque white surround. A runtime
-edge-connected white cutout removes it without modifying the PNG. A transparent
-replacement is preferred. If replacing an image with a different large canvas or
+`backgrounds/button_pressed.png` has been replaced with a transparent version; its content bounds are updated. The runtime edge-connected white cutout remains
+available for older/local replacements without modifying their source PNGs. If replacing an image with a different large canvas or
 content position, update its BOUNDS entry in the helper; compact native-size
 replacements are detected automatically. Restart Godot after replacing artwork.
 The old `assets/ui/icons/toolbar.svg` remains available but is no longer used by

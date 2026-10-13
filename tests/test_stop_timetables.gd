@@ -16,6 +16,7 @@ func tick(game: Node) -> void:
 func fixture() -> Node:
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	root.add_child(game)
+	game.sim_rng.set_seed(12345)
 	game.set_process(false)
 	game.paused = true
 	game.money = 100000

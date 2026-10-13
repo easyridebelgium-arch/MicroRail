@@ -34,7 +34,8 @@ func _run() -> void:
 	check(game.upgrade_fleet_train(1, "speed").contains("bought") and game._get_train_speed() == 100, "speed upgrade may reach but must respect coach speed limit")
 	before = game.money
 	check(game.upgrade_fleet_train(1, "speed").contains("limits speed") and game.money == before, "an ineffective speed upgrade must not charge the player")
-	game._set_waiting("a", 40)
+	# This is a capacity test: all forty riders want the served destination B.
+	game.passenger_demand.queues.a = {"b": 40}
 	var finished := false
 	var start_position: Vector2 = game.train_position
 	var moved := false

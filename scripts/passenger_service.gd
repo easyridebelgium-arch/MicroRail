@@ -5,6 +5,7 @@ extends RefCounted
 const Services = preload("res://scripts/service_routes.gd")
 const Runtime = preload("res://scripts/core/runtime_routes.gd")
 const Directional = preload("res://scripts/core/directional_routes.gd")
+const Demand = preload("res://scripts/core/passenger_demand.gd")
 const FleetData = preload("res://scripts/fleet.gd")
 var key: String
 var configuration: Dictionary
@@ -16,12 +17,19 @@ var stop_index := 0
 var forward := true
 var dwell := 0.0
 var boarding := true
-var passengers := 0
+var passenger_destinations: Dictionary = {}
+var passengers: int:
+	get: return Demand.total(passenger_destinations)
+	set(value): passenger_destinations = Demand.legacy_manifest(value, configuration, stop_index, forward, returning)
 var enabled := true
 var held := false
 var returning := false
 var return_stop := 0
-var operating_timer := 0.0
+## Tick-backed expense timing avoids sub-tick float drift across save/load.
+var _operating_ticks := 0
+var operating_timer: float:
+	get: return float(_operating_ticks) / 60.0
+	set(value): _operating_ticks = roundi(value * 60.0)
 var position := Vector2.ZERO
 var heading := 0.0
 var connected := false
@@ -82,10 +90,10 @@ func advance(game: Node, delta: float) -> void:
 		return
 	if game._scheduled_departure_hold(key): return
 	if boarding:
-		var origin: String = configuration.stops[stop_index]
-		var count: int = mini(game._waiting(origin), FleetData.capacity(train) - passengers)
-		game._set_waiting(origin, game._waiting(origin) - count)
-		passengers += count
+		if enabled and not returning:
+			var origin: String = configuration.stops[stop_index]
+			var future := Demand.future_stops(configuration.stops, stop_index, forward, configuration.get("mode", "shuttle"))
+			game.passenger_demand.board(origin, future, FleetData.capacity(train), passenger_destinations)
 		boarding = false
 	game._maybe_reroute_platform(key)
 	var departure: Dictionary = game._departure_context(key)
@@ -95,13 +103,15 @@ func advance(game: Node, delta: float) -> void:
 	distance = game._reserved_movement(key, path, distance, move_toward(distance, target, FleetData.speed(train) * delta), target)
 	if departure.at_stop and not departure.returning and absf(distance - before_movement) > 0.001:
 		game._record_departure(key)
-		game._record_event(game.EventLog.TRAIN_DEPARTED, id, {"service": key, "stop": configuration.stops[stop_index], "passengers": passengers})
+		game._record_event(game.EventLog.TRAIN_DEPARTED, id, {"service": key, "stop": configuration.stops[stop_index], "passengers": passengers, "destinations": passenger_destinations.duplicate(true)})
 	if absf(distance - target) < 0.001:
 		distance = target
 		if returning:
 			var origin: String = configuration.stops[stop_index]
-			game._set_waiting(origin, game._waiting(origin) + passengers)
-			passengers = 0
+			var arrived := Demand.alight(passenger_destinations, origin)
+			game.passengers_delivered += arrived
+			game.money += arrived * game.TICKET_PRICE
+			game.passenger_demand.return_to(origin, passenger_destinations)
 			returning = false
 			held = true
 			enabled = false
@@ -110,10 +120,10 @@ func advance(game: Node, delta: float) -> void:
 			dwell = 0
 			game._record_event(game.EventLog.TRAIN_RECOVERED, id, {"service": key, "stop": origin, "action": "returned to departure stop"})
 		else:
-			game.passengers_delivered += passengers
-			game.money += passengers * game.TICKET_PRICE
-			game._record_event(game.EventLog.TRAIN_ARRIVED, id, {"service": key, "stop": configuration.stops[destination], "passengers": passengers})
-			passengers = 0
+			var arrived := Demand.alight(passenger_destinations, configuration.stops[destination])
+			game.passengers_delivered += arrived
+			game.money += arrived * game.TICKET_PRICE
+			game._record_event(game.EventLog.TRAIN_ARRIVED, id, {"service": key, "stop": configuration.stops[destination], "passengers": arrived})
 			stop_index = destination
 			if is_loop():
 				if stop_index == 0: distance = 0
@@ -150,7 +160,7 @@ func status(game: Node) -> String:
 	return title + (": withdrawing; travelling to " if not enabled else ": travelling to ") + Services.STATIONS[configuration.stops[next_stop()]].name
 
 func save_state() -> Dictionary:
-	return {"cells": Runtime.encode(cells), "distance": distance, "stop_index": stop_index, "forward": forward, "dwell": dwell, "boarding": boarding, "passengers": passengers, "enabled": enabled, "held": held, "returning": returning, "return_stop": return_stop, "operating_timer": operating_timer}
+	return {"cells": Runtime.encode(cells), "distance": distance, "stop_index": stop_index, "forward": forward, "dwell": dwell, "boarding": boarding, "passengers": passengers, "passenger_destinations": passenger_destinations.duplicate(true), "enabled": enabled, "held": held, "returning": returning, "return_stop": return_stop, "operating_timer": operating_timer}
 
 static func from_save(service_key: String, value: Variant, service: Dictionary, capacity: int) -> PassengerServiceState:
 	if not value is Dictionary or not Runtime.valid_cells(value.get("cells")): return null
@@ -162,6 +172,7 @@ static func from_save(service_key: String, value: Variant, service: Dictionary, 
 	for field in ["stop_index", "passengers", "return_stop"]:
 		if float(value[field]) != floor(float(value[field])): return null
 	if value.stop_index >= service.stops.size() or value.return_stop >= service.stops.size() or value.passengers > capacity or value.dwell > 2 or value.operating_timer >= 1: return null
+	if not Demand.valid_counts(value.get("passenger_destinations"), service.stops) or Demand.total(value.passenger_destinations) != int(value.passengers): return null
 	if value.returning and value.return_stop != value.stop_index: return null
 	var built := Runtime.passenger_path(Runtime.decode(value.cells), service.stops, 32, service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}))
 	if built.is_empty() or built.cells.is_empty(): return null
@@ -178,5 +189,9 @@ static func from_save(service_key: String, value: Variant, service: Dictionary, 
 	for field in ["forward", "boarding", "enabled", "held", "returning"]: result.set(field, value[field])
 	for field in ["stop_index", "passengers", "return_stop"]: result.set(field, int(value[field]))
 	for field in ["distance", "dwell", "operating_timer"]: result.set(field, float(value[field]))
+	result.passenger_destinations = Demand.normalize(value.passenger_destinations)
+	# Legacy timers can lie just below a whole second through float drift.
+	# Preserve the pending charge for the next fixed tick, keeping saved < 1 s.
+	result._operating_ticks = mini(59, result._operating_ticks)
 	result.update_transform()
 	return result

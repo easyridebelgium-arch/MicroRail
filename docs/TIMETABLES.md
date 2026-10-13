@@ -50,7 +50,7 @@ or promise that arbitrary later-stop combinations are attainable.
 
 ## Saves and remaining work
 
-Save version **24** stores timetable cursors, counts/recent delays and origin
+Save version **24 and later** stores timetable cursors, counts/recent delays and origin
 headway history. Loading preserves served slots and exact train positions.
 Version 23 and supported earlier saves migrate with empty dispatch history; their
 schedules remain and begin monitoring from the loaded clock time. The complete

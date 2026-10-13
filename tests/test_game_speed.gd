@@ -39,6 +39,7 @@ func _run() -> void:
 			var game = load("res://scenes/main/main.tscn").instantiate()
 			game.set_process(false)
 			root.add_child(game)
+			game.sim_rng.set_seed(12345)
 			await process_frame
 			game.set_process(false)
 			game.paused = true
@@ -71,6 +72,7 @@ func _run() -> void:
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	game.set_process(false)
 	root.add_child(game)
+	game.sim_rng.set_seed(12345)
 	await process_frame
 	game.set_process(false)
 	for index in range(4):

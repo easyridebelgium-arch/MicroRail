@@ -44,6 +44,12 @@ func open_train(id: int) -> void:
 	data = game.train_diagnostics(id)
 	if data.is_empty(): return
 	summary.text = "%s\n%s\n%s\nTraffic waiting: %.1f simulation seconds in the current measured episode.\nGame paused; close and resume when ready." % [data.title, data.state, data.reason, data.wait_seconds]
+	if game.ServiceRoutes.is_passenger_key(str(data.service)):
+		var manifest: Dictionary = game.passenger_destinations if data.service == "passenger" else game.passenger_services[data.service].passenger_destinations
+		var destinations: PackedStringArray = []
+		for station in game.PassengerDemand.STATIONS:
+			if int(manifest.get(station, 0)) > 0: destinations.append("%s: %d" % [game.ServiceRoutes.STATIONS[station].name, int(manifest[station])])
+		summary.text += "\nOnboard destinations: " + (", ".join(destinations) if not destinations.is_empty() else "none")
 	var lines: PackedStringArray = ["Physical body now (%d tiles): %s" % [data.occupied.size(), game.TrainDiagnostics.cells_text(data.occupied)], "Last allocation at tick %d:" % data.tick, "Granted tiles (%d): %s" % [data.granted.size(), game.TrainDiagnostics.cells_text(data.granted)], "Attempted tile requests (%d): %s" % [data.requested.size(), game.TrainDiagnostics.cells_text(data.requested)]]
 	for lock in data.switches:
 		lines.append("Locked switch %d,%d — %s" % [lock.cell.x, lock.cell.y, "through" if lock.state == 0 else "branch"])

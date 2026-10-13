@@ -17,6 +17,7 @@ func _run() -> void:
 		for fps in [30, 60, 120]:
 			var game = load("res://scenes/main/main.tscn").instantiate()
 			root.add_child(game)
+			game.sim_rng.set_seed(12345)
 			await process_frame
 			game.set_process(false)
 			game.sim_clock.reset()

@@ -36,6 +36,7 @@ func _run() -> void:
 	game.set_process(false)
 	game.paused = true
 	root.add_child(game)
+	game.sim_rng.set_seed(12345)
 	await process_frame
 	game.set_process(false)
 	game.paused = true
@@ -190,6 +191,7 @@ func _run() -> void:
 		game.set_process(false)
 		game.paused = true
 		root.add_child(game)
+		game.sim_rng.set_seed(12345)
 		await process_frame
 		game.set_process(false)
 		game.paused = true

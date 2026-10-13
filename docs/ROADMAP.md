@@ -13,13 +13,15 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. Unified waiting inspection is implemented. |
-| Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
+| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; waiting-area/amenity upgrades, transfers, satisfaction, processing chains and growth/scenario rules remain. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Next implementation:** Phase 2A passenger origins/destinations and destination-specific
-station queues. Directional departure timetables at later stops are now implemented;
-arrival targets, satisfaction effects, freight contract penalties and timed transfers
-follow their demand/contract prerequisites. See [timetables](TIMETABLES.md).
+**Next implementation:** Phase 2A station waiting-area capacity upgrades and demand/
+amenity foundations, then passenger transfers and satisfaction. Direct passenger
+origins/destinations, per-destination queues, through riders and destination-only
+fares are now implemented; see [passenger destinations](PASSENGER_DESTINATIONS.md).
+Directional departure timetables remain implemented. Arrival targets, contract
+penalties and timed transfers follow their demand/contract prerequisites.
 Phase 1B remains complete for supported route/body combinations; the refused
 repeated-path cases and in-motion arrival-platform changes remain deferred. Automatic platform
 choice is done at Apply time (the editor's "Auto" option; see [platforms](PLATFORMS.md)); choosing
@@ -30,10 +32,10 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation passed all 71 headless suites in Godot 4.6.3,
+complete. The latest cloud validation passed all 72 headless suites in Godot 4.6.3,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
-departures, blocked-departure accounting and version-24 dispatch save/load. Earlier gameplay
+departures, blocked-departure accounting and version-25 destination/dispatch save/load and passenger conservation. Earlier gameplay
 updates were also tested in Godot 4.7.stable.
 Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
@@ -77,7 +79,8 @@ the tail's route and the extension past a reversal stop intact. Figure-eight rou
   track. R/Remove also selects left-drag removal.
   Track laying adds correctly oriented switches automatically, including the
   switch price in preview/drafts; see [automatic junctions](AUTOMATIC_SWITCHES.md).
-- Passenger and log-freight services, production and delivery income.
+- Direct passenger destinations, per-destination queues and through riders; log-freight
+  production and delivery income.
 - Separate speed and capacity upgrades.
 - Ordered pass-through waypoints per passenger leg and freight service, with
   port-aware pathfinding, map selection and a scrollable editor.
@@ -100,7 +103,7 @@ the tail's route and the extension past a reversal stop intact. Figure-eight rou
 
 These are prototype foundations. The fleet assigns one train to each active
 service; additional passenger services can run together and spares stay off-map.
-Individual passenger destinations, multiple trains per service, automatic platform
+Passenger transfers, in-motion automatic platform
 selection and additional dispatch policies remain planned; fixed platform sidings exist. See [multiple active services](MULTIPLE_SERVICES.md).
 Junctions, reservations and basic block signals provide shared-track safety.
 See [Fleet management](FLEET.md) for the implemented controls.
@@ -245,7 +248,7 @@ must be labelled estimates.
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
 | Timetables and service frequencies | Set exact departures or recurring frequencies. Early and late arrivals affect passenger satisfaction and freight contract payouts. | Recurring headway controls are implemented (target gap, actual vs target, infeasibility explanation; see [headway](HEADWAY.md)); exact departure timetables are implemented for the first stop with a 24-minute game day ([timetables](TIMETABLES.md)); timetables at later stops and satisfaction effects remain. Record actual versus target intervals and explain infeasible targets; multiple trains per service depend on Phase 1B body/platform safety. Daily departure schedules now work at every passenger stop/direction; physical departure counts, missed slots, recent delays and saved cursors are implemented. Scheduled arrivals, punctuality penalties and timed transfers follow actual passenger destinations/contracts and reliable arrival/dwell rules. |
-| Passenger destinations and transfers | Reward networks that connect useful places, including journeys requiring a change of train. | Replace the current next-stop passenger model with origins, destinations and journey planning. |
+| Passenger destinations and transfers | Reward networks that connect useful places, including journeys requiring a change of train. | Direct destination journeys implemented: per-destination station queues, forward-itinerary boarding, through riders, destination-only delivery/fare and saved manifests. Transfers, journey planning across services, waiting-age fairness and satisfaction remain. See [passenger destinations](PASSENGER_DESTINATIONS.md). |
 | Platform preferences | Prefer a platform by service, direction, train length, electrification, cargo access or transfer convenience, with safe fallback. | Basic platform infrastructure and assignment belong to Phase 1B. Phase 2A adds service/direction preferences, passenger transfer convenience and safe compatible fallback. Electrification and cargo-access preferences wait for those systems. Platform selection never overrides reservations. |
 | Holding rules and timed transfers | Wait for a connection or a target load, avoid early departure and cap waiting time. Protect transfers within configurable windows and warn about missed connections. | Requires timetables, passenger destinations and platform metadata. Avoid indefinite holds and explain knock-on delays. |
 | Express versus local passenger demand | High-paying express passengers prefer direct travel between distant hubs; commuters accept frequent stops along a local line. | Define clear rules for directness, stops, journey time and fares. Depends on passenger destinations and service performance data. |
@@ -269,7 +272,7 @@ Versioned cargo/industry definitions start before the first processing industry.
 | Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Phase 2B first delivers a playable logs → sawmill → timber delivery chain, then adds a factory and finished-goods destination to complete the logs → sawmill → timber → factory chain. Verify input consumption, production recipes, bounded storage, compatible wagons and delivery accounting before generalising cargo types. |
 | Cargo with distinct behaviours | Perishable cargo spoils over time, hazardous materials need lower speeds or special handling, and high-value express cargo rewards fast delivery. | Track shipment age and delivery terms; connect cargo requirements to rolling stock, facilities and routing. Make spoilage, restrictions and bonuses visible before loading. |
 | Mail and parcels | Add small, fast, high-value consignments, including carriage on compatible passenger trains. | Requires cargo definitions, compatible vehicles and explicit capacity sharing; introduce before complex intermodal logistics. |
-| Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Physical platforms and usable lengths belong to Phase 1B. Phase 2A adds waiting rooms and passenger loading amenities; Phase 2B adds cargo warehouses and handling. Fuel depots wait for locomotive technology and energy costs. Each facility needs a clear priced benefit. |
+| Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Physical platforms and usable lengths belong to Phase 1B. Phase 2A next adds separate waiting-area capacity and demand/amenity purchases; train capacity does not create passengers. Passenger loading facilities follow measured dwell/loading rules; Phase 2B adds cargo warehouses and handling. Fuel depots wait for locomotive technology and energy costs. Each facility needs a clear priced benefit. |
 | Delivery contracts | Earn rewards for specified quantities delivered within deadlines. | Extend the existing objective system with selectable, timed contracts and clear failure conditions. |
 
 ### Phase 2C — Growth and persistence
@@ -409,9 +412,10 @@ instead of adding a separate campaign simulation.
    route copying is implemented with draft preview, safe Apply and vanished-leg warnings.
    Still needed: full service duplication/drag reordering, safe multiple trains per service, then measured
    headways and frequency targets with clear attainable limits.
-5. **Passenger origins/destinations (2A):** queues, journey choices and then
-   transfers, classes/fares/satisfaction. Exact timetables follow frequency/dwell
-   foundations; introduce punctuality contracts only once those rules exist.
+5. **Passenger demand (2A, direct destinations implemented):** next add separate
+   station waiting-area capacity and demand/amenity upgrades, then transfers and
+   journey choices, classes/fares/satisfaction. Departure timetables are implemented;
+   arrival targets and punctuality contracts follow their demand/contract rules.
 6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
    by factory/finished goods; verify stock, recipes, storage and payments first.
 7. **Growth, sandbox rules and persistence (2C):** service-driven growth,

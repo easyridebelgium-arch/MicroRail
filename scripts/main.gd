@@ -23,6 +23,7 @@ const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
+const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
 const Platforms = preload("res://scripts/core/platforms.gd")
 const SingleTrack = preload("res://scripts/core/single_track.gd")
 const Headway = preload("res://scripts/core/headway.gd")
@@ -223,9 +224,17 @@ var right_elapsed: float = 0.0
 var right_start_point: Vector2 = Vector2.ZERO
 var right_start_cell: Vector2i = Vector2i.ZERO
 
-var waiting_at_a: int = 8
-var waiting_at_b: int = 8
-var waiting_at_c: int = 8
+var passenger_demand = PassengerDemand.new()
+var passenger_destinations: Dictionary = {}
+var waiting_at_a: int:
+	get: return passenger_demand.waiting("a")
+	set(value): passenger_demand.reset_total("a", value)
+var waiting_at_b: int:
+	get: return passenger_demand.waiting("b")
+	set(value): passenger_demand.reset_total("b", value)
+var waiting_at_c: int:
+	get: return passenger_demand.waiting("c")
+	set(value): passenger_demand.reset_total("c", value)
 var passenger_stop_index: int = 0
 var stop_distances: Array[float] = []
 var services: Dictionary = ServiceRoutes.defaults()
@@ -238,7 +247,9 @@ var total_vehicle_cost: int = 0
 var route_editor: RouteEditor
 var routes_button: Button
 var passenger_route_error: String = "No connected passenger route"
-var passengers_on_train: int = 0
+var passengers_on_train: int:
+	get: return PassengerDemand.total(passenger_destinations)
+	set(value): passenger_destinations = PassengerDemand.legacy_manifest(value, services.get("passenger", {}), passenger_stop_index, travelling_to_b, passenger_returning)
 
 var passengers_delivered: int = 0
 var money: int = STARTING_BALANCE
@@ -613,7 +624,7 @@ func _move_train(delta: float) -> void:
 	route_distance = _reserved_movement("passenger", route_path, route_distance, move_toward(route_distance, target_distance, _get_train_speed() * delta), target_distance)
 	if departure.at_stop and not departure.returning and absf(route_distance - before_movement) > 0.001:
 		_record_departure("passenger")
-		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"].stops[passenger_stop_index], "passengers": passengers_on_train})
+		_record_event(EventLog.TRAIN_DEPARTED, "passenger", {"stop": services["passenger"].stops[passenger_stop_index], "passengers": passengers_on_train, "destinations": passenger_destinations.duplicate(true)})
 	if absf(route_distance - target_distance) < 0.001:
 		route_distance = target_distance
 		if passenger_returning:
@@ -627,8 +638,7 @@ func _move_train(delta: float) -> void:
 			_record_event(EventLog.TRAIN_RECOVERED, str(Fleet.assigned(fleet, "passenger")["id"]), {"service": "passenger", "stop": services["passenger"]["stops"][passenger_stop_index], "action": "returned to departure stop"})
 			_update_train_transform()
 			return
-		var unloaded: int = passengers_on_train
-		_unload_passengers()
+		var unloaded: int = _unload_passengers(services.passenger.stops[next_stop])
 		passenger_stop_index = next_stop
 		_record_event(EventLog.TRAIN_ARRIVED, "passenger", {"stop": services["passenger"]["stops"][next_stop], "passengers": unloaded})
 		if _passenger_is_loop():
@@ -1197,23 +1207,21 @@ func _generate_passengers(delta: float) -> void:
 	passenger_timer += delta
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
-		for key in ServiceRoutes.STATIONS:
-			# Returned passengers may exceed normal station capacity. Never discard
-			# that queue while limiting new arrivals.
-			_set_waiting(key, maxi(_waiting(key), mini(_waiting(key) + PASSENGERS_PER_BATCH, MAX_STATION_QUEUE)))
-
+		for key in PassengerDemand.STATIONS:
+			passenger_demand.generate(key, PASSENGERS_PER_BATCH, MAX_STATION_QUEUE, sim_rng)
 
 func _board_passengers() -> void:
-	var key: String = services["passenger"]["stops"][passenger_stop_index]
-	var boarding: int = mini(_waiting(key), _get_train_capacity() - passengers_on_train)
-	_set_waiting(key, _waiting(key) - boarding)
-	passengers_on_train += boarding
+	if not passenger_service_enabled or passenger_returning: return
+	var config: Dictionary = services.passenger
+	var station: String = config.stops[passenger_stop_index]
+	var future := PassengerDemand.future_stops(config.stops, passenger_stop_index, travelling_to_b, config.get("mode", "shuttle"))
+	passenger_demand.board(station, future, _get_train_capacity(), passenger_destinations)
 
-
-func _unload_passengers() -> void:
-	passengers_delivered += passengers_on_train
-	money += passengers_on_train * TICKET_PRICE
-	passengers_on_train = 0
+func _unload_passengers(station: String) -> int:
+	var arrived := PassengerDemand.alight(passenger_destinations, station)
+	passengers_delivered += arrived
+	money += arrived * TICKET_PRICE
+	return arrived
 
 func _charge_operating_cost(delta: float) -> void:
 	operating_timer += delta
@@ -1269,6 +1277,7 @@ func _save_game() -> void:
 	var data: Dictionary = {
 		"version": SAVE_VERSION,
 		"runtime": _saved_runtime_routes(),
+		"demand": {"queues": passenger_demand.queues.duplicate(true), "primary": passenger_destinations.duplicate(true)},
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
 		"passenger_services": _saved_passenger_services(),
 		"signals": _saved_signals(),
@@ -1442,6 +1451,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 			return false
 
 	var state: Dictionary = data["state"]
+	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger): return false
 
 	for field in SAVE_FIELDS:
 		if not state.has(field):
@@ -1686,6 +1696,9 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 			TYPE_INT: set(field, int(state[field]))
 			TYPE_FLOAT: set(field, float(state[field]))
 			TYPE_BOOL: set(field, state[field])
+	for station in PassengerDemand.STATIONS:
+		passenger_demand.queues[station] = PassengerDemand.normalize(data.demand.queues[station])
+	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
 	route_distance = loaded_distance
 	is_dragging = false
 	_update_train_transform()
@@ -2238,12 +2251,12 @@ func _update_station_inspector() -> void:
 			serving.append("#%d %s" % [int(train.id), services[service].name])
 			states.append(fleet_train_status(int(train.id)))
 			if service == "passenger":
-				if route_connected and services[service].stops[_next_passenger_stop()] == key: incoming += passengers_on_train
+				incoming += _incoming_passengers(service, key)
 			else:
-				var running = passenger_services[service]
-				if running.connected and services[service].stops[running.next_stop()] == key: incoming += running.passengers
+				incoming += _incoming_passengers(service, key)
 		station_title.text = ServiceRoutes.STATIONS[key].name
-		station_details.text = "Services: %s\n\nWaiting passengers: %d\nIncoming passengers: %d\n\n%s\n\nManage individual trains and upgrades in Fleet." % [", ".join(serving) if not serving.is_empty() else "None", _waiting(key), incoming, "\n".join(states)]
+		station_details.text = "Services: %s\n\nWaiting passengers: %d\nPassengers aboard for this station: %d\n\n%s\n\nManage individual trains and upgrades in Fleet." % [", ".join(serving) if not serving.is_empty() else "None", _waiting(key), incoming, "\n".join(states)]
+		station_details.text += "\n\n" + _destination_queue_text(key)
 		station_details.text += "\n\n" + _platform_text(selected_station)
 		return
 	capacity_upgrade_button.show()
@@ -2258,8 +2271,7 @@ func _update_station_inspector() -> void:
 		destination_name += " (not served)"
 	var waiting: int = _waiting(station_key)
 	var incoming: int = 0
-	if route_connected and services["passenger"]["stops"][_next_passenger_stop()] == station_key:
-		incoming = passengers_on_train
+	incoming = _incoming_passengers("passenger", station_key)
 
 	var train_at_station: bool = (
 		train_position.distance_to(_cell_center(selected_station)) < 0.5
@@ -2275,7 +2287,7 @@ func _update_station_inspector() -> void:
 	station_details.text = (
 		"Route: %s"
 		+ "\n\nWaiting passengers: %d"
-		+ "\nIncoming passengers: %d"
+		+ "\nPassengers aboard for this station: %d"
 		+ "\n\nTrain: %s"
 		+ "\nCapacity: %d passengers (%d/%d)"
 		+ "\nSpeed: %.0f px/s (%d/%d)"
@@ -2293,11 +2305,12 @@ func _update_station_inspector() -> void:
 		MAX_SPEED_LEVEL,
 		service_status
 	]
+	station_details.text += "\n\n" + _destination_queue_text(station_key)
 	station_details.text += "\n\n" + _platform_text(selected_station)
 
 	_update_upgrade_button(
 		capacity_upgrade_button,
-		"Capacity",
+		"Train capacity",
 		capacity_upgrade_level,
 		MAX_CAPACITY_LEVEL,
 		_get_capacity_upgrade_price(),
@@ -3740,10 +3753,23 @@ func _passenger_target_distance() -> float:
 	return stop_distances[_next_passenger_stop()]
 
 func _return_onboard_passengers() -> void:
-	if passengers_on_train > 0:
-		var key: String = services["passenger"]["stops"][passenger_stop_index]
-		_set_waiting(key, _waiting(key) + passengers_on_train)
-	passengers_on_train = 0
+	var station: String = services.passenger.stops[passenger_stop_index]
+	_unload_passengers(station)
+	passenger_demand.return_to(station, passenger_destinations)
+
+func _destination_queue_text(station: String) -> String:
+	var lines: PackedStringArray = ["Waiting capacity: %d / %d" % [_waiting(station), MAX_STATION_QUEUE]]
+	for destination in PassengerDemand.STATIONS:
+		if destination == station: continue
+		var available := false
+		for key in service_keys():
+			if key != "freight" and service_enabled(key) and services[key].stops.has(station) and services[key].stops.has(destination): available = true
+		lines.append("To %s: %d%s" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), " — no enabled direct service" if not available else ""])
+	return "\n".join(lines)
+
+func _incoming_passengers(service: String, station: String) -> int:
+	var manifest: Dictionary = passenger_destinations if service == "passenger" else passenger_services[service].passenger_destinations
+	return int(manifest.get(station, 0))
 
 func _setup_routes_editor() -> void:
 	route_editor = RouteEditor.new()

@@ -49,6 +49,7 @@ func _run() -> void:
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	game.paused = true
 	root.add_child(game)
+	game.sim_rng.set_seed(12345)
 	await process_frame
 	game.set_process(false)
 	fixture(game)
@@ -293,6 +294,7 @@ func _run() -> void:
 		game = load("res://scenes/main/main.tscn").instantiate()
 		game.paused = true
 		root.add_child(game)
+		game.sim_rng.set_seed(12345)
 		await process_frame
 		game.set_process(false)
 		fixture(game)

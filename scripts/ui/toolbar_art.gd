@@ -7,7 +7,7 @@ const BOUNDS := {
 	"backgrounds/button_disabled.png": Rect2i(278, 291, 698, 657),
 	"backgrounds/button_hover.png": Rect2i(279, 291, 698, 658),
 	"backgrounds/button_normal.png": Rect2i(278, 292, 697, 655),
-	"backgrounds/button_pressed.png": Rect2i(278, 292, 699, 657),
+	"backgrounds/button_pressed.png": Rect2i(354, 353, 547, 548),
 	"backgrounds/button_selected.png": Rect2i(278, 292, 699, 657),
 	"backgrounds/button_selected_hover.png": Rect2i(277, 292, 700, 656),
 	"backgrounds/ribbon_panel.png": Rect2i(85, 140, 1748, 536),

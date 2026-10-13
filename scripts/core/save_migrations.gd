@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 28
+const CURRENT_VERSION: int = 29
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -117,6 +117,11 @@ static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 
 		27:
 			data["presentation"] = preload("res://scripts/core/presentation.gd").defaults()
+			return data
+
+		28:
+			# Manifests now allow final destinations reached via another service.
+			# Existing destination counts and physical positions need no conversion.
 			return data
 
 	# Unreachable while every version between OLDEST and CURRENT has a step.

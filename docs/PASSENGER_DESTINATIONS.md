@@ -1,4 +1,4 @@
-# Passenger destinations — direct journeys
+# Passenger destinations and transfers
 
 Passengers now have a destination station. Queue totals remain visible, but the
 simulation stores A→B separately from A→C, and similarly for B and C. The starter
@@ -7,15 +7,16 @@ New arrivals use the owned simulation RNG; its state is saved and restored.
 
 ## What changes in play
 
-- An A–B service boards A→B passengers. A→C passengers wait for a route that
-  includes C as an actual stop; a waypoint or passing its track is not a stop.
+- An A–B service boards A→B passengers and can also carry A→C passengers
+  changing onto B–C. If no enabled connection exists, C-bound passengers remain
+  at A. A waypoint or passing a platform is not a passenger stop.
 - On A–B–C Shuttle, A→C riders stay aboard at B, where only B-bound riders alight.
   At B on the outward trip, B→C riders can board; B→A riders wait for the return.
 - A Loop can board for destinations beyond its closing first stop. A train may
   therefore arrive at its first stop with through passengers still aboard.
 - Boarding prioritizes the upcoming stop order, respects the complete train's
-  remaining seat capacity and never boards a destination outside the forward
-  itinerary. FIFO/age fairness is a later refinement.
+  remaining seat capacity. Transfer riders board only when a forward stop makes
+  progress along a journey with the fewest changes. FIFO/age fairness is a later refinement.
 - Fares and the delivered counter increase only when the destination is reached.
   Flat £5 fares remain; distance pricing, classes and satisfaction are later work.
 - Withdrawal stops taking new riders and completes accepted journeys. A Loop may
@@ -39,13 +40,41 @@ new demand resumes only when room is available. Increasing train capacity does n
 create extra demand. Destinations are initially chosen uniformly from the other
 two stations; towns, attractiveness and service-quality demand factors are later work.
 
-Transfers are not implemented yet. Passengers wait for an enabled direct service
-instead of boarding a train toward a potential interchange. Service presence is a
-configuration fact, not a promise of punctuality or an unblocked route.
+## Connecting journeys
+
+An enabled, unheld passenger service with complete track contributes its station
+stops to a deterministic service graph. One edge means travelling without changing
+trains; fewest changes win and direct services are preferred. Shuttles serve both
+directions; Loops can reach their listed stops after wrapping. Waypoints, freight
+routes, stored trains, manual recovery and withdrawn services provide no connection.
+This graph describes connectivity, not reservations, a guaranteed departure time,
+available seats or punctuality.
+
+On the current three-station map, A–B plus B–C enables A→C via B. Riders keep C as
+their final destination while aboard A–B. Physically arriving at B moves them into
+B's C-bound queue; they compete for seats on B–C under the existing upcoming-stop
+boarding order. No fare or delivered count is awarded at B. The £5 fare is paid
+once at C. Transfer arrivals can overflow a full waiting area without losing riders;
+new random arrivals remain capped. There is no walking delay or timed-connection hold.
+
+Through riders stay on A–B–C instead of unnecessarily changing trains. A direct
+A–C service is preferred to A–B plus B–C, even if the direct train is temporarily
+waiting for track. A held/withdrawn/broken onward service disappears from new
+journey plans. Already accepted riders still reach their interchange and safely
+wait there until a usable connection returns. Recovery returns unfinished final
+destinations to the physically reached departure queue, as before.
+
+Click a station for destination counts and **direct service**, **change at Station B**
+or **no enabled connection**. Train inspectors mark off-route final destinations
+with **change trains**. Transfer events enter the existing event log. Passenger-age
+fairness, crowding/punctuality satisfaction, larger-map journey leg assignment and
+protected timed connections remain later Phase 2A work.
 
 ## Persistence and invariants
 
-Save version **25** stores destination queues and onboard manifests. Aggregate
+Destination queues and onboard manifests began in version 25. Save version **29**
+also permits a final destination outside the current train’s stops, for transfers.
+Version 28 upgrades without changing counts, train positions or route instructions. Aggregate
 waiting/onboard counters are derived views and cross-checked against saved detail.
 Invalid destinations, fractional/negative counts, mismatched totals and train
 capacity violations reject a load before world state changes. Version 24 and
@@ -54,10 +83,16 @@ to their previously intended next stop. No train changes position during migrati
 backed by fixed ticks so fractional timer drift cannot alter a saved runtime.
 
 Passenger counts are conserved across boarding, through stops, delivery and
-physical recovery. Random demand uses one saved RNG in fixed station order. FPS
+physical recovery and interchanges. Random demand uses one saved RNG in fixed station order. FPS
 checks use a common explicit seed as well as a common starting map. Exact generated
 demand changes with the seed and station queue availability.
 
 Code: `scripts/core/passenger_demand.gd`, primary passenger hooks in `main.gd`,
 `passenger_service.gd` for independent/linked trains. Tests:
-`test_passenger_demand.gd`, fixed-frame-rate, service, consists, recovery and save suites.
+`test_passenger_demand.gd`, `test_passenger_transfers.gd`, fixed-frame-rate, service, consists, recovery and save suites.
+
+Validation: the transfer suite covers both train runtimes, a physical two-service
+journey, final-only fares, capacity/queue conservation, withdrawn connections,
+waiting-area overflow, inspector explanations and version-28 migration. Its fixed
+clock fixture compares queues, onboard manifests, cash and the event stream at
+30, 60 and 120 FPS with identical results (26 checks).

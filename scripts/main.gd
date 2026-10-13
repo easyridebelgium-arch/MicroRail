@@ -23,6 +23,7 @@ const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
+const PassengerJourneys = preload("res://scripts/core/passenger_journeys.gd")
 const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
 const Amenities = preload("res://scripts/core/amenities.gd")
 const Presentation = preload("res://scripts/core/presentation.gd")
@@ -717,6 +718,7 @@ func _move_train(delta: float) -> void:
 			_update_train_transform()
 			return
 		var unloaded: int = _unload_passengers(services.passenger.stops[next_stop])
+		_transfer_passengers("passenger", services.passenger.stops[next_stop], passenger_destinations)
 		passenger_stop_index = next_stop
 		_record_event(EventLog.TRAIN_ARRIVED, "passenger", {"stop": services["passenger"]["stops"][next_stop], "passengers": unloaded})
 		if _passenger_is_loop():
@@ -1278,12 +1280,31 @@ func _generate_passengers(delta: float) -> void:
 		for key in PassengerDemand.STATIONS:
 			passenger_demand.generate(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), amenities.queue_limit(key), sim_rng)
 
+func _passenger_network() -> Dictionary:
+	var available: Dictionary = {}
+	for key in service_keys():
+		if key == "freight" or not service_enabled(key): continue
+		if key == "passenger":
+			if passenger_held or passenger_returning: continue
+		else:
+			if passenger_services[key].held or passenger_services[key].returning: continue
+		var config: Dictionary = services[key]
+		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), config.get("platforms", {}))
+		if not built.cells.is_empty(): available[key] = config
+	return PassengerJourneys.graph(available)
+
+func _transfer_passengers(key: String, station: String, manifest: Dictionary) -> int:
+	var changed: int = passenger_demand.interchange(station, services[key].stops, manifest)
+	if changed > 0:
+		_record_event(EventLog.PASSENGERS_TRANSFERRED, key, {"stop": station, "passengers": changed})
+	return changed
+
 func _board_passengers() -> void:
 	if not passenger_service_enabled or passenger_returning: return
 	var config: Dictionary = services.passenger
 	var station: String = config.stops[passenger_stop_index]
 	var future := PassengerDemand.future_stops(config.stops, passenger_stop_index, travelling_to_b, config.get("mode", "shuttle"))
-	passenger_demand.board(station, future, _get_train_capacity(), passenger_destinations)
+	passenger_demand.board(station, PassengerJourneys.boarding(_passenger_network(), station, future), _get_train_capacity(), passenger_destinations)
 
 func _unload_passengers(station: String) -> int:
 	var arrived := PassengerDemand.alight(passenger_destinations, station)
@@ -3835,13 +3856,17 @@ func _buy_amenity(id: String) -> void:
 
 func _destination_queue_text(station: String) -> String:
 	var lines: PackedStringArray = ["Waiting capacity: %d / %d" % [_waiting(station), amenities.queue_limit(station)]]
+	var network := _passenger_network()
 	for destination in PassengerDemand.STATIONS:
 		if destination == station: continue
-		var available := false
-		for key in service_keys():
-			if key != "freight" and service_enabled(key) and services[key].stops.has(station) and services[key].stops.has(destination): available = true
-		lines.append("To %s: %d%s" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), " — no enabled direct service" if not available else ""])
+		var journey := PassengerJourneys.plan(network, station, destination)
+		var connection := " — no enabled connection"
+		if journey.size() == 2: connection = " — direct service"
+		elif journey.size() > 2: connection = " — change at " + ServiceRoutes.STATIONS[journey[1]].name
+		lines.append("To %s: %d%s" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), connection])
+	lines.append("Connections use enabled, unheld services with complete track; departure times and free seats are not guaranteed.")
 	return "\n".join(lines)
+
 
 func _incoming_passengers(service: String, station: String) -> int:
 	var manifest: Dictionary = passenger_destinations if service == "passenger" else passenger_services[service].passenger_destinations

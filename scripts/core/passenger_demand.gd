@@ -1,6 +1,6 @@
 extends RefCounted
 ## Destination counts are authoritative. Aggregate counters remain views for UI
-## and legacy fixtures. Direct journeys only; transfers and satisfaction follow.
+## and legacy fixtures. Final destinations persist across transfers.
 const STATIONS: Array[String] = ["a", "b", "c"]
 var queues: Dictionary = {}
 
@@ -70,6 +70,16 @@ func return_to(station: String, manifest: Dictionary) -> void:
 			queues[station][destination] = int(queues[station].get(destination, 0)) + int(manifest[destination])
 	manifest.clear()
 
+func interchange(station: String, served_stops: Array, manifest: Dictionary) -> int:
+	var changed := 0
+	for destination in manifest.keys():
+		if served_stops.has(destination): continue
+		var count := int(manifest[destination])
+		queues[station][destination] = int(queues[station].get(destination, 0)) + count
+		manifest.erase(destination)
+		changed += count
+	return changed
+
 static func valid_counts(value: Variant, allowed: Array) -> bool:
 	if not value is Dictionary: return false
 	for destination in value:
@@ -84,13 +94,13 @@ static func normalize(counts: Dictionary) -> Dictionary:
 		if int(counts[destination]) > 0: result[destination] = int(counts[destination])
 	return result
 
-static func valid_state(value: Variant, state: Dictionary, service: Dictionary) -> bool:
+static func valid_state(value: Variant, state: Dictionary, _service: Dictionary) -> bool:
 	if not value is Dictionary or not value.get("queues") is Dictionary or value.queues.size() != STATIONS.size(): return false
 	for station in STATIONS:
 		var allowed := STATIONS.duplicate()
 		allowed.erase(station)
 		if not valid_counts(value.queues.get(station), allowed) or total(value.queues[station]) != state.get("waiting_at_" + station): return false
-	return valid_counts(value.get("primary"), service.stops) and total(value.primary) == state.get("passengers_on_train")
+	return valid_counts(value.get("primary"), STATIONS) and total(value.primary) == state.get("passengers_on_train")
 
 static func legacy_manifest(count: int, config: Dictionary, index: int, forward: bool, returning: bool) -> Dictionary:
 	if count <= 0 or not config.get("stops") is Array or config.stops.size() < 2: return {}

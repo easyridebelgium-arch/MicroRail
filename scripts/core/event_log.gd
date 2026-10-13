@@ -21,6 +21,7 @@ const DISPATCH_CHANGED: String = "dispatch_changed"
 const TRAIN_REVERSED: String = "train_reversed"
 const TRAIN_RECOVERED: String = "train_recovered"
 const TRAIN_WAITING: String = "train_waiting"
+const PASSENGERS_TRANSFERRED: String = "passengers_transferred"
 const TRAIN_ARRIVED: String = "train_arrived"
 const CARGO_DELIVERED: String = "cargo_delivered"
 const CONSTRUCTION_APPLIED: String = "construction_applied"
@@ -145,6 +146,8 @@ static func summary(event: Dictionary) -> String:
 			return "Train #%s: %s" % [who, data.get("reason", "Waiting for track")]
 		TRAIN_DEPARTED:
 			return "%s departed %s" % [who, data.get("stop", "")]
+		PASSENGERS_TRANSFERRED:
+			return "%d passengers changed trains at %s" % [int(data.get("passengers", 0)), data.get("stop", "")]
 		TRAIN_ARRIVED:
 			return "%s arrived at %s" % [who, data.get("stop", "")]
 		CARGO_DELIVERED:

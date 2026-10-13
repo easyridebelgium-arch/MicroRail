@@ -28,7 +28,8 @@ already on the map in a row, and each ticket pays £5. You start with £1,000 an
 ## Minute 9–12: run a train
 1. Press **Space** to resume and use **1 to 4** to choose a speed (1×, 2×, 5×, 10×).
 2. Click a station and make sure passenger service is enabled. Click a train to inspect where it is going.
-3. Passengers wait per destination and only board a train that will actually stop there.
+3. Passengers wait per final destination. A–B plus B–C lets C-bound passengers
+   change at B; a direct A–C service is preferred. Click a station to see connections.
 4. If a train stops, open **Problems** (toolbar) to see why, or use the alert banner's **Inspect**. **Acknowledge** hides that alert while keeping the problem visible.
 5. Signal letters mean S = manual stop, H = current held request, R = reserved tile, A = automatic/unrequested. The train inspector explains actual permission to move.
 

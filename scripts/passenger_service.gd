@@ -93,7 +93,7 @@ func advance(game: Node, delta: float) -> void:
 		if enabled and not returning:
 			var origin: String = configuration.stops[stop_index]
 			var future := Demand.future_stops(configuration.stops, stop_index, forward, configuration.get("mode", "shuttle"))
-			game.passenger_demand.board(origin, future, FleetData.capacity(train), passenger_destinations)
+			game.passenger_demand.board(origin, game.PassengerJourneys.boarding(game._passenger_network(), origin, future), FleetData.capacity(train), passenger_destinations)
 		boarding = false
 	game._maybe_reroute_platform(key)
 	var departure: Dictionary = game._departure_context(key)
@@ -121,6 +121,7 @@ func advance(game: Node, delta: float) -> void:
 			game._record_event(game.EventLog.TRAIN_RECOVERED, id, {"service": key, "stop": origin, "action": "returned to departure stop"})
 		else:
 			var arrived := Demand.alight(passenger_destinations, configuration.stops[destination])
+			game._transfer_passengers(key, configuration.stops[destination], passenger_destinations)
 			game.passengers_delivered += arrived
 			game.money += arrived * game.TICKET_PRICE
 			game._record_event(game.EventLog.TRAIN_ARRIVED, id, {"service": key, "stop": configuration.stops[destination], "passengers": arrived})
@@ -172,7 +173,7 @@ static func from_save(service_key: String, value: Variant, service: Dictionary, 
 	for field in ["stop_index", "passengers", "return_stop"]:
 		if float(value[field]) != floor(float(value[field])): return null
 	if value.stop_index >= service.stops.size() or value.return_stop >= service.stops.size() or value.passengers > capacity or value.dwell > 2 or value.operating_timer >= 1: return null
-	if not Demand.valid_counts(value.get("passenger_destinations"), service.stops) or Demand.total(value.passenger_destinations) != int(value.passengers): return null
+	if not Demand.valid_counts(value.get("passenger_destinations"), Demand.STATIONS) or Demand.total(value.passenger_destinations) != int(value.passengers): return null
 	if value.returning and value.return_stop != value.stop_index: return null
 	var built := Runtime.passenger_path(Runtime.decode(value.cells), service.stops, 32, service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}))
 	if built.is_empty() or built.cells.is_empty(): return null

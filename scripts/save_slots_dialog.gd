@@ -1,5 +1,9 @@
 extends ConfirmationDialog
 ## Select a storage slot without changing the active game until an operation succeeds.
+const Preview = preload("res://scripts/core/save_preview.gd")
+const Thumbnail = preload("res://scripts/ui/save_thumbnail.gd")
+var thumbnail: Control
+var preview_label: Label
 const Slots = preload("res://scripts/core/save_slots.gd")
 var game: Node
 var operation := "save"
@@ -12,8 +16,13 @@ func configure(owner_game: Node) -> void:
 	get_cancel_button().text = "Close"
 	exclusive = true
 	dialog_hide_on_ok = false
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size.y = 80
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
 	var box := VBoxContainer.new()
-	add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
 	explanation = Label.new()
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(explanation)
@@ -21,6 +30,15 @@ func configure(owner_game: Node) -> void:
 	slots.custom_minimum_size = Vector2(400, 170)
 	slots.item_selected.connect(func(_index: int) -> void: _refresh_action())
 	box.add_child(slots)
+	var preview_row := HBoxContainer.new()
+	box.add_child(preview_row)
+	thumbnail = Thumbnail.new()
+	preview_row.add_child(thumbnail)
+	preview_label = Label.new()
+	preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preview_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview_row.add_child(preview_label)
+
 	fresh_button = Button.new()
 	fresh_button.text = "Start fresh game in selected slot"
 	fresh_button.pressed.connect(_start_fresh)
@@ -43,9 +61,13 @@ func open_dialog(mode: String) -> void:
 		slots.set_item_tooltip(slot - 1, ProjectSettings.globalize_path(Slots.path(slot)))
 	slots.select(game.active_save_slot - 1)
 	_refresh_action()
-	popup_centered_clamped(Vector2i(540, 330), 0.95)
+	popup_centered_clamped(Vector2i(620, 450), 0.95)
 
 func _refresh_action() -> void:
+	if not slots.get_selected_items().is_empty():
+		var snapshot := Preview.read(Slots.path(slots.get_selected_items()[0] + 1, "backup" if operation == "backup" else "save"))
+		thumbnail.set_snapshot(snapshot)
+		preview_label.text = snapshot.text
 	get_ok_button().disabled = slots.get_selected_items().is_empty()
 	if not get_ok_button().disabled and operation != "save":
 		get_ok_button().disabled = not FileAccess.file_exists(Slots.path(slots.get_selected_items()[0] + 1, "backup" if operation == "backup" else "save"))

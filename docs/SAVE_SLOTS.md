@@ -17,8 +17,8 @@ Opening it pauses gameplay; close it and press Play/Space to resume.
 
 Loading or starting fresh discards unsaved progress in the current session. Save
 first if you want to keep it. Slot timestamps are shown in UTC. The current slot
-is labelled in the chooser. Restarting the application initially selects Slot 1;
-load another slot to continue that game. Shared display/accessibility preferences
+is labelled in the chooser. The title screen offers Continue for the latest readable primary save; choose
+another slot with Load game or recover its previous save with Load previous save. Shared display/accessibility preferences
 apply to every game, while maps, fleet, economy, passenger demand and simulation
 state are stored independently.
 
@@ -30,7 +30,8 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 27, including amenities and loan state. Slots choose storage
+schema is version 28, including amenities, loan state, route appearance and
+alert acknowledgements. Version 27 saves migrate with default presentation data. Slots choose storage
 locations rather than changing simulation rules.
 Each write uses that slot's temporary file, checks write/backup errors, then
 renames it into place. Failed saves retain the selected session/slot; failed loads
@@ -53,3 +54,17 @@ touches the old folder, which can be deleted once the saves are confirmed.
 Loan balances and repayment schedules are stored independently per slot; old saves
 migrate to zero debt. Map/Goals visibility is shared in player settings, not saved
 per game. See [bank loans](LOANS.md).
+
+## Title menu and previews
+
+The title screen supports Continue, selected-slot Load, Load previous save, New,
+Settings and Quit. Continue chooses the most recently modified primary save with
+readable metadata, then validates the complete save before entering gameplay.
+Failed loads leave the title menu usable. New starts paused and changes no saved
+file until you explicitly Save. In-game Settings can return to the title screen;
+save your current progress first.
+
+The in-game chooser includes a bounded read-only map thumbnail, game time and
+balance for the selected primary/backup. Invalid metadata shows a fallback rather
+than applying any state. Preview success is not full validation. No live simulation
+is created for these thumbnails, and no image files are added to your save folder.

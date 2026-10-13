@@ -39,6 +39,7 @@ static var _windowed_mode: Window.Mode = Window.MODE_MAXIMIZED
 static var compact_header: bool = false
 static var map_visible: bool = true
 static var goals_visible: bool = true
+static var slow_on_incident: bool = false
 
 ## {action name: [key codes]} as saved. Empty means "use the defaults".
 static var key_bindings: Dictionary = {}
@@ -63,6 +64,7 @@ static func load_settings() -> void:
 	fullscreen = bool(config.get_value("display", "fullscreen", false))
 	map_visible = bool(config.get_value("panels", "map_visible", true))
 	goals_visible = bool(config.get_value("panels", "goals_visible", true))
+	slow_on_incident = bool(config.get_value("notifications", "slow_on_incident", false))
 
 	notification_rules = NotificationPolicy.normalize(config.get_value("notifications", "rules", {}))
 
@@ -83,6 +85,7 @@ static func save_settings() -> bool:
 	config.set_value("display", "fullscreen", fullscreen)
 	config.set_value("panels", "map_visible", map_visible)
 	config.set_value("panels", "goals_visible", goals_visible)
+	config.set_value("notifications", "slow_on_incident", slow_on_incident)
 	config.set_value("input", "bindings", key_bindings)
 	config.set_value("input", "mouse_bindings", mouse_bindings)
 	config.set_value("notifications", "rules", NotificationPolicy.normalize(notification_rules))
@@ -119,7 +122,8 @@ static func toggle_fullscreen(window: Window) -> void:
 
 
 static func use_compact_header() -> bool:
-	return compact_header or ui_scale >= 1.75
+	# Reserve map space for actionable alerts as well as the wrapping ribbon.
+	return compact_header or ui_scale >= 1.5
 
 
 static func nearest_scale(value: float) -> float:

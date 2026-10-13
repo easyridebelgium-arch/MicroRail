@@ -12,7 +12,7 @@ separator tooltips. Controls remain individually focusable and can wrap without
 forcing a wide group off-screen. No new shortcuts replace existing bindings.
 
 Normal buttons are 64 logical pixels. Compact mode (selected in Settings, or
-used automatically at 175–200% UI scale) reduces them to 48 logical pixels with
+used automatically at 150–200% UI scale) reduces them to 48 logical pixels with
 smaller icons. Display scaling still enlarges those controls; map zoom is preserved.
 The existing selection underline, keyboard focus ring, live Problems counter and
 speed dropdown remain active.
@@ -58,15 +58,10 @@ Accounts, unchanged allocations, expandable details, direct blocker inspection
 and readable layouts/Close buttons at 100%, 150% and 200%. Existing toolbar,
 inspection, accessibility and simulation suites remain required.
 
-The remaining current-stage UI work is listed in the roadmap's UI enhancement
-table. Map/Goals visibility now persists in shared player preferences. Station/industry
-inspectors now show overview, actions and expandable details, with an always-visible
-Close button outside the scrolling region. Their sidebar is clamped in logical UI
-pixels so 200% scaling does not double its width. Existing amenity, train-upgrade
-and freight departure controls remain available. Bank loans are reached through
-Accounts; see [loans](LOANS.md). Cursor-side construction feedback and consistent
-tooltip descriptions are next. Branded
-title-screen actions, save thumbnails and route identity colours are still planned.
+All twelve current-stage UI roadmap items are implemented. Map/Goals visibility
+persists in shared preferences. Facility inspectors use overview/actions/details
+with an always-visible Close button and a clamped logical width. Bank loans remain
+under Accounts; see [loans](LOANS.md).
 
 ## Cursor construction feedback and tooltips
 
@@ -96,3 +91,50 @@ reservation/error/draft wording, viewport corners at 100/150/200%, input pass-th
 remapped controls and unchanged finances/clock/events/authority. This batch also
 passes the existing toolbar, UI clarity, UI scale, inspection, command-wiring,
 panel-preference and mouse-track suites (eight focused suites total).
+
+## Route identities and signal cues
+
+While paused, open Routes, enter a 1–6-character label (A–Z, 0–9 or hyphen),
+choose a palette colour and press **Apply appearance**. This changes only appearance;
+it does not apply your route draft or require the train to return home. Linked
+trains share the source service identity. Labels appear on locomotive badges,
+route overlays and train inspectors, independently of livery. High contrast keeps
+text labels and uses white route lines.
+
+Signals use shape and text: **S** manual stop, **H** a held request in the current
+allocation, **R** reserved signal tile, **A** automatic with no current held request.
+A bidirectional signal cannot promise a global green: permission is train-specific.
+Hovered cells also show +/× alongside the existing construction feedback.
+
+## Persistent alerts
+
+An actionable banner shows current warnings/urgent incidents, with **Inspect**
+(or **Bank**) and **Acknowledge**. Acknowledgement hides the banner for the same
+condition, leaves Problems and operating safety unchanged, and is saved per game.
+Acknowledging a confirmed deadlock acknowledges its participating trains together.
+When a condition clears or changes it can alert again. Initial unbuilt starter
+routes do not clutter the banner. Duplicate pending notifications coalesce; the
+underlying event stream remains intact.
+
+In Settings, optionally enable **Slow 5×/10× to 1× on new waits, deadlocks or overdue
+loans**. It defaults off and does not force pause. Existing pause-on-deadlock remains
+independent. Overdue payments link directly to Bank loans.
+
+## Startup and save previews
+
+The application starts at the branded title menu. Continue selects the latest
+readable primary slot; Load and Load previous save use the selected slot. All loads
+use the normal validator, and failures leave the menu available. New starts a paused
+map without overwriting a saved file. The loading bar reports threaded resource
+loading, not an artificial delay. Settings works before entering a game; F11 follows
+its remapped binding. In-game Settings offers **Return to title screen (save first)**.
+
+Save choosers show a small read-only map, simulation time and balance for the
+selected primary or backup. Preview failure cannot prevent normal load validation
+or backup recovery. The preview is metadata, not a guarantee that a save is valid.
+The chooser scrolls within the viewport at 200% scaling, with fixed footer actions.
+
+Validation: `tests/test_stage_ui.gd` covers saved identities and schema migration,
+linked routes, signal cues, persistent cycle acknowledgement, incident slowdown,
+metadata fallbacks, layout scaling, failed title loads and successful Continue.
+The full gameplay suites continue to check movement, reservations and save safety.

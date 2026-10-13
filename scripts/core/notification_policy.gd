@@ -44,7 +44,11 @@ func consume(event: Dictionary, rules: Dictionary) -> void:
 	if mode == OFF: return
 	_pause_requested = _pause_requested or mode == PAUSE
 	var priority := 2 if key == "deadlocks" else 1 if key == "waiting" else 0
-	var item := {"text": Events.summary(event), "pause": mode == PAUSE, "priority": priority}
+	var item := {"signature": str(event.type) + "|" + str(event.subject) + "|" + str(event.data.get("reason", "")) + "|" + str(event.data.get("trains", [])), "text": Events.summary(event), "pause": mode == PAUSE, "priority": priority}
+	for pending in _pending:
+		if pending.signature == item.signature:
+			pending.pause = bool(pending.pause) or bool(item.pause)
+			return
 	if _pending.size() >= MAX_PENDING:
 		# Keep severe alerts when low-priority chatter fills the bounded queue.
 		var lowest := 0

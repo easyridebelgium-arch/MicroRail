@@ -25,6 +25,8 @@ const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
 const Amenities = preload("res://scripts/core/amenities.gd")
+const Presentation = preload("res://scripts/core/presentation.gd")
+var presentation: Dictionary = Presentation.defaults()
 const Loans = preload("res://scripts/core/loans.gd")
 const LoansDialog = preload("res://scripts/loans_dialog.gd")
 var loans = Loans.new()
@@ -165,6 +167,8 @@ const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const ToolbarArt = preload("res://scripts/ui/toolbar_art.gd")
 const HeaderControls = preload("res://scripts/ui/header_controls.gd")
+const AlertBanner = preload("res://scripts/ui/alert_banner.gd")
+var alert_banner: PanelContainer
 const ConstructionHint = preload("res://scripts/ui/construction_hint.gd")
 const ToolbarTooltips = preload("res://scripts/ui/toolbar_tooltips.gd")
 var construction_hint: PanelContainer
@@ -470,9 +474,31 @@ func _simulation_step(step_seconds: float) -> void:
 	traffic_metrics.update(sim_clock.tick, reservation_trains.keys(), traffic_wait_samples)
 	_check_scenario_objectives()
 	_advance_loans()
+	_clear_resolved_acknowledgements()
 	_refresh_directional_routes()
 	_flush_notifications()
 
+
+func _saved_presentation() -> Dictionary:
+	var result := presentation.duplicate(true)
+	for key in result.routes.keys():
+		if not services.has(key): result.routes.erase(key)
+	return result
+
+func route_identity(key: String) -> Dictionary:
+	return Presentation.identity(services, presentation, key)
+
+func route_colour(key: String) -> Color:
+	return Color.WHITE if GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST else Color(Presentation.COLOURS[int(route_identity(key).colour)])
+
+func set_route_identity(key: String, label: String, colour: int) -> String:
+	if not paused or not services.has(key): return "Pause and select an existing service."
+	label = label.strip_edges().to_upper()
+	if not Presentation.label_valid(label) or colour < 0 or colour >= Presentation.COLOURS.size(): return "Use 1–6 letters/numbers/hyphens and a listed colour."
+	key = Presentation.source(services, key)
+	presentation.routes[key] = {"label": label, "colour": colour}
+	queue_redraw()
+	return "Route appearance applied; instructions and train position are unchanged. Save to keep it."
 
 func borrow_money(amount: int) -> String:
 	if not paused: return "Pause before borrowing."
@@ -501,6 +527,7 @@ func _advance_loans() -> void:
 
 func _record_event(type: String, subject: String, data: Dictionary = {}) -> void:
 	var event: Dictionary = event_log.record(sim_clock.tick, type, subject, data)
+	if GameSettings.slow_on_incident and not paused and sim_clock.speed >= 5 and type in [EventLog.DEADLOCK_DETECTED, EventLog.TRAIN_WAITING, EventLog.LOAN_OVERDUE]: _set_game_speed(0)
 	notifications.consume(event, GameSettings.notification_rules)
 
 
@@ -790,10 +817,12 @@ func _update_instructions() -> void:
 	if (is_dragging or planning_mode) and not construction_feedback.blocked.is_empty():
 		direction += " | %d reserved tiles cannot be edited" % construction_feedback.blocked.size()
 
+	var current_problems := problem_rows()
 	if problems_button != null:
-		problems_button.text = str(problem_rows().size()) if problems_button.has_meta("toolbar_action") else "Problems (%d)" % problem_rows().size()
+		problems_button.text = str(current_problems.size()) if problems_button.has_meta("toolbar_action") else "Problems (%d)" % current_problems.size()
 
 	if header_controls != null: header_controls.refresh()
+	if alert_banner != null: alert_banner.refresh(current_problems)
 	if construction_hint != null:
 		construction_hint.refresh_at(get_viewport().get_mouse_position(), is_dragging and not _modal_open() and not _mouse_is_over_interface())
 	instructions.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -900,15 +929,32 @@ func _draw() -> void:
 	elif _is_inside_map(hovered_cell):
 		var color: Color = Palette.get_color(Palette.Role.HOVER_OK if _can_build_at(hovered_cell) else Palette.Role.HOVER_BAD)
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
+		draw_string(ThemeDB.fallback_font, _cell_center(hovered_cell) + Vector2(-4, 4), "+" if _can_build_at(hovered_cell) else "×", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 	if reservation_overlay:
 		_draw_reservations()
 	_draw_waypoints()
 	_draw_signals()
 	_draw_train()
+	_draw_route_badge("passenger", train_position)
+	_draw_route_badge("freight", freight_train.position)
 	for key in additional_service_keys():
 		var running = passenger_services[key]
 		_draw_passenger_consist(key, running.path, running.distance, running.position, running.heading, running.forward)
+		_draw_route_badge(key, running.position)
 
+
+func _draw_route_badge(key: String, at: Vector2) -> void:
+	var label: String = str(route_identity(key).label)
+	var width := ThemeDB.fallback_font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 6
+	draw_rect(Rect2(at + Vector2(-width * 0.5, -29), Vector2(width, 14)), Color("#101923"))
+	draw_line(at + Vector2(-width * 0.5, -29), at + Vector2(width * 0.5, -29), route_colour(key), 2)
+	draw_string(ThemeDB.fallback_font, at + Vector2(-width * 0.5 + 3, -18), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
+
+func signal_cue(cell: Vector2i) -> String:
+	if track_signals.get(cell, "") == "stop": return "S"
+	for conflict in movement_conflicts.values():
+		if conflict.get("cell", Vector2i(-1, -1)) == cell and int(conflict.get("revision", -1)) == authority_revision: return "H"
+	return "R" if reservations.owners.has(cell) else "A"
 
 func _draw_grid() -> void:
 	var map_size := Vector2(
@@ -1334,6 +1380,7 @@ func _save_game(slot: int = 0) -> bool:
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
+		"presentation": _saved_presentation(),
 		"demand": {"queues": passenger_demand.queues.duplicate(true), "primary": passenger_destinations.duplicate(true)},
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
 		"passenger_services": _saved_passenger_services(),
@@ -1511,6 +1558,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 	if not Amenities.valid_save(data.get("amenities")): return false
 	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
+	if not Presentation.valid(data.get("presentation"), data.services): return false
 	var state: Dictionary = data["state"]
 	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger): return false
 
@@ -1763,6 +1811,7 @@ func _load_game(save_path: String = "") -> bool:
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
 	amenities.load_save(data.amenities)
 	loans.restore_state(data.loans)
+	presentation = Presentation.normalize(data.presentation)
 	route_distance = loaded_distance
 	is_dragging = false
 	_update_train_transform()
@@ -3253,130 +3302,11 @@ func _draw_demolition_preview() -> void:
 			color,
 			2.0
 		)
-func _make_ui_style(
-	background: Color,
-	border: Color,
-	padding: float = 8.0
-) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-
-	style.bg_color = background
-	style.border_color = border
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(7)
-
-	style.content_margin_left = padding
-	style.content_margin_right = padding
-	style.content_margin_top = padding
-	style.content_margin_bottom = padding
-
-	return style
 func _setup_modern_ui_theme() -> void:
-	var ui_theme := Theme.new()
-	ui_theme.default_font_size = 16
-
-	var normal := _make_ui_style(
-		Color("#202B3C"),
-		Color("#35445B")
-	)
-
-	var hover := _make_ui_style(
-		Color("#2C3D55"),
-		Color("#6485AD")
-	)
-
-	var pressed := _make_ui_style(
-		Color("#245B83"),
-		Color("#62B5F2")
-	)
-
-	var disabled := _make_ui_style(
-		Color("#18212F"),
-		Color("#283345")
-	)
-
-	for control_type in ["Button", "OptionButton"]:
-		ui_theme.set_stylebox("normal", control_type, normal)
-		ui_theme.set_stylebox("hover", control_type, hover)
-		ui_theme.set_stylebox("pressed", control_type, pressed)
-		ui_theme.set_stylebox("hover_pressed", control_type, pressed)
-		ui_theme.set_stylebox("disabled", control_type, disabled)
-
-		ui_theme.set_color(
-			"font_color",
-			control_type,
-			Color("#E8EEF6")
-		)
-		ui_theme.set_color(
-			"font_hover_color",
-			control_type,
-			Color.WHITE
-		)
-		ui_theme.set_color(
-			"font_pressed_color",
-			control_type,
-			Color.WHITE
-		)
-		ui_theme.set_color(
-			"font_disabled_color",
-			control_type,
-			Color("#748298")
-		)
-		ui_theme.set_color(
-			"icon_disabled_color",
-			control_type,
-			Color(1.0, 1.0, 1.0, 0.35)
-		)
-
-	ui_theme.set_color("font_color", "Label", Color("#E8EEF6"))
-
-	ui_theme.set_stylebox(
-		"panel",
-		"PanelContainer",
-		_make_ui_style(
-			Color("#172131"),
-			Color("#35445B"),
-			0.0
-		)
-	)
-
-	ui_theme.set_stylebox(
-		"panel",
-		"TooltipPanel",
-		_make_ui_style(
-			Color("#111827"),
-			Color("#536780")
-		)
-	)
-
-	ui_theme.set_color(
-		"font_color",
-		"TooltipLabel",
-		Color("#E8EEF6")
-	)
-	ui_theme.set_stylebox(
-		"background",
-		"ProgressBar",
-		_make_ui_style(
-			Color("#202B3C"),
-			Color("#35445B"),
-			0.0
-		)
-	)
-
-	ui_theme.set_stylebox(
-		"fill",
-		"ProgressBar",
-		_make_ui_style(
-			Color("#3688BE"),
-			Color("#62B5F2"),
-			0.0
-		)
-	)
-
+	var ui_theme := preload("res://scripts/ui/shared_theme.gd").build()
 	# Themes are inherited by the controls inside these UI roots.
 	for child in $Interface.get_children():
-		if child is Control:
+		if child is Control or child is Window:
 			child.theme = ui_theme
 
 	header_background.color = Color("#111827")
@@ -3436,13 +3366,18 @@ func _setup_toolbar_icons() -> void:
 	construction_hint = ConstructionHint.new()
 	construction_hint.configure(self)
 	$Interface.add_child(construction_hint)
+	alert_banner = AlertBanner.new()
+	alert_banner.configure(self)
+	header_box.add_child(alert_banner)
+	header_box.move_child(alert_banner, instructions.get_index())
 	straight_button.tooltip_text = "Connect track — drag between two points; automatic diagonal and platform approaches"
 	curve_button.tooltip_text = "Draw track — hold left mouse and change direction; bends are automatic"
 	_update_toolbar()
 
 func _setup_settings_dialog() -> void:
 	settings_dialog = SettingsDialog.new()
-	settings_dialog.configure()
+	settings_dialog.configure(true)
+	settings_dialog.main_menu_requested.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/ui/title.tscn"))
 	settings_dialog.settings_applied.connect(_apply_settings)
 	$Interface.add_child(settings_dialog)
 
@@ -4879,12 +4814,14 @@ func _execute_set_signal(data: Dictionary) -> void:
 func _draw_signals() -> void:
 	for cell in track_signals:
 		var center := _cell_center(cell) + Vector2(0, -12)
-		var stop: bool = track_signals[cell] == "stop"
-		var color := Color(1, 0.35, 0.25) if stop else Color(0.9, 0.95, 1)
-		draw_rect(Rect2(center - Vector2(6, 6), Vector2(12, 12)), Color(0.05, 0.08, 0.1))
-		if stop: draw_rect(Rect2(center - Vector2(6, 6), Vector2(12, 12)), color, false, 2)
-		else: draw_circle(center, 6, color, false, 1.5)
-		draw_string(ThemeDB.fallback_font, center + Vector2(-4, 4), "S" if stop else "A", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
+		var cue := signal_cue(cell)
+		var colour := Color.WHITE if GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST else Color("#E69F00") if cue in ["S", "H"] else Color("#56B4E9")
+		draw_rect(Rect2(center - Vector2(7, 7), Vector2(14, 14)), Color("#101923"))
+		if cue == "S": draw_rect(Rect2(center - Vector2(6, 6), Vector2(12, 12)), colour, false, 2)
+		else: draw_circle(center, 6, colour, false, 1.5)
+		if cue == "H": draw_line(center + Vector2(-7, -7), center + Vector2(7, 7), colour, 2)
+		if cue == "R": draw_line(center + Vector2(-6, 7), center + Vector2(6, 7), colour, 2)
+		draw_string(ThemeDB.fallback_font, center + Vector2(-4, 4), cue, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, colour)
 
 func set_dispatch_hold(id: int, hold: bool) -> String:
 	if not paused: return "Pause before changing dispatch instructions."
@@ -5258,7 +5195,7 @@ func _draw_inspection_paths() -> void:
 		var path: Curve2D = train.path
 		if path.point_count < 2: continue
 		var length := path.get_baked_length()
-		var tint: Color = Palette.get_color(Palette.Role.HOVER_OK)
+		var tint: Color = route_colour(train.key)
 		# Dash patterns differ by permanent ID, so colour is never the sole key.
 		var spacing := 12.0 + float(int(train.id) % 3) * 4.0
 		var distance := 0.0
@@ -5269,7 +5206,7 @@ func _draw_inspection_paths() -> void:
 		draw_rect(Rect2(origin - Vector2(5, 5), Vector2(10, 10)), Color.WHITE, false, 2.0)
 		draw_arc(path.sample_baked(train.target), 7, 0, TAU, 16, Color.WHITE, 2.0)
 		var label := path.sample_baked(train.distance) + Vector2(8, -12 - int(train.id) % 3 * 12)
-		draw_string(ThemeDB.fallback_font, label, "#%d %s" % [train.id, train.name], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+		draw_string(ThemeDB.fallback_font, label, "[%s] #%d %s" % [route_identity(train.key).label, train.id, train.name], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 
 
 func _setup_problems() -> void:
@@ -5331,8 +5268,30 @@ func problem_rows() -> Array:
 		var owned: Dictionary = Fleet.find(fleet, train.id)
 		var title := "#%d %s — %s — %s" % [train.id, str(owned.get("name", "Train")), train.name, issue]
 		var details := "%s\n%s\nMeasured traffic waiting: %.1fs continuous, %.1fs recent (~60s), %.1fs since measurement began. Station dwell, loading and dispatcher holds are excluded. Measurements restart after loading; incident history is saved." % [title, explanation, float(stats.continuous_seconds), float(stats.recent_seconds), float(stats.total_seconds)]
-		rows.append({"key": "train:%d" % train.id, "id": train.id, "severity": level, "title": title, "details": details, "cell": Vector2i(-1, -1)})
+		rows.append({"signature": "%d|%s|%s" % [train.id, issue.get_slice(" ", 0), explanation], "key": "train:%d" % train.id, "id": train.id, "severity": level, "title": title, "details": details, "cell": Vector2i(-1, -1)})
+	if loans.overdue() > 0:
+		rows.append({"key": "company:loan", "signature": "loan:overdue", "id": -1, "severity": "Warning", "title": "Bank payment overdue — £%d" % loans.overdue(), "details": "Available future cash pays overdue interest and principal automatically. Open Bank loans to review the balance and schedule.", "cell": Vector2i(-1, -1)})
+	for row in rows: row["acknowledged"] = presentation.acknowledged.get(row.key, "") == row.signature
 	return rows
+
+func acknowledge_problem(row: Dictionary) -> void:
+	if not row.has("signature"): return
+	if str(row.get("title", "")).contains("Confirmed deadlock"):
+		for cycle in deadlocks.cycles:
+			if cycle.has(int(row.id)):
+				for participant in problem_rows():
+					if cycle.has(int(participant.id)) and str(participant.title).contains("Confirmed deadlock"):
+						presentation.acknowledged[participant.key] = participant.signature
+				return
+	if presentation.acknowledged.size() >= 100: presentation.acknowledged.erase(presentation.acknowledged.keys()[0])
+	presentation.acknowledged[row.key] = row.signature
+
+func _clear_resolved_acknowledgements() -> void:
+	if presentation.acknowledged.is_empty(): return
+	var current: Dictionary = {}
+	for row in problem_rows(): current[row.key] = row.signature
+	for key in presentation.acknowledged.keys():
+		if current.get(key, "") != presentation.acknowledged[key]: presentation.acknowledged.erase(key)
 
 func incident_rows() -> Array:
 	var rows: Array = []

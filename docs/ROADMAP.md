@@ -12,14 +12,16 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 0 — Foundations | Implemented; requirements remain active for every update. | Continue deterministic, save and accessibility checks. Full input replay/controller support are later extensions. |
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
-| Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. Unified waiting inspection is implemented. |
+| Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings and richer measured planning. Alert acknowledgement/persistence and optional incident slowdown are implemented. Unified waiting inspection is implemented. |
 | Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; Transfers, satisfaction, demand balancing, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Latest UI batch:** cursor-side construction cost/error/refund feedback and consistent
-tooltips are implemented. Eight focused UI/control suites pass, including 25 new
-construction-feedback checks. The preceding full gameplay validation covered 78
-suites; this presentation-only batch does not change the save schema or simulation.
+**Current-stage UI work is complete:** all twelve items in the table below are
+implemented. The final batch adds saved route identities, text/shape signal cues,
+a persistent actionable alert banner with acknowledgement, optional incident
+slowdown, map/time/balance save previews and the branded title menu. Save version
+28 adds validated appearance/acknowledgement data; version 27 migrates to defaults.
+These presentation changes preserve physical train positions and routing rules.
 
 **Latest economy/UI update:** fixed-rate bank loans, accruing interest, automatic
 instalments, arrears and early repayment are implemented ([bank loans](LOANS.md)).
@@ -33,13 +35,11 @@ the slot chooser and fresh-game action remain available. The existing save is Sl
 See [save slots](SAVE_SLOTS.md). Periodic autosaves remain Phase 2C work.
 Toolbar refinement instructions are in the [Krita guide](../assets/ui/toolbar/KRITA_GUIDE.md).
 
-**Next implementation:** continue UI enhancements with stable service colours and
-short route labels, followed by notification refinements and save-slot previews.
-Cursor-side construction feedback, consistent tooltips, remembered panels and
-facility overview/actions/details are implemented. Continue these UI batches
-alongside the remaining gameplay work, then resume
-Phase 2A passenger transfers and satisfaction (waiting-area amenities are done); demand
-factors follow. Direct passenger
+**Next implementation:** resume Phase 2A passenger transfers and satisfaction,
+then demand balancing. Waiting-area amenities and the current UI work are complete.
+Historical dashboards, expanded camera modes and optional gameplay branding remain
+later enhancements. This closes the UI workstream, not every Phase 1B/1C extension.
+Direct passenger
 origins/destinations, per-destination queues, through riders and destination-only
 fares are now implemented; see [passenger destinations](PASSENGER_DESTINATIONS.md).
 Directional departure timetables remain implemented. Arrival targets, contract
@@ -54,14 +54,16 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation covered 78 passing headless suites in Godot 4.6.3
-(full regression plus the updated migration rerun), including 50 loan checks and
+complete. The latest cloud validation covers all 80 passing headless suites in Godot 4.6.3
+(full regression plus an affected-suite rerun after fixing the 150% alert layout), including 50 loan checks and
 26 panel-preference/layout checks,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
 departures, blocked-departure accounting and destination/dispatch save/load, passenger conservation, four independent manual slots,
-version-26 station amenities, rename migration, version-27 debt persistence and the new
-header/inspector layouts. Earlier gameplay
+version-26 station amenities, rename migration, version-27 debt persistence,
+version-28 route identities/acknowledgements and title/save-preview/header layouts.
+The final eight focused UI suites pass after the layout adjustment, and threaded
+title-to-New startup passes an isolated smoke check. Earlier gameplay
 updates were also tested in Godot 4.7.stable.
 Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
@@ -86,11 +88,9 @@ one (copy only, never overwrites, old folder left intact); see [save slots](SAVE
 
 ## Current-stage UI enhancements — Phase 1C / Phase 2A
 
-These twelve improvements are now part of the current workstream. Ship small,
-verified batches alongside gameplay; retain the authoritative graph, reservations,
+All twelve improvements below are implemented. Maintain them alongside gameplay; retain the authoritative graph, reservations,
 fixed clock, accessibility and atomic saves. Presentation must not alter movement
-rules or hide actionable waiting causes. First batch: grouped ribbon, compact status/
-Accounts and summary-first train inspection. See [UI clarity](UI_CLARITY.md).
+rules or hide actionable waiting causes. The grouped ribbon, compact status/Accounts and summary-first inspection remain available. See [UI clarity](UI_CLARITY.md).
 
 | Improvement | Current status and next acceptance point |
 | --- | --- |
@@ -98,14 +98,14 @@ Accounts and summary-first train inspection. See [UI clarity](UI_CLARITY.md).
 | Compact status bar | Implemented: clock, balance, session operating profit, delivered passengers and Accounts. Detailed revenue/spend/queue figures move to a paused, scrollable Accounts window. Historical dashboard graphs follow measured metrics. |
 | Collapsible panels | Implemented: Map/Goals visibility persists in shared player preferences across sessions/slots; toggles restore in sync. Existing layout reclaims space when panels are hidden. |
 | Consistent inspectors | Implemented: train and facility overviews precede actions and expandable detail. Station/industry upgrades, amenities and loading rules remain available. Facility Close stays outside scrolling content; sidebar width is scaled once and clamped to the logical viewport. Bank uses the same readable, scrollable dialog theme. |
-| Clear waiting explanations | Implemented first batch: current blocker identity in the summary and direct Inspect blocking train action; reservation detail collapses independently. Retain honest stale-allocation warnings and actionable manual-stop/route/dwell explanations. More natural stop/block labels can follow. |
+| Clear waiting explanations | Implemented: current blocker identity in the summary and direct Inspect blocking train action; reservation detail collapses independently. Retain honest stale-allocation warnings and actionable manual-stop/route/dwell explanations. More natural stop/block labels can follow. |
 | Construction feedback near cursor | Implemented: pointer-side build/switch cost breakdown, refunds, valid/invalid/partial/draft wording, actual placement errors and retained-path service impact. Clamped/flipped inside the logical viewport; ignores input and hides over UI/dialogs. Draft stroke prices are distinct from full-plan validation. Safety/funds are rechecked on commit; no speculative conflict forecasts. |
-| Route colours and labels | Planned: stable service colour plus short text identity in Routes, trains, overlays and inspectors. Do not use colour alone or change routing to match visuals. Persist identity choices with validated service definitions. |
+| Route colours and labels | Implemented: saved palette and 1–6-character identity in Routes, locomotive badges, overlays and inspectors. Apply appearance independently of route edits while paused; linked trains share their source identity. High contrast retains labels with white lines. Livery remains separate. |
 | Readable tooltips | Implemented: consistent action name/description across the ribbon, clear signals/waypoints/slots semantics, current remapped keyboard/mouse bindings where they exist, and 0.4-second hover delay. Existing accessible names/focus retained. Dynamic Pause/Speed controls continue showing current actions and bindings. |
-| Accessible selection states | Existing PNG states, white selected underline, focus ring and palette options retained. Next: audit every signal state and preview for a distinct shape/text cue, including high contrast and colour-blind modes; operational state must never rely on colour alone. |
-| Quieter notifications | Existing notices and Problems/incident centre retained. Planned polish: small success messages, persistent prominent actionable incidents, clear jump actions and acknowledgement; keep slowdown optional and avoid repeated duplicate alerts. |
-| Save-slot previews | Four manual slots already work. Planned: safe read-only map thumbnails, game time and balance so players recognize each saved game; failed metadata/thumbnail reads must not change gameplay or prevent backup recovery. |
-| Branded title screen | Logo uploaded at `assets/ui/branding/game_logo.png`. Planned: Continue, Load Game, New Game, Settings and Quit; validate Continue's target slot and provide real loading progress only where measurable. Optional small gameplay logo must not displace useful map/toolbar space. |
+| Accessible selection states | Implemented: PNG states, selected underline, keyboard focus and palette options; hovered cells use +/×, construction hints use words/symbols, and signals show S/H/R/A with shapes. S = manual stop, H = current held request, R = reserved signal tile, A = automatic/unrequested. R is not a global permission to enter; authority remains train-specific. |
+| Quieter notifications | Implemented: identical pending alerts coalesce, persistent actionable banner offers Inspect/Bank and Acknowledge, and acknowledged conditions remain visible in Problems. Acknowledgement persists per save and rearms when the condition changes/resolves. Confirmed deadlock acknowledgement covers the cycle. Optional Settings slowdown changes 5×/10× to 1× on new waits/deadlocks/overdue payments; default off. |
+| Save-slot previews | Implemented: bounded read-only map thumbnails, game time and balance for primary/backup slots. Missing/bad preview data has an explicit fallback; actual Load still performs full validation. Four separate manual slots and backups remain available. |
+| Branded title screen | Implemented: uploaded logo, Continue to latest readable primary slot, slot-selectable Load/previous backup/New, Settings and Quit. Continue uses normal save validation; failed loads keep the menu usable. Threaded resource progress reports actual loading; New leaves saved files intact until Save. Scrollable at 100–200% UI scale. |
 
 Use one inherited visual theme for readable typography, spacing, panel borders
 and focus indication. Keep pixel-art icons/borders; retain a clear small text font.

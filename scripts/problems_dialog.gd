@@ -6,6 +6,7 @@ var source: OptionButton
 var severity: OptionButton
 var items: ItemList
 var inspect_button: Button
+var acknowledge_button: Button
 var details: Label
 var count_label: Label
 var _rows: Array = []
@@ -52,6 +53,14 @@ func configure(owner_game: Node) -> void:
 	inspect_button.text = "Inspect train now"
 	inspect_button.pressed.connect(_inspect)
 	box.add_child(inspect_button)
+	acknowledge_button = Button.new()
+	acknowledge_button.text = "Acknowledge selected problem"
+	acknowledge_button.pressed.connect(func() -> void:
+		if items.get_selected_items().is_empty(): return
+		game.acknowledge_problem(_rows[items.get_selected_items()[0]])
+		refresh()
+	)
+	box.add_child(acknowledge_button)
 	confirmed.connect(_locate)
 
 func open_dialog() -> void:
@@ -70,7 +79,7 @@ func refresh() -> void:
 		if not selected_severity.is_empty() and row.severity != selected_severity: continue
 		if not query.is_empty() and not (str(row.title) + " " + str(row.details)).to_lower().contains(query): continue
 		_rows.append(row)
-		items.add_item("[%s] %s" % [row.severity, row.title])
+		items.add_item("[%s] %s%s" % [row.severity, row.title, " (acknowledged)" if row.get("acknowledged", false) else ""])
 		items.set_item_tooltip(items.item_count - 1, row.details)
 		if str(row.key) == previous: items.select(items.item_count - 1)
 	if items.get_selected_items().is_empty() and not _rows.is_empty(): items.select(0)
@@ -81,11 +90,14 @@ func _describe_selected() -> void:
 	var selection := items.get_selected_items()
 	if selection.is_empty():
 		details.text = "No matching problems." if source.selected == 0 else "No matching historical incidents. History is not a list of active problems."
+		acknowledge_button.disabled = true
 		inspect_button.disabled = true
 		get_ok_button().disabled = true
 		return
 	var row: Dictionary = _rows[selection[0]]
-	inspect_button.disabled = game.Fleet.find(game.fleet, int(row.id)).is_empty()
+	acknowledge_button.disabled = source.selected != 0 or row.get("acknowledged", false)
+	inspect_button.text = "Open Bank loans" if row.key == "company:loan" else "Inspect train now"
+	inspect_button.disabled = row.key != "company:loan" and game.Fleet.find(game.fleet, int(row.id)).is_empty()
 	details.text = row.details
 	get_ok_button().disabled = not game.can_locate_problem(row)
 
@@ -97,6 +109,10 @@ func _locate() -> void:
 func _inspect() -> void:
 	var selection := items.get_selected_items()
 	if selection.is_empty(): return
+	if _rows[selection[0]].key == "company:loan":
+		hide()
+		game.loans_dialog.open_dialog()
+		return
 	var id := int(_rows[selection[0]].id)
 	if game.Fleet.find(game.fleet, id).is_empty(): return
 	hide()

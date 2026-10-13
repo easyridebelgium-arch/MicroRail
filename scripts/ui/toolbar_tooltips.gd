@@ -9,7 +9,7 @@ static func refresh(game: Node) -> void:
 		game.curve_button: "Hold %s and draw freely; track follows changes in direction." % build,
 		game.switch_button: "Add or reshape a junction (£%d). Reserved switches cannot be changed." % game.SWITCH_COST,
 		game.remove_button: "Select Remove, then drag with %s. Holding/dragging %s also removes track; reserved tiles are protected.\nShortcut: %s" % [build, reset, keys.key_label(keys.SELECT_REMOVE)],
-		game.signal_button: "Click straight track to cycle automatic block signal, manual stop and removal. A manual stop does not release automatically.",
+		game.signal_button: "Click straight track to cycle automatic block signal, manual stop and removal. A manual stop does not release automatically. Symbols: S manual stop; H recorded hold; R signal tile reserved; A idle. R is not a global green aspect.",
 		game.waypoint_button: "Place a routing marker on track, then assign it to a route leg in Routes. Waypoints are not passenger stops.",
 		game.routes_button: "Edit stops, Shuttle/Loop mode, platforms, waypoints and departure schedules. Opens paused.",
 		game.fleet_button: "Buy, assign, name and upgrade trains; manage coaches, withdrawals and linked services. Opens paused.",

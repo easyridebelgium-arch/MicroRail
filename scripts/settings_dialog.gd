@@ -2,11 +2,13 @@ extends ConfirmationDialog
 ## Accessibility and controls: UI scale, colour palette, reduced motion and
 ## key bindings. Nothing changes until the player presses Apply.
 
+signal main_menu_requested
 signal settings_applied
 
 const Settings = preload("res://scripts/core/game_settings.gd")
 const Actions = preload("res://scripts/core/input_actions.gd")
 
+var slow_check: CheckBox
 var notification_choices: Dictionary = {}
 
 var scale_choice: OptionButton
@@ -23,7 +25,7 @@ var key_buttons: Dictionary = {}
 var capturing_action: StringName = &""
 
 
-func configure() -> void:
+func configure(in_game: bool = false) -> void:
 	title = "Settings"
 	size = Vector2i(560, 520)
 	ok_button_text = "Apply"
@@ -66,6 +68,15 @@ func configure() -> void:
 	box.add_child(compact_header_check)
 
 	box.add_child(_heading("Operational alerts"))
+	slow_check = CheckBox.new()
+	slow_check.text = "Slow 5×/10× to 1× on new waits, deadlocks or overdue loans"
+	box.add_child(slow_check)
+	if in_game:
+		var menu_button := Button.new()
+		menu_button.text = "Return to title screen (save first)"
+		menu_button.pressed.connect(func() -> void: hide(); main_menu_requested.emit())
+		box.add_child(menu_button)
+
 	var explanation := Label.new()
 	explanation.text = "Choose notices or automatic pause for new incidents. All incidents stay in Problems history. Build and objective feedback keep their existing controls."
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -148,6 +159,7 @@ func open_dialog() -> void:
 	palette_choice.select(Settings.palette_mode)
 	reduced_motion_check.button_pressed = Settings.reduced_motion
 	compact_header_check.button_pressed = Settings.compact_header
+	slow_check.button_pressed = Settings.slow_on_incident
 	fullscreen_check.button_pressed = Settings.fullscreen
 	fullscreen_check.tooltip_text = "Toggle fullscreen: " + Actions.key_label(Actions.TOGGLE_FULLSCREEN)
 	var rules := Settings.NotificationPolicy.normalize(Settings.notification_rules)
@@ -360,6 +372,7 @@ func _apply() -> void:
 	Settings.reduced_motion = reduced_motion_check.button_pressed
 	Settings.compact_header = compact_header_check.button_pressed
 	Settings.fullscreen = fullscreen_check.button_pressed
+	Settings.slow_on_incident = slow_check.button_pressed
 	for category in notification_choices:
 		Settings.notification_rules[category] = notification_choices[category].selected
 

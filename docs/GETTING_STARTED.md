@@ -3,8 +3,10 @@
 **Goal:** connect the stations, run passenger trains and earn enough to grow. Stations A, B and C are
 already on the map in a row, and each ticket pays £5. You start with £1,000 and track costs £10 per tile.
 
-## Minute 0–2: look around and pause
-- Press **Space** to pause. Building, upgrades and amenities all need the game paused.
+## Minute 0–2: start and look around
+- On the title screen choose a slot and **New game in selected slot**. The map starts paused.
+  **Continue** opens your latest readable save; **Load game** and **Load previous save** recover a selected slot.
+- Press **Space** to play/pause. Building, upgrades and amenities all need the game paused.
 - Move the camera with **W A S D** or the arrow keys (hold **Shift** to go faster), drag with the
   **middle mouse button**, and zoom with the **mouse wheel**. **Home** resets the view.
 - Check your **money**, **profit** and the **game clock** in the status bar. **Accounts** shows income, running costs and purchases. Press **G** to see your current objective.
@@ -20,20 +22,23 @@ already on the map in a row, and each ticket pays £5. You start with £1,000 an
 1. Open **Routes**. Give the service a name, choose its mode (**Shuttle** goes back and forth, **Loop** circles) and add stops in order.
 2. Leave each stop's platform on **Auto**. The game chooses a platform when applying the route and can choose a free destination platform before departure; it does not switch platforms while approaching.
 3. Press **Apply**. If the route is not connected, the editor says what is missing.
-4. Open **Fleet** to buy, name or assign more trains.
+4. While paused, choose a short route label and colour, then **Apply appearance**. This is separate from applying route instructions.
+5. Open **Fleet** to buy, name or assign more trains.
 
 ## Minute 9–12: run a train
 1. Press **Space** to resume and use **1 to 4** to choose a speed (1×, 2×, 5×, 10×).
 2. Click a station and make sure passenger service is enabled. Click a train to inspect where it is going.
 3. Passengers wait per destination and only board a train that will actually stop there.
-4. If a train stops, open **Problems** (toolbar) to see why.
+4. If a train stops, open **Problems** (toolbar) to see why, or use the alert banner's **Inspect**. **Acknowledge** hides that alert while keeping the problem visible.
+5. Signal letters mean S = manual stop, H = current held request, R = reserved tile, A = automatic/unrequested. The train inspector explains actual permission to move.
 
 ## Minute 12–15: spend your first profit
 1. **Pause**, then click a station.
 2. Buy **Train capacity** (more seats) or **Speed**.
 3. Build an **amenity** at a busy station: Shelter (£300, waiting limit +50, arrivals +5%),
    Waiting room (£700, needs a Shelter, +100 and +10%) or Kiosk (£400, +25 and +10%).
-4. Use **Save game** in the toolbar. There are four slots.
+4. Use **Save game** in the toolbar. There are four slots, with map/time/balance previews.
+5. To return to startup, use **Settings → Return to title screen (save first)**.
 
 ## Next steps
 Short of cash? **Accounts → Bank loans** offers £1,000, £2,500 or £5,000 at 1% interest per game hour, repaid in ten hourly instalments (see [loans](LOANS.md)). Borrow while paused, and repay early if you can.
@@ -78,7 +83,7 @@ route editor, and **signals** where trains share track.
 | **Save game / Load** | four save slots |
 | **Settings** | interface scale, colours and key bindings |
 
-Upgrades, amenities and undo only work while paused. Keys can be changed in **Settings**.
+Upgrades, amenities and undo only work while paused. Keys can be changed in **Settings**. Settings also offers optional slowdown from 5×/10× to 1× on new traffic waits, deadlocks or overdue payments.
 
 Hover toolbar controls for their action and description. Relevant shortcuts and
 mouse controls follow your current Settings bindings; this reference lists defaults.

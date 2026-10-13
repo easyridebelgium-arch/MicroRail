@@ -7,6 +7,8 @@ var draft: Dictionary
 var service_choice: OptionButton
 var route_mode: OptionButton
 var heading: Label
+var style_label: LineEdit
+var style_colour: OptionButton
 var name_field: LineEdit
 var stop_list: ItemList
 var station_choice: OptionButton
@@ -87,6 +89,22 @@ func configure(owner_game: Node) -> void:
 	name_field.max_length = 40
 	name_field.placeholder_text = "Route name"
 	box.add_child(name_field)
+	var appearance := HFlowContainer.new()
+	box.add_child(appearance)
+	style_label = LineEdit.new()
+	style_label.max_length = 6
+	style_label.custom_minimum_size.x = 90
+	style_label.placeholder_text = "Route label"
+	appearance.add_child(style_label)
+	style_colour = OptionButton.new()
+	for name in game.Presentation.NAMES: style_colour.add_item(name)
+	appearance.add_child(style_colour)
+	var apply_style := Button.new()
+	apply_style.text = "Apply appearance"
+	apply_style.tooltip_text = "Changes only the route badge/colour; linked trains share their source identity. Save to keep it."
+	apply_style.pressed.connect(func() -> void: status.text = game.set_route_identity(_key(), style_label.text, style_colour.selected))
+	appearance.add_child(apply_style)
+
 	route_mode = OptionButton.new()
 	route_mode.add_item("Shuttle — return through stops in reverse")
 	route_mode.add_item("Loop — last stop returns directly to first")
@@ -315,6 +333,9 @@ func _show_service() -> void:
 	if linked: link_label.text = "Linked to %s — its route, headway and departure timetables follow that source." % draft[str(draft[_key()]["link"])].name
 	directive_warning.text = str(removed_waypoint_legs.get(_key(), ""))
 	name_field.text = draft[_key()]["name"]
+	var identity: Dictionary = game.route_identity(_key())
+	style_label.text = identity.label
+	style_colour.select(int(identity.colour))
 	editing_controls.visible = Services.is_passenger_key(_key())
 	route_mode.visible = Services.is_passenger_key(_key())
 	route_mode.select(1 if draft[_key()].get("mode", "shuttle") == "loop" else 0)

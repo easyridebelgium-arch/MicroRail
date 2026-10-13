@@ -24,6 +24,8 @@ const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerJourneys = preload("res://scripts/core/passenger_journeys.gd")
+const DemandResponse = preload("res://scripts/core/demand_response.gd")
+var demand_response = DemandResponse.new()
 const Satisfaction = preload("res://scripts/core/passenger_satisfaction.gd")
 var satisfaction = Satisfaction.new()
 const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
@@ -1279,8 +1281,11 @@ func _generate_passengers(delta: float) -> void:
 	passenger_timer += delta
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
+		var network := _passenger_network()
 		for key in PassengerDemand.STATIONS:
-			passenger_demand.generate(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), amenities.queue_limit(key), sim_rng, sim_clock.tick)
+			var experience: Dictionary = satisfaction.station(key, passenger_demand.waiting_groups(key, sim_clock.tick), sim_clock.tick, amenities.owned[key])
+			var arrivals: int = demand_response.arrivals(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), int(experience.rating), int(experience.boarded), not network[key].is_empty())
+			passenger_demand.generate(key, arrivals, amenities.queue_limit(key), sim_rng, sim_clock.tick)
 
 func _passenger_network() -> Dictionary:
 	var available: Dictionary = {}
@@ -1409,6 +1414,7 @@ func _save_game(slot: int = 0) -> bool:
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
 		"satisfaction": satisfaction.save_state(),
+		"demand_response": demand_response.save_state(),
 		"presentation": _saved_presentation(),
 		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
@@ -1585,6 +1591,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 		if train_x > _cell_center(STATION_B).x:
 			return false
 
+	if not DemandResponse.valid_state(data.get("demand_response")): return false
 	if not Satisfaction.valid_state(data.get("satisfaction"), int(sim.clock.tick)): return false
 	if not Amenities.valid_save(data.get("amenities")): return false
 	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
@@ -1841,6 +1848,7 @@ func _load_game(save_path: String = "") -> bool:
 	amenities.load_save(data.amenities)
 	loans.restore_state(data.loans)
 	satisfaction.restore_state(data.satisfaction)
+	demand_response.restore_state(data.demand_response)
 	presentation = Presentation.normalize(data.presentation)
 	route_distance = loaded_distance
 	is_dragging = false
@@ -2413,7 +2421,7 @@ func _update_station_inspector() -> void:
 				incoming += _incoming_passengers(service, key)
 		var experience: Dictionary = satisfaction.station(key, passenger_demand.waiting_groups(key, sim_clock.tick), sim_clock.tick, amenities.owned[key])
 		var rating_text := "%d / 100" % experience.rating if experience.rating >= 0 else "no data yet"
-		station_summary.text = "Waiting passengers: %d / %d\nPassengers aboard for here: %d\nServing routes: %d\nWaiting satisfaction: %s\nPause to build amenities; manage trains in Fleet." % [_waiting(key), amenities.queue_limit(key), incoming, count, rating_text]
+		station_summary.text = "Waiting passengers: %d / %d\nPassengers aboard for here: %d\nServing routes: %d\nWaiting satisfaction: %s\nDemand response: %d%%\nPause to build amenities; manage trains in Fleet." % [_waiting(key), amenities.queue_limit(key), incoming, count, rating_text, int(demand_response.state[key].factor)]
 
 func _update_station_details() -> void:
 	if not station_panel.visible:
@@ -3878,6 +3886,8 @@ func _destination_queue_text(station: String) -> String:
 		elif journey.size() > 2: connection = " — change at " + ServiceRoutes.STATIONS[journey[1]].name
 		lines.append("To %s: %d%s | Oldest wait %.1fs" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), connection, passenger_demand.oldest_seconds(station, sim_clock.tick, destination)])
 	lines.append(satisfaction.describe(station, passenger_demand, sim_clock.tick, amenities))
+	var experience: Dictionary = satisfaction.station(station, passenger_demand.waiting_groups(station, sim_clock.tick), sim_clock.tick, amenities.owned[station])
+	lines.append(demand_response.describe(station, int(experience.rating), int(experience.boarded), not network[station].is_empty()))
 	lines.append("Connections use enabled, unheld services with complete track; departure times and free seats are not guaranteed.")
 	return "\n".join(lines)
 

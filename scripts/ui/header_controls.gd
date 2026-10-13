@@ -133,6 +133,9 @@ func open_accounts() -> void:
 func waiting_summary() -> String:
 	var company: Dictionary = game.satisfaction.company(game.passenger_demand, game.sim_clock.tick, game.amenities)
 	var lines: PackedStringArray = ["Passenger waiting satisfaction: no data yet" if company.rating < 0 else "Passenger waiting satisfaction: %d / 100" % company.rating]
+	var network: Dictionary = game._passenger_network()
 	for station in game.PassengerDemand.STATIONS:
+		var experience: Dictionary = game.satisfaction.station(station, game.passenger_demand.waiting_groups(station, game.sim_clock.tick), game.sim_clock.tick, game.amenities.owned[station])
 		lines.append("\n" + game.ServiceRoutes.STATIONS[station].name + "\n" + game.satisfaction.describe(station, game.passenger_demand, game.sim_clock.tick, game.amenities))
+		lines.append(game.demand_response.describe(station, int(experience.rating), int(experience.boarded), not network[station].is_empty()))
 	return "\n".join(lines)

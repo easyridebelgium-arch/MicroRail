@@ -37,7 +37,8 @@ capacity**. Station waiting-area and demand upgrades are now amenities; see [sta
 ## Capacity and demand
 
 The base waiting limit is 100 per station (amenities raise it). New arrivals stop when the queue is
-full. Returned recovery passengers may exceed that limit and are never discarded;
+full. A gradual satisfaction-based factor now scales amenity-adjusted arrivals
+between 50–125%; see [demand response](DEMAND_RESPONSE.md). Returned recovery passengers may exceed that limit and are never discarded;
 new demand resumes only when room is available. Increasing train capacity does not
 create extra demand. Destinations are initially chosen uniformly from the other
 two stations; towns, attractiveness and service-quality demand factors are later work.

@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 31
+const CURRENT_VERSION: int = 32
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -130,6 +130,10 @@ static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 
 		30:
 			data["satisfaction"] = preload("res://scripts/core/passenger_satisfaction.gd").defaults()
+			return data
+
+		31:
+			data["demand_response"] = preload("res://scripts/core/demand_response.gd").defaults()
 			return data
 
 	# Unreachable while every version between OLDEST and CURRENT has a step.

@@ -13,7 +13,7 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings and richer measured planning. Alert acknowledgement/persistence and optional incident slowdown are implemented. Unified waiting inspection is implemented. |
-| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, demand balancing, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
+| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
 **Current-stage UI work is complete:** all twelve items in the table below are
@@ -58,8 +58,17 @@ history; version 30 upgrades without changing arrival groups or positions.
 This is station waiting satisfaction, not end-to-end journey or punctuality scoring;
 see [passenger satisfaction](PASSENGER_SATISFACTION.md).
 
-**Next implementation:** Phase 2A demand balancing. Extend satisfaction with
-journey-time/crowding/punctuality measurements before using those factors. Waiting-area amenities and the current UI work are complete.
+**Latest demand batch:** arrivals respond gradually to station waiting satisfaction,
+with a saved 50–125% factor, at most one percentage point per normal arrival
+interval. Growth above 100% requires recent boarding evidence and an enabled
+connection. Station/Accounts explanations distinguish the current rate from the
+target. Save version 32 retains factor/carry; existing passengers and queue caps
+are preserved. See [demand response](DEMAND_RESPONSE.md).
+
+**Next implementation:** Phase 2A end-to-end journey-time measurement across
+services/transfers, before journey-time, crowding or punctuality scoring. Basic
+waiting-based demand balancing is complete; population, classes, fares and richer
+demand factors remain later refinements. Waiting-area amenities and the current UI work are complete.
 Historical dashboards, expanded camera modes and optional gameplay branding remain
 later enhancements. This closes the UI workstream, not every Phase 1B/1C extension.
 Direct passenger
@@ -77,8 +86,8 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation covers all 83 passing headless suites in Godot 4.6.3
-(full waiting-satisfaction regression plus three focused UI reruns), including 50 loan checks and
+complete. The latest cloud validation covers all 84 passing headless suites in Godot 4.6.3
+(full demand-response regression plus the expanded 29-check response rerun), including 50 loan checks and
 26 panel-preference/layout checks,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
@@ -86,7 +95,9 @@ departures, blocked-departure accounting and destination/dispatch save/load, pas
 version-26 station amenities, rename migration, version-27 debt persistence,
 version-28 route identities/acknowledgements, title/save-preview/header layouts
 and version-29 connecting passenger manifests, version-30 arrival cohorts and
-version-31 satisfaction history. The 28 satisfaction checks pass, including
+version-31 satisfaction history and version-32 demand factor/carry. The 29
+demand-response checks pass, including actual held-connection gating, queue/RNG
+protection, save continuation and equal 30/60/120 FPS results. The 28 satisfaction checks pass, including
 score/comfort evidence, load validation, station overview, Accounts scaling and
 30/60/120 FPS equality.
 The 21 fairness checks and 40 Loop checks pass; both Loop and multiple-service
@@ -110,7 +121,7 @@ advance or reorder the gameplay milestones above.
 
 **Amenities checkpoint:** stations can buy a Shelter, Waiting room and Kiosk. Each raises that
 station's waiting limit and passenger arrivals by a small, saved percentage (save version 26); see
-[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness and waiting-experience satisfaction are implemented; demand balancing is next.
+[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction and gradual demand response are implemented; journey-time measurement is next.
 
 **Rename checkpoint:** the project is now **MicroRail** (formerly "Trainz", a name already in use by another
 game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
@@ -351,7 +362,7 @@ must be labelled estimates.
 | Demand and bottleneck adviser | Forecast queues, platform demand and shortages; explain persistent congestion with clickable evidence and recommendations. | Stopped-traffic measurements and a bounded recent-wait overlay are implemented. Forecasts still require utilisation and demand history. Start with transparent heuristics; present forecasts as estimates, not guaranteed outcomes. |
 | Passenger classes and preferences | Add commuters seeking frequency, business travellers prioritising speed/punctuality, tourists valuing comfort/scenery and budget travellers sensitive to fares. | Extend express/local demand rather than adding a competing demand system. Add classes gradually with understandable journey-choice rules. |
 | Fare control and demand elasticity | Set fares by service/class and offer off-peak discounts, balancing demand and revenue. | Depends on destinations, classes, satisfaction and simple documented price-response rules. |
-| Company reputation and passenger satisfaction | Reward reliable, comfortable service with demand growth, better contracts and subsidies instead of rewarding only transport volume. | First slice implemented: station waiting satisfaction from current queues plus the last 128 boarding groups per station, weighted by passengers, with explicit amenity comfort and causes in stations/Accounts. Save version 31 stores history. Journey time, crowding, punctuality and reputation-driven growth/contracts require their own measurements before influencing gameplay. See [waiting satisfaction](PASSENGER_SATISFACTION.md). |
+| Company reputation and passenger satisfaction | Reward reliable, comfortable service with demand growth, better contracts and subsidies instead of rewarding only transport volume. | First slice implemented: station waiting satisfaction from current queues plus the last 128 boarding groups per station, weighted by passengers, with explicit amenity comfort and causes in stations/Accounts. Save version 31 stores history; version 32 adds bounded gradual arrival response with service-evidence gating. Journey time, crowding, punctuality and reputation-driven growth/contracts require their own measurements before influencing gameplay. See [waiting satisfaction](PASSENGER_SATISFACTION.md). |
 | Marketing, subsidies and public-service obligations | Fund temporary demand boosts and win regional contracts for reliable service to underserved towns, with frequency/fare conditions. | Reuse contracts, reputation, timetables and demand modifiers. Show obligations and penalties before acceptance. |
 | Detailed station life and waiting passengers | Show tiny pixel-art passengers accumulating on platforms during delays and boarding when trains arrive. | Drive visuals from actual queues; cap or group sprites for performance without changing simulated passenger counts. |
 
@@ -511,7 +522,8 @@ instead of adding a separate campaign simulation.
    headways and frequency targets with clear attainable limits.
 5. **Passenger demand (2A, destinations, amenities and basic transfers implemented):**
    waiting-age fairness and waiting-experience satisfaction are implemented; next
-   balance demand, then add richer journey choices, classes/fares and scoring. Departure timetables are implemented;
+   waiting-based demand response is implemented; next measure complete journeys,
+   then add richer choices, classes/fares and scoring. Departure timetables are implemented;
    arrival targets and punctuality contracts follow their demand/contract rules.
 6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
    by factory/finished goods; verify stock, recipes, storage and payments first.

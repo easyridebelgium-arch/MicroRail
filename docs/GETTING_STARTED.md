@@ -32,7 +32,8 @@ already on the map in a row, and each ticket pays £5. You start with £1,000 an
    change at B; a direct A–C service is preferred. The oldest eligible riders board
    first. Click a station to see connections, oldest waits and **Waiting satisfaction**.
    **Accounts** explains the company score; more useful service reduces waits, and
-   amenities add a small comfort bonus.
+   amenities add a small comfort bonus. The station's **Demand response** shows how
+   arrivals gradually adapt (50–125%); growth needs actual boarding evidence.
 4. If a train stops, open **Problems** (toolbar) to see why, or use the alert banner's **Inspect**. **Acknowledge** hides that alert while keeping the problem visible.
 5. Signal letters mean S = manual stop, H = current held request, R = reserved tile, A = automatic/unrequested. The train inspector explains actual permission to move.
 

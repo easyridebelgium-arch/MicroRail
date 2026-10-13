@@ -39,8 +39,10 @@ who changes trains can therefore contribute more than one station experience.
 This rating covers station waiting, not unique passengers' complete journey time.
 Onboard delays, crowding, timetable punctuality, classes, fares and company
 reputation are not measured here. Existing amenities retain their published
-capacity/demand effects; this increment adds feedback without modifying fares,
-random arrivals, train movement or reservations. Demand balancing follows separately.
+capacity/demand effects. Waiting-based demand response is now implemented as a
+separate, bounded factor;
+see [demand response](DEMAND_RESPONSE.md). Fares, movement and reservations remain
+governed by their existing systems.
 
 ## Improve the result
 

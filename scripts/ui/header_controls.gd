@@ -75,7 +75,7 @@ func configure(owner_game: Node) -> void:
 	loans_button.pressed.connect(func() -> void: game.loans_dialog.open_dialog())
 	var loan_icon := "res://assets/ui/toolbar/icons/loans.png"
 	if ResourceLoader.exists(loan_icon):
-		loans_button.icon = load(loan_icon)
+		loans_button.icon = Art.texture("icons/loans.png", Vector2i(24, 24), true)
 		loans_button.expand_icon = true
 		loans_button.add_theme_constant_override("icon_max_width", 24)
 		loans_button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

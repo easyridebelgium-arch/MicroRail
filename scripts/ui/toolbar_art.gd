@@ -45,7 +45,7 @@ static func texture(relative: String, canvas: Vector2i, icon: bool = false) -> T
 	if textures.has(cache_key): return textures[cache_key]
 	var source: Texture2D = load(ROOT + relative)
 	var source_image := source.get_image()
-	var region: Rect2i = BOUNDS[relative]
+	var region: Rect2i = BOUNDS[relative] if BOUNDS.has(relative) else source_image.get_used_rect()
 	# Accept compact replacements exported at the documented native sizes.
 	if region.end.x > source_image.get_width() or region.end.y > source_image.get_height():
 		region = source_image.get_used_rect()

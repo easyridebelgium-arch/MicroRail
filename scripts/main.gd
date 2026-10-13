@@ -151,7 +151,7 @@ const Palette = preload("res://scripts/core/palette.gd")
 const SettingsDialog = preload("res://scripts/settings_dialog.gd")
 const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
 const MAX_CONSTRUCTION_HISTORY: int = 100
-const TOOLBAR_ICON_SHEET = preload("res://assets/ui/icons/toolbar.svg")
+const ToolbarArt = preload("res://scripts/ui/toolbar_art.gd")
 const NetworkMap = preload("res://scripts/network_map.gd")
 const ScenarioGoals = preload("res://scripts/scenario_goals.gd")
 
@@ -291,7 +291,7 @@ var switch_button: Button
 var remove_button: Button
 var demolition_cells: Dictionary = {}
 var demolition_last_cell: Vector2i = Vector2i.ZERO
-var toolbar_icon_textures: Array[Texture2D] = []
+var find_button: Button
 var network_map: NetworkMap
 var map_button: Button
 var scenario_goals: ScenarioGoals = ScenarioGoals.new()
@@ -727,7 +727,7 @@ func _update_instructions() -> void:
 		direction += " | %d reserved tiles cannot be edited" % construction_feedback.blocked.size()
 
 	if problems_button != null:
-		problems_button.text = "Problems (%d)" % problem_rows().size()
+		problems_button.text = str(problem_rows().size()) if problems_button.has_meta("toolbar_action") else "Problems (%d)" % problem_rows().size()
 
 	var status_line: String = "%s | Cell: %d,%d | Build: £%d%s | %s" % [
 		direction,
@@ -1964,8 +1964,8 @@ func _update_toolbar() -> void:
 
 	pause_button.text = ""
 
-	if toolbar_icon_textures.size() == 10:
-		pause_button.icon = toolbar_icon_textures[5 if paused else 4]
+	if pause_button.has_meta("toolbar_action"):
+		pause_button.icon = ToolbarArt.texture("icons/%s.png" % ("play" if paused else "pause"), Vector2i(24, 24), true)
 
 	pause_button.tooltip_text = "%s — %s" % [
 		"Resume simulation" if paused else "Pause simulation",
@@ -1983,6 +1983,14 @@ func _input(event: InputEvent) -> void:
 	if _right_mouse_input(event): return
 	if _modal_open():
 		_clear_direct_inspection()
+		return
+
+	# Toolbar buttons are now keyboard-focusable. Keep the gameplay pause
+	# shortcut (normally Space) from activating the focused tool instead.
+	var focused_control := get_viewport().gui_get_focus_owner()
+	if focused_control != null and (focused_control.has_meta("toolbar_action") or focused_control == speed_selector) and event.is_action_pressed(InputActions.TOGGLE_PAUSE):
+		_toggle_pause()
+		get_viewport().set_input_as_handled()
 		return
 
 	if event.is_action_pressed(InputActions.CAMERA_PAN):
@@ -3240,60 +3248,59 @@ func _setup_modern_ui_theme() -> void:
 	instructions.add_theme_font_size_override("font_size", 14)
 
 func _setup_toolbar_icons() -> void:
-	toolbar_icon_textures.clear()
-
-	var cell_size: float = float(TOOLBAR_ICON_SHEET.get_height())
-
-	for index in range(10):
-		var icon := AtlasTexture.new()
-		icon.atlas = TOOLBAR_ICON_SHEET
-		icon.region = Rect2(
-			index * cell_size,
-			0.0,
-			cell_size,
-			cell_size
-		)
-		icon.filter_clip = true
-
-		toolbar_icon_textures.append(icon)
-
-	var buttons: Array[Button] = [
-		straight_button,
-		curve_button,
-		inspect_button,
-		pause_button,
-		save_button,
-		load_button,
-		folder_button,
-		backup_button
-	]
-
-	var icon_indices: Array[int] = [
-		0, 1, 3, 4, 6, 7, 8, 9
-	]
-
-	for index in range(buttons.size()):
-		var button: Button = buttons[index]
-
-		button.text = ""
-		button.icon = toolbar_icon_textures[icon_indices[index]]
-		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		button.expand_icon = true
-		button.custom_minimum_size = Vector2(44, 44)
-		button.add_theme_constant_override("icon_max_width", 24)
-
-		# Smooth UI icons while the map retains its pixel-art filtering.
-		button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-
+	var actions := {
+		inspect_button: ["inspect", "Inspect"],
+		straight_button: ["track_connect", "Connect track"],
+		curve_button: ["track_draw", "Draw track"],
+		pause_button: ["pause", "Pause or resume simulation"],
+		save_button: ["save", "Save game"],
+		load_button: ["load", "Load latest save"],
+		folder_button: ["save_folder", "Open save folder"],
+		backup_button: ["history", "Load previous save"],
+		switch_button: ["switch", "Switch tool"],
+		remove_button: ["track_remove", "Remove track"],
+		routes_button: ["routes", "Routes"],
+		fleet_button: ["fleet", "Fleet"],
+		settings_button: ["settings", "Settings"],
+		reservation_button: ["reservations", "Reservations"],
+		inspection_button: ["overlays", "Overlays"],
+		problems_button: ["problems", "Problems and recent incidents"],
+		find_button: ["find", "Find objects"],
+		traffic_button: ["traffic", "Traffic controls"],
+		signal_button: ["signals", "Signals"],
+		waypoint_button: ["waypoint", "Waypoints"],
+	}
+	for button in actions:
+		ToolbarArt.decorate(button, actions[button][0], actions[button][1])
+	# Keep the live incident count alongside the warning symbol.
+	problems_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	problems_button.add_theme_constant_override("icon_max_width", 32)
+	problems_button.text = str(problem_rows().size())
+	for entry in [[undo_button, "undo", "Undo construction"], [redo_button, "redo", "Redo construction"]]:
+		ToolbarArt.decorate(entry[0], entry[1], entry[2])
+		entry[0].custom_minimum_size = Vector2(40, 40)
+		entry[0].add_theme_constant_override("icon_max_width", 24)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var art_state: String = "selected_hover" if state == "hover_pressed" else "selected" if state == "pressed" else state
+		speed_selector.add_theme_stylebox_override(state, ToolbarArt.style(art_state))
+	speed_selector.add_theme_icon_override("arrow", ToolbarArt.texture("details/dropdown_arrow.png", Vector2i(8, 8)))
+	speed_selector.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	speed_selector.custom_minimum_size = Vector2(84, 64)
+	speed_selector.focus_mode = Control.FOCUS_ALL
+	speed_selector.accessibility_name = "Simulation speed"
+	speed_selector.add_theme_stylebox_override("focus", pause_button.get_theme_stylebox("focus"))
+	var ribbon := StyleBoxTexture.new()
+	ribbon.texture = ToolbarArt.texture("backgrounds/ribbon_panel.png", Vector2i(128, 40))
+	for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]: ribbon.set_texture_margin(side, 8)
+	header_toolbar.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	header_toolbar.draw.connect(func() -> void:
+		header_toolbar.draw_style_box(ribbon, Rect2(Vector2(-6, -6), header_toolbar.size + Vector2(12, 12))))
+	header_toolbar.resized.connect(header_toolbar.queue_redraw)
+	header_toolbar.move_child(clock_label, header_toolbar.get_child_count() - 1)
 	straight_button.tooltip_text = "Connect track — drag between two points; automatic diagonal and platform approaches"
 	curve_button.tooltip_text = "Draw track — hold left mouse and change direction; bends are automatic"
-	inspect_button.tooltip_text = "Inspect trains, stations and industries — I"
-	save_button.tooltip_text = "Save game"
-	load_button.tooltip_text = "Load latest save"
-	folder_button.tooltip_text = "Open save folder"
-	backup_button.tooltip_text = "Load previous save"
-
 	_update_toolbar()
+
 func _setup_settings_dialog() -> void:
 	settings_dialog = SettingsDialog.new()
 	settings_dialog.configure()
@@ -5388,7 +5395,7 @@ func _setup_object_browser() -> void:
 	object_browser = ObjectBrowser.new()
 	object_browser.configure(self)
 	$Interface.add_child(object_browser)
-	var find_button := Button.new()
+	find_button = Button.new()
 	find_button.text = "Find"
 	find_button.focus_mode = Control.FOCUS_NONE
 	find_button.tooltip_text = "Search objects, locate trains and facilities, and pin a session watchlist. Opens paused."

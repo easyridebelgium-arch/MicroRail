@@ -25,13 +25,19 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation verified all 68 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
-desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
-tool reset, click/hold/drag removal, saved curved-junction layouts and safe route-copy drafts, in Godot 4.6.3
-(the platform update was previously tested on 4.7.stable).
+complete. The latest cloud validation passed all 70 headless suites in Godot 4.6.3,
+including the uploaded PNG ribbon, action bindings, selected/disabled states,
+keyboard focus, live counters and wrapping at 100–200% UI scale. Earlier gameplay
+updates were also tested in Godot 4.7.stable.
 Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
 repeat runs, and both suites now isolate/restore it; see the regression checks and acceptance coverage below.
+
+**Presentation checkpoint:** the approved PNG toolbar pack is integrated into existing
+controls, with live speed/Problems text, nearest-neighbour display, accessible names,
+keyboard focus and a non-colour selected underline. Source files are preserved; see
+[toolbar graphics](../assets/ui/toolbar/README.md). This presentation update does not
+advance or reorder the gameplay milestones above.
 
 **Resume checkpoint:** maximized startup, adaptive window filling and saved
 fullscreen (Settings/F11) are implemented and confirmed working by the player.

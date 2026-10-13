@@ -17,6 +17,9 @@ func key_event(code: Key) -> InputEventKey:
 	event.pressed = true
 	return event
 func _run() -> void:
+	# Use a desktop viewport for toolbar layout checks; headless defaults to
+	# 64 × 64, smaller than a single accessible ribbon button at 200% scale.
+	root.size = Vector2i(1280, 720)
 	for fps in [30, 60, 120]:
 		for speed in [1, 2, 5, 10]:
 			var clock := Clock.new()

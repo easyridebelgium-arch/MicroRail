@@ -7,3 +7,6 @@ builds/
 # Operating-system files
 .DS_Store
 Thumbs.db
+
+# Toolbar PNGs use default lossless imports; generated local sidecars
+/assets/ui/toolbar/**/*.png.import

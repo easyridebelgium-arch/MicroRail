@@ -101,7 +101,25 @@ creation date, reference provenance and applicable licence/usage terms for appro
 assets. Godot creates `.import` sidecars; do not hand-edit them or rename a live
 referenced asset without updating references.
 
-At documentation creation, the newly prepared toolbar PNGs were not visible on
-GitHub's published branches. The existing `assets/ui/icons/toolbar.svg` is separate
-from this proposed artwork pack and remains in place. No graphics are wired into
-the game by this documentation update.
+## Integration status
+
+The uploaded pack is now wired into the existing toolbar, speed dropdown and
+construction Undo/Redo controls. PNGs remain unchanged. The live Problems count,
+tooltips, accessible action names and keyboard focus are retained. Selected tools
+also display a white underline, so the state does not depend only on blue colour.
+The toolbar wraps with its existing flow layout at smaller windows/larger UI scale.
+
+The uploads are large source images rather than the native sizes above.
+`scripts/ui/toolbar_art.gd` uses measured content bounds, caches normalized display
+textures, preserves icon aspect ratios and uses nearest-neighbour sampling.
+Buttons display at 64 × 64 logical pixels, with icons up to 48 × 48; Undo/Redo use
+40 × 40 buttons. Speed and Problems retain live text. The ribbon panel is drawn
+behind the flow layout; the separator asset is retained for future grouped layouts.
+
+`backgrounds/button_pressed.png` currently has an opaque white surround. A runtime
+edge-connected white cutout removes it without modifying the PNG. A transparent
+replacement is preferred. If replacing an image with a different large canvas or
+content position, update its BOUNDS entry in the helper; compact native-size
+replacements are detected automatically. Restart Godot after replacing artwork.
+The old `assets/ui/icons/toolbar.svg` remains available but is no longer used by
+the toolbar. Tests: `tests/test_toolbar_art.gd` plus existing UI/control suites.

@@ -160,6 +160,8 @@ const SettingsDialog = preload("res://scripts/settings_dialog.gd")
 const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const ToolbarArt = preload("res://scripts/ui/toolbar_art.gd")
+const HeaderControls = preload("res://scripts/ui/header_controls.gd")
+var header_controls: RefCounted
 const NetworkMap = preload("res://scripts/network_map.gd")
 const ScenarioGoals = preload("res://scripts/scenario_goals.gd")
 
@@ -753,48 +755,13 @@ func _update_instructions() -> void:
 	if problems_button != null:
 		problems_button.text = str(problem_rows().size()) if problems_button.has_meta("toolbar_action") else "Problems (%d)" % problem_rows().size()
 
-	var status_line: String = "%s | Cell: %d,%d | Build: £%d%s | %s" % [
-		direction,
-		hovered_cell.x,
-		hovered_cell.y,
-		preview_cost,
-		affordability,
-		status
-	]
-	var waiting_line: String = "Waiting: A %d / B %d / C %d | Onboard: %d/%d | Delivered: %d" % [
-		waiting_at_a,
-		waiting_at_b,
-		waiting_at_c,
-		passengers_on_train,
-		_get_train_capacity(),
-		passengers_delivered
-	]
-	var money_line: String = "Balance: £%d | Fares: £%d | Freight: £%d | Build: £%d | Running: £%d | Fleet: £%d" % [
-		money,
-		passengers_delivered * TICKET_PRICE,
-		freight_income,
-		total_construction_cost,
-		total_operating_cost + freight_operating_cost,
-		total_vehicle_cost
-	]
-
-	if GameSettings.use_compact_header():
-		instructions.text = "%s\nBalance: £%d | %s" % [status_line, money, waiting_line]
-		instructions.tooltip_text = money_line
-		return
-
-	instructions.tooltip_text = ""
-	instructions.text = (
-		"Left-drag: automatic track | Right-drag/hold: remove"
-		+ " | Short right-click: cancel | %s: Remove tool" % InputActions.key_label(InputActions.SELECT_REMOVE)
-		+ " | %s: pause | %s: cancel" % [
-			InputActions.key_label(InputActions.TOGGLE_PAUSE),
-			InputActions.key_label(InputActions.CANCEL)
-		]
-		+ "\n" + status_line
-		+ "\n" + waiting_line
-		+ "\n" + money_line
-	)
+	if header_controls != null: header_controls.refresh()
+	instructions.mouse_filter = Control.MOUSE_FILTER_PASS
+	instructions.tooltip_text = "Left-drag: lay track. Right-drag/hold: remove. Short right-click: reset to Connect track. %s: Remove. %s: pause. %s: cancel." % [InputActions.key_label(InputActions.SELECT_REMOVE), InputActions.key_label(InputActions.TOGGLE_PAUSE), InputActions.key_label(InputActions.CANCEL)]
+	instructions.text = "%s | %s | Cell %d,%d | Build £%d%s" % [status, direction, hovered_cell.x, hovered_cell.y, preview_cost, affordability]
+	instructions.tooltip_text = instructions.text + "\n" + instructions.tooltip_text
+	instructions.max_lines_visible = 1
+	instructions.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 
 
 func _on_viewport_size_changed() -> void:
@@ -808,8 +775,9 @@ func _on_viewport_size_changed() -> void:
 func _apply_header_mode() -> void:
 	var compact: bool = GameSettings.use_compact_header()
 	header_title.visible = not compact
+	if header_controls != null: header_controls.apply_layout(compact)
 	header_toolbar.add_theme_constant_override("h_separation", 4 if compact else 8)
-	instructions.mouse_filter = Control.MOUSE_FILTER_PASS if compact else Control.MOUSE_FILTER_IGNORE
+	instructions.mouse_filter = Control.MOUSE_FILTER_PASS
 
 	if objective_progress != null:
 		objective_progress.visible = not compact
@@ -3340,7 +3308,7 @@ func _setup_toolbar_icons() -> void:
 		curve_button: ["track_draw", "Draw track"],
 		pause_button: ["pause", "Pause or resume simulation"],
 		save_button: ["save", "Save game"],
-		load_button: ["load", "Load latest save"],
+		load_button: ["load", "Load game from a save slot"],
 		folder_button: ["save_folder", "Open save folder"],
 		backup_button: ["history", "Load previous save"],
 		switch_button: ["switch", "Switch tool"],
@@ -3382,7 +3350,8 @@ func _setup_toolbar_icons() -> void:
 	header_toolbar.draw.connect(func() -> void:
 		header_toolbar.draw_style_box(ribbon, Rect2(Vector2(-6, -6), header_toolbar.size + Vector2(12, 12))))
 	header_toolbar.resized.connect(header_toolbar.queue_redraw)
-	header_toolbar.move_child(clock_label, header_toolbar.get_child_count() - 1)
+	header_controls = HeaderControls.new()
+	header_controls.configure(self)
 	straight_button.tooltip_text = "Connect track — drag between two points; automatic diagonal and platform approaches"
 	curve_button.tooltip_text = "Draw track — hold left mouse and change direction; bends are automatic"
 	_update_toolbar()
@@ -4025,7 +3994,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
+	return (header_controls != null and header_controls.accounts_dialog.visible) or (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()

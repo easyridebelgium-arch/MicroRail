@@ -13,15 +13,19 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings, alert acknowledgement/persistence and optional incident slowdown. Unified waiting inspection is implemented. |
-| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; waiting-area/amenity upgrades, transfers, satisfaction, processing chains and growth/scenario rules remain. |
+| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; Transfers, satisfaction, demand balancing, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Latest usability update:** four independent manual game slots with separate backups,
-a slot chooser and fresh-game action are implemented; the existing save is Slot 1.
+**Latest usability update:** grouped ribbon, compact status/Accounts and summary-first
+train inspection with expandable reservation details are implemented. Four independent
+manual game slots retain separate backups;
+the slot chooser and fresh-game action remain available. The existing save is Slot 1.
 See [save slots](SAVE_SLOTS.md). Periodic autosaves remain Phase 2C work.
 Toolbar refinement instructions are in the [Krita guide](../assets/ui/toolbar/KRITA_GUIDE.md).
 
-**Next implementation:** Phase 2A passenger transfers and satisfaction (waiting-area amenities are done); demand
+**Next implementation:** continue the current UI clarity workstream below: remember
+Map/Goals visibility and standardize station/industry inspectors. Then resume
+Phase 2A passenger transfers and satisfaction (waiting-area amenities are done); demand
 factors follow. Direct passenger
 origins/destinations, per-destination queues, through riders and destination-only
 fares are now implemented; see [passenger destinations](PASSENGER_DESTINATIONS.md).
@@ -37,10 +41,12 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation passed all 73 headless suites in Godot 4.6.3,
+complete. The latest cloud validation passed 75 existing headless suites and 42 new UI clarity
+checks in Godot 4.6.3,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
-departures, blocked-departure accounting and version-25 destination/dispatch save/load, passenger conservation and four independent manual slots. Earlier gameplay
+departures, blocked-departure accounting and destination/dispatch save/load, passenger conservation, four independent manual slots,
+version-26 station amenities, rename migration and the new header/inspector layouts. Earlier gameplay
 updates were also tested in Godot 4.7.stable.
 Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
@@ -62,6 +68,35 @@ station's waiting limit and passenger arrivals by a small, saved percentage (sav
 game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
 `LegacyMigration` copies saves and settings from the old `Trainz` user-data folder into the new `MicroRail`
 one (copy only, never overwrites, old folder left intact); see [save slots](SAVE_SLOTS.md). All 75 headless suites pass (run `godot --import` once after a fresh clone).
+
+## Current-stage UI enhancements — Phase 1C / Phase 2A
+
+These twelve improvements are now part of the current workstream. Ship small,
+verified batches alongside gameplay; retain the authoritative graph, reservations,
+fixed clock, accessibility and atomic saves. Presentation must not alter movement
+rules or hide actionable waiting causes. First batch: grouped ribbon, compact status/
+Accounts and summary-first train inspection. See [UI clarity](UI_CLARITY.md).
+
+| Improvement | Current status and next acceptance point |
+| --- | --- |
+| Grouped toolbar | Implemented: Construction, Operations, Inspection, Games/Settings with supplied separators. Pause/Speed and Save/Load remain adjacent. Flat controls wrap independently; compact mode reduces button size so 200% UI scale still leaves map space. |
+| Compact status bar | Implemented: clock, balance, session operating profit, delivered passengers and Accounts. Detailed revenue/spend/queue figures move to a paused, scrollable Accounts window. Historical dashboard graphs follow measured metrics. |
+| Collapsible panels | Map and Goals already toggle. Next: remember their visibility in player preferences across sessions/slots, keep toggles synchronized and test small-window layouts. |
+| Consistent inspectors | Train overview/advice/actions now precede expandable detail. Next: apply shared spacing, headings and overview/action/detail hierarchy to station and industry panels; retain their existing upgrade/loading controls. |
+| Clear waiting explanations | Implemented first batch: current blocker identity in the summary and direct Inspect blocking train action; reservation detail collapses independently. Retain honest stale-allocation warnings and actionable manual-stop/route/dwell explanations. More natural stop/block labels can follow. |
+| Construction feedback near cursor | Planned current-stage batch: price, valid/invalid symbols, cause and affected-service count beside the ghost, clamped to the viewport. Keep full details in Overlays and do not claim predictive conflicts without authority evidence. |
+| Route colours and labels | Planned: stable service colour plus short text identity in Routes, trains, overlays and inspectors. Do not use colour alone or change routing to match visuals. Persist identity choices with validated service definitions. |
+| Readable tooltips | Existing action/shortcut tooltips retained; Accounts, profit, groups, detail toggle and blocker actions now explain their meaning. Next: consistent concise descriptions and remapped shortcuts wherever a binding exists, with a short hover delay and accessible names. |
+| Accessible selection states | Existing PNG states, white selected underline, focus ring and palette options retained. Next: audit every signal state and preview for a distinct shape/text cue, including high contrast and colour-blind modes; operational state must never rely on colour alone. |
+| Quieter notifications | Existing notices and Problems/incident centre retained. Planned polish: small success messages, persistent prominent actionable incidents, clear jump actions and acknowledgement; keep slowdown optional and avoid repeated duplicate alerts. |
+| Save-slot previews | Four manual slots already work. Planned: safe read-only map thumbnails, game time and balance so players recognize each saved game; failed metadata/thumbnail reads must not change gameplay or prevent backup recovery. |
+| Branded title screen | Logo uploaded at `assets/ui/branding/game_logo.png`. Planned: Continue, Load Game, New Game, Settings and Quit; validate Continue's target slot and provide real loading progress only where measurable. Optional small gameplay logo must not displace useful map/toolbar space. |
+
+Use one inherited visual theme for readable typography, spacing, panel borders
+and focus indication. Keep pixel-art icons/borders; retain a clear small text font.
+Do not flatten the ribbon into one image or bake live speed/counter text into assets.
+New presentation batches must test at 100–200% UI scale, in smaller windows and
+fullscreen, and preserve existing shortcuts, saves and physical train positions.
 
 **Resume checkpoint:** maximized startup, adaptive window filling and saved
 fullscreen (Settings/F11) are implemented and confirmed working by the player.

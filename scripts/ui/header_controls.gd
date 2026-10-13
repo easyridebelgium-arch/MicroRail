@@ -1,0 +1,111 @@
+extends RefCounted
+## Presentation only: rearrange controls and summarize existing simulation totals.
+const Art = preload("res://scripts/ui/toolbar_art.gd")
+var game: Node
+var status_bar: HFlowContainer
+var balance: Label
+var profit: Label
+var deliveries: Label
+var accounts_button: Button
+var accounts_dialog: AcceptDialog
+var accounts_text: Label
+var separators: Array[TextureRect] = []
+
+func configure(owner_game: Node) -> void:
+	game = owner_game
+	var groups := {
+		"Construction": [game.straight_button, game.curve_button, game.switch_button, game.remove_button, game.signal_button, game.waypoint_button],
+		"Operations": [game.pause_button, game.speed_selector, game.routes_button, game.fleet_button, game.traffic_button],
+		"Inspection": [game.inspect_button, game.reservation_button, game.inspection_button, game.problems_button, game.find_button],
+		"Games and settings": [game.save_button, game.load_button, game.backup_button, game.folder_button, game.settings_button],
+	}
+	var index := 0
+	for group in groups:
+		if index > 0:
+			var separator := TextureRect.new()
+			separator.texture = Art.texture("details/group_separator.png", Vector2i(4, 32))
+			separator.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			separator.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			separator.custom_minimum_size = Vector2(8, 64)
+			separator.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			separator.tooltip_text = group + " controls"
+			separator.mouse_filter = Control.MOUSE_FILTER_PASS
+			game.header_toolbar.add_child(separator)
+			game.header_toolbar.move_child(separator, index)
+			separators.append(separator)
+			index += 1
+		for control in groups[group]:
+			control.set_meta("toolbar_group", group)
+			game.header_toolbar.move_child(control, index)
+			index += 1
+	status_bar = HFlowContainer.new()
+	status_bar.name = "StatusBar"
+	status_bar.add_theme_constant_override("h_separation", 18)
+	status_bar.add_theme_constant_override("v_separation", 4)
+	game.header_box.add_child(status_bar)
+	game.header_box.move_child(status_bar, game.instructions.get_index())
+	game.clock_label.reparent(status_bar)
+	for field in ["balance", "profit", "deliveries"]:
+		var label := Label.new()
+		label.mouse_filter = Control.MOUSE_FILTER_PASS
+		status_bar.add_child(label)
+		set(field, label)
+	profit.tooltip_text = "Operating profit = passenger fares + freight income − train running costs. Capital purchases and objective rewards are excluded."
+	accounts_button = Button.new()
+	accounts_button.text = "Accounts"
+	accounts_button.accessibility_name = "Company accounts"
+	accounts_button.tooltip_text = "View company income, running costs, purchases and station queues"
+	accounts_button.pressed.connect(open_accounts)
+	status_bar.add_child(accounts_button)
+	accounts_dialog = AcceptDialog.new()
+	accounts_dialog.title = "Company accounts"
+	accounts_dialog.ok_button_text = "Close"
+	accounts_dialog.exclusive = true
+	accounts_dialog.theme = game.header_box.theme
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	accounts_dialog.add_child(scroll)
+	accounts_text = Label.new()
+	accounts_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	accounts_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(accounts_text)
+	game.get_node("Interface").add_child(accounts_dialog)
+	refresh()
+
+func apply_layout(compact: bool) -> void:
+	var side := 48 if compact else 64
+	for child in game.header_toolbar.get_children():
+		if child is Button and child.has_meta("toolbar_group"):
+			child.custom_minimum_size = Vector2(84 if child == game.speed_selector else side, side)
+			if child != game.speed_selector:
+				var icon_size := (24 if compact else 32) if child == game.problems_button else (32 if compact else 48)
+				child.add_theme_constant_override("icon_max_width", icon_size)
+	for separator in separators: separator.custom_minimum_size.y = side
+	for child in status_bar.get_children(): child.add_theme_font_size_override("font_size", 14 if compact else 16)
+	refresh()
+
+func refresh() -> void:
+	var fares: int = game.passengers_delivered * game.TICKET_PRICE
+	var running: int = game.total_operating_cost + game.freight_operating_cost
+	var operating: int = fares + game.freight_income - running
+	game.clock_label.text = game.game_clock_text()
+	balance.text = "Balance £%d" % game.money
+	profit.text = ("Op. profit £%d" if game.GameSettings.use_compact_header() else "Operating profit £%d") % operating
+	deliveries.text = ("Delivered %d" if game.GameSettings.use_compact_header() else "Delivered %d passengers") % game.passengers_delivered
+	if not accounts_dialog.visible: return
+	var amenity_value := 0
+	for station in game.Amenities.STATIONS:
+		for id in game.amenities.owned[station]: amenity_value += int(game.Amenities.DEFS[id].price)
+	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: A %d / B %d / C %d\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes capital purchases, construction refunds, starting cash and objective rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), game.waiting_at_a, game.waiting_at_b, game.waiting_at_c, game.passengers_delivered, game.logs_delivered]
+
+func open_accounts() -> void:
+	game._cancel_right_gesture()
+	game.is_dragging = false
+	game.is_panning = false
+	game.build_plan.clear()
+	game.demolition_cells.clear()
+	game.demolition_blocked.clear()
+	game.paused = true
+	game._update_toolbar()
+	accounts_dialog.popup_centered_clamped(Vector2i(560, 500), 0.95)
+	refresh()

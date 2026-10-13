@@ -48,7 +48,7 @@ func _run() -> void:
 	check(is_equal_approx(game.camera.zoom.x, 0.5), "reset gives the compensated zoom at 200%")
 
 	check(not game.header_title.visible and Settings.use_compact_header(), "200% uses the compact header")
-	check(game.instructions.text.count("\n") == 1, "compact status text is two lines")
+	check(game.instructions.text.count("\n") == 0 and game.header_controls.status_bar.visible, "compact feedback is one line with a separate live status bar")
 
 	# The Apply button must stay reachable at the largest scale.
 	game.settings_dialog.open_dialog()

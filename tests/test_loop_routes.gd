@@ -158,7 +158,10 @@ func _run() -> void:
 	check(not game.route_connected and game.train_position == game._cell_center(game.STATION_A), "Next lap notices the gap ahead only after arriving at A")
 	game.tracks[Vector2i(14, 8)] = false
 	game._check_route()
-	check(not game._passenger_service_is_active() and game.route_distance == 0, "Withdrawal finishes its lap and parks at A")
+	# Older C-bound riders may now beat newer A-bound riders at B. Withdrawal
+	# must finish those accepted through journeys after the track is repaired.
+	advance_until(game, func() -> bool: return not game._passenger_service_is_active())
+	check(game.route_distance == 0 and game.passengers_on_train == 0, "Withdrawal completes accepted journeys and parks empty at A")
 	game._open_routes_editor()
 	await process_frame
 	editor.waypoint_leg.select(2)

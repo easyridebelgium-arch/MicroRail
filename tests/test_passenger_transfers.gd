@@ -95,7 +95,7 @@ func run() -> void:
 	check(game.passenger_demand.interchange("b", ["a", "b"], manifest) == 8 and game.waiting_at_b == 108, "full waiting area never discards transferred riders")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(4)))
 	var migrated: Dictionary = game.SaveMigrations.migrate(dict_version(saved, 28))
-	check(migrated.ok and migrated.data.version == 29 and migrated.data.demand == saved.demand, "v28 migration preserves demand and positions")
+	check(migrated.ok and migrated.data.version == game.SaveMigrations.CURRENT_VERSION and migrated.data.demand == saved.demand, "v28 migration preserves demand and positions")
 	game.queue_free()
 	await process_frame
 	var baseline: Dictionary = await frame_case(30)

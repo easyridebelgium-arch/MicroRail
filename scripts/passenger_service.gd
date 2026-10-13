@@ -93,7 +93,7 @@ func advance(game: Node, delta: float) -> void:
 		if enabled and not returning:
 			var origin: String = configuration.stops[stop_index]
 			var future := Demand.future_stops(configuration.stops, stop_index, forward, configuration.get("mode", "shuttle"))
-			game.passenger_demand.board(origin, game.PassengerJourneys.boarding(game._passenger_network(), origin, future), FleetData.capacity(train), passenger_destinations)
+			game.passenger_demand.board(origin, game.PassengerJourneys.boarding(game._passenger_network(), origin, future), FleetData.capacity(train), passenger_destinations, game.sim_clock.tick)
 		boarding = false
 	game._maybe_reroute_platform(key)
 	var departure: Dictionary = game._departure_context(key)
@@ -111,7 +111,7 @@ func advance(game: Node, delta: float) -> void:
 			var arrived := Demand.alight(passenger_destinations, origin)
 			game.passengers_delivered += arrived
 			game.money += arrived * game.TICKET_PRICE
-			game.passenger_demand.return_to(origin, passenger_destinations)
+			game.passenger_demand.return_to(origin, passenger_destinations, game.sim_clock.tick)
 			returning = false
 			held = true
 			enabled = false

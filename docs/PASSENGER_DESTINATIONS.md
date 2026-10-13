@@ -14,9 +14,10 @@ New arrivals use the owned simulation RNG; its state is saved and restored.
   At B on the outward trip, B→C riders can board; B→A riders wait for the return.
 - A Loop can board for destinations beyond its closing first stop. A train may
   therefore arrive at its first stop with through passengers still aboard.
-- Boarding prioritizes the upcoming stop order, respects the complete train's
-  remaining seat capacity. Transfer riders board only when a forward stop makes
-  progress along a journey with the fewest changes. FIFO/age fairness is a later refinement.
+- Boarding prioritizes the oldest eligible station arrivals and respects the
+  complete train's remaining seat capacity. Equal-age groups use upcoming stop
+  order. Transfer riders board only when a forward stop makes progress along a
+  journey with the fewest changes. Unserved demand remains queued.
 - Fares and the delivered counter increase only when the destination is reached.
   Flat £5 fares remain; distance pricing, classes and satisfaction are later work.
 - Withdrawal stops taking new riders and completes accepted journeys. A Loop may
@@ -52,8 +53,7 @@ available seats or punctuality.
 
 On the current three-station map, A–B plus B–C enables A→C via B. Riders keep C as
 their final destination while aboard A–B. Physically arriving at B moves them into
-B's C-bound queue; they compete for seats on B–C under the existing upcoming-stop
-boarding order. No fare or delivered count is awarded at B. The £5 fare is paid
+B's C-bound queue; they compete for seats on B–C in oldest-eligible-first order. No fare or delivered count is awarded at B. The £5 fare is paid
 once at C. Transfer arrivals can overflow a full waiting area without losing riders;
 new random arrivals remain capped. There is no walking delay or timed-connection hold.
 
@@ -66,14 +66,16 @@ destinations to the physically reached departure queue, as before.
 
 Click a station for destination counts and **direct service**, **change at Station B**
 or **no enabled connection**. Train inspectors mark off-route final destinations
-with **change trains**. Transfer events enter the existing event log. Passenger-age
-fairness, crowding/punctuality satisfaction, larger-map journey leg assignment and
+with **change trains**. Transfer events enter the existing event log. Crowding/punctuality satisfaction, larger-map journey leg assignment and
 protected timed connections remain later Phase 2A work.
 
 ## Persistence and invariants
 
-Destination queues and onboard manifests began in version 25. Save version **29**
-also permits a final destination outside the current train’s stops, for transfers.
+Destination queues and onboard manifests began in version 25. Version 29 permits
+a final destination outside the current train’s stops, for
+transfers. Save version **30** adds grouped station-arrival ticks for waiting-age
+priority. Version 29 queues start their unknown waiting ages at the saved clock,
+without inventing old arrival times or changing counts/positions.
 Version 28 upgrades without changing counts, train positions or route instructions. Aggregate
 waiting/onboard counters are derived views and cross-checked against saved detail.
 Invalid destinations, fractional/negative counts, mismatched totals and train
@@ -96,3 +98,25 @@ journey, final-only fares, capacity/queue conservation, withdrawn connections,
 waiting-area overflow, inspector explanations and version-28 migration. Its fixed
 clock fixture compares queues, onboard manifests, cash and the event stream at
 30, 60 and 120 FPS with identical results (26 checks).
+
+## Waiting-age fairness
+
+Available seats go to the oldest passengers who can use this departure, across
+all eligible final destinations. Equal arrival ticks retain the existing upcoming
+stop order. A partially boarded group keeps its original arrival tick; newer riders
+to the same destination cannot overtake it. Unreachable or wrong-direction demand
+continues waiting without blocking other eligible riders.
+
+The station inspector shows **Oldest wait** per destination in simulation seconds.
+It grows with the fixed simulation clock, including accelerated play, and stops
+while paused. Arrival groups are saved, so reloading does not reset priority.
+Passengers reaching an interchange or physically returning after recovery join
+that station's queue at the current tick, behind its existing older groups. This
+measures the current station wait, not total journey time; satisfaction and
+end-to-end passenger-history tracking follow separately.
+
+Counts remain aggregated; no individual passenger nodes or RNG draws are added.
+`test_passenger_age.gd` covers older versus newer demand, partial boarding,
+unserved demand, equal-age ties, interchange ordering, age-preserving saves,
+invalid/duplicate/future cohorts, legacy migration, station wording and equal
+30/60/120 FPS outcomes (21 checks).

@@ -30,8 +30,10 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 29, including amenities, loan state, route appearance,
-alert acknowledgements and final destinations carried by connecting trains.
+schema is version 30, including amenities, loan state, route appearance,
+alert acknowledgements, final destinations carried by connecting trains, and
+station-arrival groups for boarding priority. Version 29
+initializes unknown waiting ages at its saved clock without changing counts.
 Version 28 preserves all counts/positions during migration; version 27 also gains
 default presentation data. Slots choose storage
 locations rather than changing simulation rules.

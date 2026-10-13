@@ -1278,7 +1278,7 @@ func _generate_passengers(delta: float) -> void:
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
 		for key in PassengerDemand.STATIONS:
-			passenger_demand.generate(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), amenities.queue_limit(key), sim_rng)
+			passenger_demand.generate(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), amenities.queue_limit(key), sim_rng, sim_clock.tick)
 
 func _passenger_network() -> Dictionary:
 	var available: Dictionary = {}
@@ -1294,7 +1294,7 @@ func _passenger_network() -> Dictionary:
 	return PassengerJourneys.graph(available)
 
 func _transfer_passengers(key: String, station: String, manifest: Dictionary) -> int:
-	var changed: int = passenger_demand.interchange(station, services[key].stops, manifest)
+	var changed: int = passenger_demand.interchange(station, services[key].stops, manifest, sim_clock.tick)
 	if changed > 0:
 		_record_event(EventLog.PASSENGERS_TRANSFERRED, key, {"stop": station, "passengers": changed})
 	return changed
@@ -1304,7 +1304,7 @@ func _board_passengers() -> void:
 	var config: Dictionary = services.passenger
 	var station: String = config.stops[passenger_stop_index]
 	var future := PassengerDemand.future_stops(config.stops, passenger_stop_index, travelling_to_b, config.get("mode", "shuttle"))
-	passenger_demand.board(station, PassengerJourneys.boarding(_passenger_network(), station, future), _get_train_capacity(), passenger_destinations)
+	passenger_demand.board(station, PassengerJourneys.boarding(_passenger_network(), station, future), _get_train_capacity(), passenger_destinations, sim_clock.tick)
 
 func _unload_passengers(station: String) -> int:
 	var arrived := PassengerDemand.alight(passenger_destinations, station)
@@ -1402,7 +1402,7 @@ func _save_game(slot: int = 0) -> bool:
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
 		"presentation": _saved_presentation(),
-		"demand": {"queues": passenger_demand.queues.duplicate(true), "primary": passenger_destinations.duplicate(true)},
+		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
 		"passenger_services": _saved_passenger_services(),
 		"signals": _saved_signals(),
@@ -1581,7 +1581,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
 	if not Presentation.valid(data.get("presentation"), data.services): return false
 	var state: Dictionary = data["state"]
-	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger): return false
+	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger, int(sim.clock.tick)): return false
 
 	for field in SAVE_FIELDS:
 		if not state.has(field):
@@ -1827,8 +1827,7 @@ func _load_game(save_path: String = "") -> bool:
 			TYPE_INT: set(field, int(state[field]))
 			TYPE_FLOAT: set(field, float(state[field]))
 			TYPE_BOOL: set(field, state[field])
-	for station in PassengerDemand.STATIONS:
-		passenger_demand.queues[station] = PassengerDemand.normalize(data.demand.queues[station])
+	passenger_demand.restore_state(data.demand)
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
 	amenities.load_save(data.amenities)
 	loans.restore_state(data.loans)
@@ -3112,10 +3111,12 @@ func _passenger_service_is_active() -> bool:
 	if passenger_returning or passenger_service_enabled:
 		return true
 
-	# A withdrawn train completes its round trip before stopping.
+	# A withdrawn train completes accepted journeys, including through riders
+	# that still need another Loop lap after its first stop.
 	var parked_at_a: bool = (
 		route_distance <= 0.001
 		and travelling_to_b
+		and passengers_on_train == 0
 	)
 
 	return not parked_at_a
@@ -3820,7 +3821,7 @@ func _passenger_target_distance() -> float:
 func _return_onboard_passengers() -> void:
 	var station: String = services.passenger.stops[passenger_stop_index]
 	_unload_passengers(station)
-	passenger_demand.return_to(station, passenger_destinations)
+	passenger_demand.return_to(station, passenger_destinations, sim_clock.tick)
 
 func _update_amenity_buttons(station: String) -> void:
 	for id in Amenities.ORDER:
@@ -3863,7 +3864,7 @@ func _destination_queue_text(station: String) -> String:
 		var connection := " — no enabled connection"
 		if journey.size() == 2: connection = " — direct service"
 		elif journey.size() > 2: connection = " — change at " + ServiceRoutes.STATIONS[journey[1]].name
-		lines.append("To %s: %d%s" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), connection])
+		lines.append("To %s: %d%s | Oldest wait %.1fs" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), connection, passenger_demand.oldest_seconds(station, sim_clock.tick, destination)])
 	lines.append("Connections use enabled, unheld services with complete track; departure times and free seats are not guaranteed.")
 	return "\n".join(lines)
 

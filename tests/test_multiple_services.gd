@@ -231,9 +231,9 @@ func _run() -> void:
 	check(game.passenger_services.is_empty() and game.train_position == primary_position, "v21 migration preserves original journey and adds no extra trains")
 	game.passenger_service_enabled = false
 	for step in range(1800):
-		if game.route_distance <= 0.001 and game.passenger_stop_index == 0: break
+		if not game._passenger_service_is_active(): break
 		tick(game)
-	check(not game._passenger_service_is_active(), "Original service can withdraw after additional service removal")
+	check(not game._passenger_service_is_active() and game.passengers_on_train == 0, "Original service completes accepted journeys and withdraws empty after additional service removal")
 	game.start_passenger_service(old_id, "c")
 	key = Fleet.find(game.fleet, old_id).service
 	configuration = game.services.duplicate(true)

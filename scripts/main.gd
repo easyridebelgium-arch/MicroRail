@@ -24,6 +24,7 @@ const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
+const Amenities = preload("res://scripts/core/amenities.gd")
 const Platforms = preload("res://scripts/core/platforms.gd")
 const SingleTrack = preload("res://scripts/core/single_track.gd")
 const Headway = preload("res://scripts/core/headway.gd")
@@ -231,6 +232,8 @@ var right_start_point: Vector2 = Vector2.ZERO
 var right_start_cell: Vector2i = Vector2i.ZERO
 
 var passenger_demand = PassengerDemand.new()
+var amenities = Amenities.new()
+var amenity_buttons: Dictionary = {}
 var passenger_destinations: Dictionary = {}
 var waiting_at_a: int:
 	get: return passenger_demand.waiting("a")
@@ -1216,7 +1219,7 @@ func _generate_passengers(delta: float) -> void:
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
 		for key in PassengerDemand.STATIONS:
-			passenger_demand.generate(key, PASSENGERS_PER_BATCH, MAX_STATION_QUEUE, sim_rng)
+			passenger_demand.generate(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), amenities.queue_limit(key), sim_rng)
 
 func _board_passengers() -> void:
 	if not passenger_service_enabled or passenger_returning: return
@@ -1318,6 +1321,7 @@ func _save_game(slot: int = 0) -> bool:
 	var data: Dictionary = {
 		"version": SAVE_VERSION,
 		"runtime": _saved_runtime_routes(),
+		"amenities": amenities.to_save(),
 		"demand": {"queues": passenger_demand.queues.duplicate(true), "primary": passenger_destinations.duplicate(true)},
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
 		"passenger_services": _saved_passenger_services(),
@@ -1493,6 +1497,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 		if train_x > _cell_center(STATION_B).x:
 			return false
 
+	if not Amenities.valid_save(data.get("amenities")): return false
 	var state: Dictionary = data["state"]
 	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger): return false
 
@@ -1743,6 +1748,7 @@ func _load_game(save_path: String = "") -> bool:
 	for station in PassengerDemand.STATIONS:
 		passenger_demand.queues[station] = PassengerDemand.normalize(data.demand.queues[station])
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
+	amenities.load_save(data.amenities)
 	route_distance = loaded_distance
 	is_dragging = false
 	_update_train_transform()
@@ -2192,6 +2198,12 @@ func _setup_station_inspector() -> void:
 	speed_upgrade_button.focus_mode = Control.FOCUS_NONE
 	speed_upgrade_button.pressed.connect(_upgrade_speed)
 	content.add_child(speed_upgrade_button)
+	for amenity_id in Amenities.ORDER:
+		var amenity_button := Button.new()
+		amenity_button.focus_mode = Control.FOCUS_NONE
+		amenity_button.pressed.connect(_buy_amenity.bind(amenity_id))
+		content.add_child(amenity_button)
+		amenity_buttons[amenity_id] = amenity_button
 	freight_rule_label = Label.new()
 	freight_rule_label.text = "Freight departure rule"
 	content.add_child(freight_rule_label)
@@ -2280,8 +2292,10 @@ func _update_station_inspector() -> void:
 	service_button.show()
 
 	if selected_station == FOREST_SITE or selected_station == CARGO_TERMINAL:
+		_update_amenity_buttons("")
 		_update_freight_inspector()
 		return
+	_update_amenity_buttons(_station_key(selected_station))
 
 	if not passenger_services.is_empty():
 		capacity_upgrade_button.hide()
@@ -3805,8 +3819,40 @@ func _return_onboard_passengers() -> void:
 	_unload_passengers(station)
 	passenger_demand.return_to(station, passenger_destinations)
 
+func _update_amenity_buttons(station: String) -> void:
+	for id in Amenities.ORDER:
+		var button: Button = amenity_buttons[id]
+		button.visible = station != ""
+		if station == "": continue
+		var def: Dictionary = Amenities.DEFS[id]
+		if amenities.has(station, id):
+			button.text = "%s: built" % def.name
+			button.disabled = true
+			button.tooltip_text = "Queue +%d, arrivals +%d%%." % [int(def.queue), int(def.demand)]
+			continue
+		var reason: String = amenities.refusal(station, id, money)
+		button.text = "%s (£%d)" % [def.name, int(def.price)]
+		button.disabled = not paused or reason != ""
+		button.tooltip_text = "Pause the game to build." if not paused else (reason if reason != "" else "Waiting limit +%d, passenger arrivals +%d%%." % [int(def.queue), int(def.demand)])
+
+func _buy_amenity(id: String) -> void:
+	if selected_station in [FOREST_SITE, CARGO_TERMINAL]: return
+	if not paused:
+		_show_notice("Pause the game before building.")
+		return
+	var station := _station_key(selected_station)
+	var reason: String = amenities.refusal(station, id, money)
+	if reason != "":
+		_show_notice(reason)
+		return
+	var price: int = amenities.buy(station, id, money)
+	money -= price
+	_record_event(EventLog.UPGRADE_BOUGHT, "passenger", {"kind": "amenity " + id, "station": station, "price": price})
+	_show_notice("%s built at %s: waiting limit %d, arrivals +%d%%." % [Amenities.DEFS[id].name, ServiceRoutes.STATIONS[station].name, amenities.queue_limit(station), amenities.demand_bonus(station)])
+	_update_station_inspector()
+
 func _destination_queue_text(station: String) -> String:
-	var lines: PackedStringArray = ["Waiting capacity: %d / %d" % [_waiting(station), MAX_STATION_QUEUE]]
+	var lines: PackedStringArray = ["Waiting capacity: %d / %d" % [_waiting(station), amenities.queue_limit(station)]]
 	for destination in PassengerDemand.STATIONS:
 		if destination == station: continue
 		var available := false

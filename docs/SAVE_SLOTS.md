@@ -30,7 +30,7 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema remains version 25: slots change storage locations, not simulation data.
+schema is version 26 (amenities added later): slots change storage locations, not simulation data.
 Each write uses that slot's temporary file, checks write/backup errors, then
 renames it into place. Failed saves retain the selected session/slot; failed loads
 validate before applying state and cannot switch the current slot. Errors appear

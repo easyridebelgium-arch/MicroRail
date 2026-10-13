@@ -21,8 +21,8 @@ a slot chooser and fresh-game action are implemented; the existing save is Slot 
 See [save slots](SAVE_SLOTS.md). Periodic autosaves remain Phase 2C work.
 Toolbar refinement instructions are in the [Krita guide](../assets/ui/toolbar/KRITA_GUIDE.md).
 
-**Next implementation:** Phase 2A station waiting-area capacity upgrades and demand/
-amenity foundations, then passenger transfers and satisfaction. Direct passenger
+**Next implementation:** Phase 2A passenger transfers and satisfaction (waiting-area amenities are done); demand
+factors follow. Direct passenger
 origins/destinations, per-destination queues, through riders and destination-only
 fares are now implemented; see [passenger destinations](PASSENGER_DESTINATIONS.md).
 Directional departure timetables remain implemented. Arrival targets, contract
@@ -54,10 +54,14 @@ is required to continue gameplay development. See
 [toolbar graphics](../assets/ui/toolbar/README.md). This presentation update does not
 advance or reorder the gameplay milestones above.
 
+**Amenities checkpoint:** stations can buy a Shelter, Waiting room and Kiosk. Each raises that
+station's waiting limit and passenger arrivals by a small, saved percentage (save version 26); see
+[station amenities](STATION_AMENITIES.md). Transfers and satisfaction are next.
+
 **Rename checkpoint:** the project is now **MicroRail** (formerly "Trainz", a name already in use by another
 game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
 `LegacyMigration` copies saves and settings from the old `Trainz` user-data folder into the new `MicroRail`
-one (copy only, never overwrites, old folder left intact); see [save slots](SAVE_SLOTS.md). All 74 headless suites pass (run `godot --import` once after a fresh clone).
+one (copy only, never overwrites, old folder left intact); see [save slots](SAVE_SLOTS.md). All 75 headless suites pass (run `godot --import` once after a fresh clone).
 
 **Resume checkpoint:** maximized startup, adaptive window filling and saved
 fullscreen (Settings/F11) are implemented and confirmed working by the player.

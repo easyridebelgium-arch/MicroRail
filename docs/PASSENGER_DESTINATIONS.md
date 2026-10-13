@@ -29,11 +29,11 @@ Station information shows waiting counts by destination, enabled direct-service
 availability, waiting queue capacity and all aboard passengers destined for that
 station. The train inspector shows its onboard destination counts. Current station
 panel capacity purchases still upgrade the train; the button now says **Train
-capacity**. Station waiting-area and demand/amenity upgrades are next Phase 2A work.
+capacity**. Station waiting-area and demand upgrades are now amenities; see [station amenities](STATION_AMENITIES.md).
 
 ## Capacity and demand
 
-The current waiting limit is 100 per station. New arrivals stop when the queue is
+The base waiting limit is 100 per station (amenities raise it). New arrivals stop when the queue is
 full. Returned recovery passengers may exceed that limit and are never discarded;
 new demand resumes only when room is available. Increasing train capacity does not
 create extra demand. Destinations are initially chosen uniformly from the other

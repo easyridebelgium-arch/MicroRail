@@ -16,6 +16,11 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; Transfers, satisfaction, demand balancing, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
+**Latest UI batch:** cursor-side construction cost/error/refund feedback and consistent
+tooltips are implemented. Eight focused UI/control suites pass, including 25 new
+construction-feedback checks. The preceding full gameplay validation covered 78
+suites; this presentation-only batch does not change the save schema or simulation.
+
 **Latest economy/UI update:** fixed-rate bank loans, accruing interest, automatic
 instalments, arrears and early repayment are implemented ([bank loans](LOANS.md)).
 The initial bank offers use one loan at a time, 1% per game hour and ten hourly
@@ -28,9 +33,11 @@ the slot chooser and fresh-game action remain available. The existing save is Sl
 See [save slots](SAVE_SLOTS.md). Periodic autosaves remain Phase 2C work.
 Toolbar refinement instructions are in the [Krita guide](../assets/ui/toolbar/KRITA_GUIDE.md).
 
-**Next implementation:** continue current UI clarity with cursor-side construction
-feedback and consistent tooltip descriptions/remapped shortcuts. Map/Goals visibility
-and station/industry overview/actions/details are implemented. Then resume
+**Next implementation:** continue UI enhancements with stable service colours and
+short route labels, followed by notification refinements and save-slot previews.
+Cursor-side construction feedback, consistent tooltips, remembered panels and
+facility overview/actions/details are implemented. Continue these UI batches
+alongside the remaining gameplay work, then resume
 Phase 2A passenger transfers and satisfaction (waiting-area amenities are done); demand
 factors follow. Direct passenger
 origins/destinations, per-destination queues, through riders and destination-only
@@ -92,9 +99,9 @@ Accounts and summary-first train inspection. See [UI clarity](UI_CLARITY.md).
 | Collapsible panels | Implemented: Map/Goals visibility persists in shared player preferences across sessions/slots; toggles restore in sync. Existing layout reclaims space when panels are hidden. |
 | Consistent inspectors | Implemented: train and facility overviews precede actions and expandable detail. Station/industry upgrades, amenities and loading rules remain available. Facility Close stays outside scrolling content; sidebar width is scaled once and clamped to the logical viewport. Bank uses the same readable, scrollable dialog theme. |
 | Clear waiting explanations | Implemented first batch: current blocker identity in the summary and direct Inspect blocking train action; reservation detail collapses independently. Retain honest stale-allocation warnings and actionable manual-stop/route/dwell explanations. More natural stop/block labels can follow. |
-| Construction feedback near cursor | Planned current-stage batch: price, valid/invalid symbols, cause and affected-service count beside the ghost, clamped to the viewport. Keep full details in Overlays and do not claim predictive conflicts without authority evidence. |
+| Construction feedback near cursor | Implemented: pointer-side build/switch cost breakdown, refunds, valid/invalid/partial/draft wording, actual placement errors and retained-path service impact. Clamped/flipped inside the logical viewport; ignores input and hides over UI/dialogs. Draft stroke prices are distinct from full-plan validation. Safety/funds are rechecked on commit; no speculative conflict forecasts. |
 | Route colours and labels | Planned: stable service colour plus short text identity in Routes, trains, overlays and inspectors. Do not use colour alone or change routing to match visuals. Persist identity choices with validated service definitions. |
-| Readable tooltips | Existing action/shortcut tooltips retained; Accounts, profit, groups, detail toggle and blocker actions now explain their meaning. Next: consistent concise descriptions and remapped shortcuts wherever a binding exists, with a short hover delay and accessible names. |
+| Readable tooltips | Implemented: consistent action name/description across the ribbon, clear signals/waypoints/slots semantics, current remapped keyboard/mouse bindings where they exist, and 0.4-second hover delay. Existing accessible names/focus retained. Dynamic Pause/Speed controls continue showing current actions and bindings. |
 | Accessible selection states | Existing PNG states, white selected underline, focus ring and palette options retained. Next: audit every signal state and preview for a distinct shape/text cue, including high contrast and colour-blind modes; operational state must never rely on colour alone. |
 | Quieter notifications | Existing notices and Problems/incident centre retained. Planned polish: small success messages, persistent prominent actionable incidents, clear jump actions and acknowledgement; keep slowdown optional and avoid repeated duplicate alerts. |
 | Save-slot previews | Four manual slots already work. Planned: safe read-only map thumbnails, game time and balance so players recognize each saved game; failed metadata/thumbnail reads must not change gameplay or prevent backup recovery. |

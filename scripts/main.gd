@@ -165,6 +165,9 @@ const SAVE_VERSION: int = SaveMigrations.CURRENT_VERSION
 const MAX_CONSTRUCTION_HISTORY: int = 100
 const ToolbarArt = preload("res://scripts/ui/toolbar_art.gd")
 const HeaderControls = preload("res://scripts/ui/header_controls.gd")
+const ConstructionHint = preload("res://scripts/ui/construction_hint.gd")
+const ToolbarTooltips = preload("res://scripts/ui/toolbar_tooltips.gd")
+var construction_hint: PanelContainer
 var header_controls: RefCounted
 const NetworkMap = preload("res://scripts/network_map.gd")
 const ScenarioGoals = preload("res://scripts/scenario_goals.gd")
@@ -791,8 +794,10 @@ func _update_instructions() -> void:
 		problems_button.text = str(problem_rows().size()) if problems_button.has_meta("toolbar_action") else "Problems (%d)" % problem_rows().size()
 
 	if header_controls != null: header_controls.refresh()
+	if construction_hint != null:
+		construction_hint.refresh_at(get_viewport().get_mouse_position(), is_dragging and not _modal_open() and not _mouse_is_over_interface())
 	instructions.mouse_filter = Control.MOUSE_FILTER_PASS
-	instructions.tooltip_text = "Left-drag: lay track. Right-drag/hold: remove. Short right-click: reset to Connect track. %s: Remove. %s: pause. %s: cancel." % [InputActions.key_label(InputActions.SELECT_REMOVE), InputActions.key_label(InputActions.TOGGLE_PAUSE), InputActions.key_label(InputActions.CANCEL)]
+	instructions.tooltip_text = "%s drag: lay track. %s drag/hold: remove; short click resets Connect track. %s: Remove. %s: pause. %s: cancel." % [InputActions.mouse_label(InputActions.BUILD), InputActions.mouse_label(InputActions.RESET_TOOL), InputActions.key_label(InputActions.SELECT_REMOVE), InputActions.key_label(InputActions.TOGGLE_PAUSE), InputActions.key_label(InputActions.CANCEL)]
 	instructions.text = "%s | %s | Cell %d,%d | Build £%d%s" % [status, direction, hovered_cell.x, hovered_cell.y, preview_cost, affordability]
 	instructions.tooltip_text = instructions.text + "\n" + instructions.tooltip_text
 	instructions.max_lines_visible = 1
@@ -3428,6 +3433,9 @@ func _setup_toolbar_icons() -> void:
 	header_toolbar.resized.connect(header_toolbar.queue_redraw)
 	header_controls = HeaderControls.new()
 	header_controls.configure(self)
+	construction_hint = ConstructionHint.new()
+	construction_hint.configure(self)
+	$Interface.add_child(construction_hint)
 	straight_button.tooltip_text = "Connect track — drag between two points; automatic diagonal and platform approaches"
 	curve_button.tooltip_text = "Draw track — hold left mouse and change direction; bends are automatic"
 	_update_toolbar()
@@ -3496,19 +3504,7 @@ func _facility_markers() -> Array[Dictionary]:
 
 
 func _refresh_shortcut_tooltips() -> void:
-	if remove_button != null:
-		remove_button.tooltip_text = "Remove track: left-drag. Or right-drag/hold. Shortcut: " + InputActions.key_label(InputActions.SELECT_REMOVE)
-	inspect_button.tooltip_text = "Inspect trains, stations and industries — %s" % InputActions.key_label(InputActions.TOGGLE_INSPECT)
-	map_button.tooltip_text = "Show or hide the network map — %s" % InputActions.key_label(InputActions.TOGGLE_MAP)
-	goals_button.tooltip_text = "Show or hide scenario objectives — %s" % InputActions.key_label(InputActions.TOGGLE_GOALS)
-	if speed_selector != null:
-		var shortcuts: PackedStringArray = []
-		for index in range(GAME_SPEEDS.size()):
-			shortcuts.append("%s: %d×" % [InputActions.key_label(InputActions.SPEED_ACTIONS[index]), int(GAME_SPEEDS[index])])
-		speed_selector.tooltip_text = "Simulation speed — " + ", ".join(shortcuts) + ". Selecting a speed keeps pause unchanged."
-		for index in range(GAME_SPEEDS.size()):
-			speed_selector.set_item_tooltip(index, InputActions.key_label(InputActions.SPEED_ACTIONS[index]))
-
+	ToolbarTooltips.refresh(self)
 
 func _setup_network_map() -> void:
 	network_map = NetworkMap.new()

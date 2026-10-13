@@ -14,10 +14,11 @@ already on the map in a row, and each ticket pays £5. You start with £1,000 an
 2. Prefer to steer? Use **Draw track**: hold the left mouse button and change direction as you go.
 3. Mistakes: use **Undo** (paused only) or the **Remove** tool (**R**; also right-drag). A short right-click returns to Connect track.
 4. Switches are added automatically at junctions. The **Switch** tool adjusts one by hand.
+5. While dragging, the cursor callout shows track/switch cost, placement problems, refunds and affected services. Draft strokes show their own price; review the full plan in **Overlays**.
 
 ## Minute 6–9: make a route
 1. Open **Routes**. Give the service a name, choose its mode (**Shuttle** goes back and forth, **Loop** circles) and add stops in order.
-2. Leave each stop's platform on **Auto** and the game picks a free platform on arrival.
+2. Leave each stop's platform on **Auto**. The game chooses a platform when applying the route and can choose a free destination platform before departure; it does not switch platforms while approaching.
 3. Press **Apply**. If the route is not connected, the editor says what is missing.
 4. Open **Fleet** to buy, name or assign more trains.
 
@@ -78,3 +79,6 @@ route editor, and **signals** where trains share track.
 | **Settings** | interface scale, colours and key bindings |
 
 Upgrades, amenities and undo only work while paused. Keys can be changed in **Settings**.
+
+Hover toolbar controls for their action and description. Relevant shortcuts and
+mouse controls follow your current Settings bindings; this reference lists defaults.

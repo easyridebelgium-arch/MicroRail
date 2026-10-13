@@ -67,3 +67,32 @@ and freight departure controls remain available. Bank loans are reached through
 Accounts; see [loans](LOANS.md). Cursor-side construction feedback and consistent
 tooltip descriptions are next. Branded
 title-screen actions, save thumbnails and route identity colours are still planned.
+
+## Cursor construction feedback and tooltips
+
+During a track/removal drag a small, non-interactive callout follows the pointer.
+It flips/clamps at viewport edges and hides over interface controls, dialogs or
+when the gesture ends. It does not request reservations, emit events or change
+money/track. Valid/invalid/partial/draft states use symbols and words rather than
+colour alone. Build previews include new-track and automatic-switch charges;
+removal previews show the refund for selected editable pieces and explain skipped
+reserved tiles. Placement errors preserve the planner's actual message. Affected
+services use the existing retained-path analysis; full details remain in Overlays.
+
+Draft mode labels the amount as the **stroke** price and directs players to
+Overlays for the combined draft price, refunds and validation. It does not judge
+the entire draft's affordability from one stroke. Live reservations are current
+operating data; the commit/Apply still rechecks safety and funds.
+
+Toolbar tooltips now provide an action name and concise description. Relevant
+keyboard/mouse bindings are read from InputMap after Settings Apply; no shortcuts
+are invented for actions without bindings. Signal help distinguishes automatic
+signals from permanent manual stops, and waypoint help distinguishes routing
+markers from stations. Save/Load/Previous Save explain the four slots. Hover delay
+is 0.4 seconds; existing accessible action names and keyboard focus remain.
+
+Validation: `tests/test_construction_hint.gd` checks price/switch/refund accuracy,
+reservation/error/draft wording, viewport corners at 100/150/200%, input pass-through,
+remapped controls and unchanged finances/clock/events/authority. This batch also
+passes the existing toolbar, UI clarity, UI scale, inspection, command-wiring,
+panel-preference and mouse-track suites (eight focused suites total).

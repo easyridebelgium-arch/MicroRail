@@ -26,6 +26,7 @@ const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const Platforms = preload("res://scripts/core/platforms.gd")
 const SingleTrack = preload("res://scripts/core/single_track.gd")
 const Headway = preload("res://scripts/core/headway.gd")
+const Timetable = preload("res://scripts/core/timetable.gd")
 var notifications = NotificationPolicy.new()
 
 const TrafficMetrics = preload("res://scripts/core/traffic_metrics.gd")
@@ -74,6 +75,7 @@ const FleetEditor = preload("res://scripts/fleet_editor.gd")
 
 const TRAIN_SPEED: float = 80.0
 const STATION_WAIT: float = 2.0
+const DAY_GAP_LIMIT := 1440
 
 const SAVE_PATH: String = "user://trainz_save.json"
 const SAVE_TEMP_PATH: String = "user://trainz_save.tmp"
@@ -188,6 +190,9 @@ var reservation_trains: Dictionary = {}
 var section_claims: Dictionary = {}
 ## Group (source service key) -> recent first-stop departure ticks. Not saved.
 var headway_log: Dictionary = {}
+## Group -> {"last", "served", "missed", "delays"} for timetables. Not saved.
+var timetable_state: Dictionary = {}
+var clock_label: Label
 ## Train ids currently held at a stop by a single-track claim; they reserve no lookahead.
 var section_held: Dictionary = {}
 var traffic_dialog: ConfirmationDialog
@@ -1938,6 +1943,7 @@ func _open_save_folder() -> void:
 
 func _update_toolbar() -> void:
 	inspect_button.set_pressed_no_signal(inspect_mode)
+	if clock_label != null: clock_label.text = game_clock_text()
 
 	straight_button.set_pressed_no_signal(
 		not demolition_mode and not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and not draw_track_mode
@@ -3892,6 +3898,10 @@ func _setup_fleet_editor() -> void:
 	fleet_button.tooltip_text = "Buy, name and assign individual trains"
 	fleet_button.pressed.connect(_open_fleet_editor)
 	$Interface/HeaderBox/Toolbar.add_child(fleet_button)
+	clock_label = Label.new()
+	clock_label.tooltip_text = "Game clock: one game minute per simulated second (24 real minutes a day at 1×). Timetables use it."
+	clock_label.text = game_clock_text()
+	$Interface/HeaderBox/Toolbar.add_child(clock_label)
 
 func _open_fleet_editor() -> void:
 	paused = true
@@ -4201,13 +4211,32 @@ func _headway_group(service: String) -> String:
 func _headway_target(service: String) -> int:
 	return int(services.get(_headway_group(service), {}).get("headway", 0))
 
+func _timetable_times(service: String) -> Array:
+	return services.get(_headway_group(service), {}).get("timetable", [])
+
+## Timetable hold: the train may leave once a scheduled time has passed that no
+## departure has used yet.
+func _timetable_hold(service: String) -> bool:
+	var times := _timetable_times(service)
+	if times.is_empty(): return false
+	var group := _headway_group(service)
+	var now := Timetable.absolute_minute(sim_clock.tick)
+	if not timetable_state.has(group): timetable_state[group] = {"last": now - 1, "served": 0, "missed": 0, "delays": []}
+	var state: Dictionary = timetable_state[group]
+	if not Timetable.slots_between(times, int(state.last), now).is_empty():
+		if str(reservation_waits.get(service, "")).begins_with("Holding for timetable"): reservation_waits.erase(service)
+		return false
+	reservation_waits[service] = "Holding for timetable: next departure %s" % Timetable.format(Timetable.next_slot(times, int(state.last)))
+	return true
+
 ## True (and the reason is set) while this service must wait at its first stop.
 func _headway_hold(service: String) -> bool:
+	if _timetable_hold(service): return true
 	var group := _headway_group(service)
 	var log: Array = headway_log.get(group, [])
 	var remaining := Headway.remaining_ticks(int(log.back()) if not log.is_empty() else -1, _headway_target(service), sim_clock.tick)
 	if remaining <= 0:
-		if str(reservation_waits.get(service, "")).begins_with("Holding for headway"): reservation_waits.erase(service)
+		if str(reservation_waits.get(service, "")).begins_with("Holding for"): reservation_waits.erase(service)
 		return false
 	reservation_waits[service] = "Holding for headway: %d s until the next departure" % ceili(float(remaining) / Headway.TICKS_PER_SECOND)
 	return true
@@ -4215,6 +4244,34 @@ func _headway_hold(service: String) -> bool:
 func _record_departure(service: String) -> void:
 	var group := _headway_group(service)
 	headway_log[group] = Headway.record(headway_log.get(group, []), sim_clock.tick)
+	var times := _timetable_times(service)
+	if times.is_empty() or not timetable_state.has(group): return
+	var state: Dictionary = timetable_state[group]
+	var now := Timetable.absolute_minute(sim_clock.tick)
+	var slots := Timetable.slots_between(times, int(state.last), now)
+	if slots.is_empty(): return
+	state["served"] = int(state.served) + 1
+	state["missed"] = int(state.missed) + slots.size() - 1
+	state["delays"] = (state.delays + [now - int(slots.back())]).slice(-Headway.KEEP)
+	state["last"] = int(slots.back())
+
+func game_clock_text() -> String:
+	return Timetable.clock_text(Timetable.absolute_minute(sim_clock.tick))
+
+## Plain-text timetable report for a source service.
+func timetable_report(group: String) -> String:
+	var times: Array = services.get(group, {}).get("timetable", [])
+	if times.is_empty(): return ""
+	var lines: PackedStringArray = ["Timetable: " + Timetable.to_text(times)]
+	var state: Dictionary = timetable_state.get(group, {})
+	if not state.is_empty():
+		lines.append("Next departure: %s" % Timetable.clock_text(Timetable.next_slot(times, int(state.last))))
+		var delays: Array = state.delays
+		var average := 0.0
+		for delay in delays: average += float(delay)
+		if not delays.is_empty(): average /= float(delays.size())
+		lines.append("Served %d, missed %d%s" % [state.served, state.missed, ", average delay %.1f min, last %d min" % [average, delays.back()] if not delays.is_empty() else ""])
+	return "\n".join(lines)
 
 ## Group members: the source and every service linked to it.
 func headway_group_members(group: String) -> Array:
@@ -4226,13 +4283,14 @@ func headway_group_members(group: String) -> Array:
 ## Plain-text headway report for a source service.
 func headway_report(group: String) -> String:
 	var target := int(services.get(group, {}).get("headway", 0))
+	var timetable_text := timetable_report(group)
 	var members := headway_group_members(group)
 	var stats := Headway.stats(headway_log.get(group, []))
 	var lines: PackedStringArray = []
 	if target <= 0: lines.append("Headway: off")
 	else: lines.append("Headway target: %d s" % target)
 	if int(stats.count) >= 2: lines.append("Actual: last %.0f s, average %.0f s over %d departures" % [stats.last, stats.average, stats.count])
-	if target > 0:
+	if target > 0 or not timetable_text.is_empty():
 		var route_length := 0.0
 		var distances: Array = stop_distances if group == "passenger" else passenger_services[group].distances if passenger_services.has(group) else []
 		if not distances.is_empty(): route_length = float(distances.back())
@@ -4243,6 +4301,11 @@ func headway_report(group: String) -> String:
 		var trip := Headway.round_trip(route_length, slowest, services[group].stops.size(), services[group].get("mode", "shuttle") == "loop", STATION_WAIT)
 		var reason := Headway.infeasible_reason(target, trip, members.size())
 		if not reason.is_empty(): lines.append(reason)
+		var gap := Timetable.tightest_gap(services[group].get("timetable", []))
+		if not timetable_text.is_empty() and gap < DAY_GAP_LIMIT:
+			var gap_reason := Headway.infeasible_reason(gap, trip, members.size())
+			if not gap_reason.is_empty(): lines.append("Timetable: closest departures are %d min apart. %s" % [gap, gap_reason])
+	if not timetable_text.is_empty(): lines.append(timetable_text)
 	return "\n".join(lines)
 
 ## Cell of the stop a service's train is heading for next (-1,-1 if unknown).

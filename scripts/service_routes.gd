@@ -47,6 +47,16 @@ static func valid_headway(service: Dictionary) -> bool:
 	var value: Variant = service.get("headway", 0)
 	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and value >= 0 and value <= 3600
 
+## Departure minutes after midnight (sorted, unique), kept on the source service.
+static func valid_timetable(service: Dictionary) -> bool:
+	var value: Variant = service.get("timetable", [])
+	if not value is Array or value.size() > 48: return false
+	var previous := -1
+	for minute in value:
+		if typeof(minute) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(minute)) or float(minute) != floor(float(minute)) or minute < 0 or minute > 1439 or int(minute) <= previous: return false
+		previous = int(minute)
+	return true
+
 static func is_passenger_key(key: Variant) -> bool:
 	if not key is String: return false
 	if key == "passenger": return true
@@ -135,7 +145,7 @@ static func is_valid(value: Variant) -> bool:
 			for stop in stops:
 				if not stop is String or not STATIONS.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key) or not valid_headway(service): return false
+		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service): return false
 	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}) -> Dictionary:
@@ -208,6 +218,10 @@ static func from_save(value: Dictionary) -> Dictionary:
 		var normalized_platforms: Dictionary = {}
 		for stop in chosen: normalized_platforms[stop] = int(chosen[stop])
 		result[service]["platforms"] = normalized_platforms
+		var times: Array = []
+		for minute in result[service].get("timetable", []): times.append(int(minute))
+		if times.is_empty(): result[service].erase("timetable")
+		else: result[service]["timetable"] = times
 		if int(result[service].get("headway", 0)) <= 0: result[service].erase("headway")
 		else: result[service]["headway"] = int(result[service]["headway"])
 		var marks: Dictionary = {}

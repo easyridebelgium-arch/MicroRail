@@ -1,6 +1,7 @@
 extends ConfirmationDialog
 
 const Services = preload("res://scripts/service_routes.gd")
+const Timetable = preload("res://scripts/core/timetable.gd")
 var game: Node
 var draft: Dictionary
 var service_choice: OptionButton
@@ -26,6 +27,7 @@ var copy_controls: HFlowContainer
 var headway_controls: HFlowContainer
 var headway_spin: SpinBox
 var headway_label: Label
+var timetable_field: LineEdit
 var link_controls: HFlowContainer
 var link_label: Label
 var unlink_button: Button
@@ -103,6 +105,16 @@ func configure(owner_game: Node) -> void:
 	headway_spin.tooltip_text = "Minimum seconds between departures from the first stop, shared by every train linked to this route. 0 turns it off."
 	headway_spin.value_changed.connect(_set_headway)
 	headway_controls.add_child(headway_spin)
+	var timetable_title := Label.new()
+	timetable_title.text = "Timetable"
+	headway_controls.add_child(timetable_title)
+	timetable_field = LineEdit.new()
+	timetable_field.placeholder_text = "Departures HH:MM, e.g. 07:00, 07:30, 18:15"
+	timetable_field.custom_minimum_size.x = 260
+	timetable_field.tooltip_text = "Exact departure times from the first stop each day (one game day = 24 minutes at 1×). Empty = no timetable. Trains never leave early; late trains leave at once."
+	timetable_field.text_submitted.connect(func(_text: String) -> void: _set_timetable())
+	timetable_field.focus_exited.connect(_set_timetable)
+	headway_controls.add_child(timetable_field)
 	headway_label = Label.new()
 	headway_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	headway_label.custom_minimum_size.x = 540
@@ -222,6 +234,18 @@ func _set_headway(value: float) -> void:
 	if int(value) <= 0: draft[_key()].erase("headway")
 	else: draft[_key()]["headway"] = int(value)
 
+func _set_timetable() -> bool:
+	if not draft.has(_key()) or not Services.is_passenger_key(_key()) or not headway_controls.visible: return true
+	var parsed := Timetable.parse(timetable_field.text)
+	if not parsed.ok:
+		status.text = str(parsed.error)
+		return false
+	if parsed.times.is_empty(): draft[_key()].erase("timetable")
+	else: draft[_key()]["timetable"] = parsed.times
+	timetable_field.text = Timetable.to_text(parsed.times)
+	status.text = "Timetable updated in draft. Apply to use it."
+	return true
+
 func _unlink() -> void:
 	draft[_key()].erase("link")
 	_show_service()
@@ -236,6 +260,7 @@ func _show_service() -> void:
 	headway_label.visible = has_headway
 	if has_headway:
 		headway_spin.set_value_no_signal(float(draft[_key()].get("headway", 0)))
+		timetable_field.text = Timetable.to_text(draft[_key()].get("timetable", []))
 		headway_label.text = game.headway_report(_key())
 	if linked: link_label.text = "Linked to %s — its stops, mode, waypoints and platforms follow that route." % draft[str(draft[_key()]["link"])].name
 	directive_warning.text = str(removed_waypoint_legs.get(_key(), ""))
@@ -388,6 +413,7 @@ func _stop_drop(at: Vector2, data: Variant) -> void:
 	move_stop_to(int(data["stop_index"]), stops.size() - 1 if target < 0 else target)
 
 func _apply() -> void:
+	if not _set_timetable(): return
 	_capture_name(_key())
 	status.text = game.apply_service_routes(draft)
 

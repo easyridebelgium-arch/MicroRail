@@ -16,7 +16,7 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phases 2A–2C — Demand, freight chains and growth | Planned; simplified passenger queues and direct log delivery already exist. | Actual destinations/frequency controls, processing chains and growth/scenario rules. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Next implementation:** exact departure timetables on top of headway controls (see [headway](HEADWAY.md)); Phase 1B is otherwise complete except the refused repeated-path cases above. Automatic platform
+**Next implementation:** Phase 1C/2 follow-ups: timetables at later stops and satisfaction/contract effects for early/late arrivals ([timetables](TIMETABLES.md)); Phase 1B is otherwise complete except the refused repeated-path cases above. Automatic platform
 choice is done at Apply time (the editor's "Auto" option; see [platforms](PLATFORMS.md)); choosing
 a different platform at arrival time, while the train is moving, remains optional later work and
 must preserve the physical body and its route behind the train.
@@ -25,7 +25,7 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The most recent validation verified all 67 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
+complete. The most recent validation verified all 68 headless suites (Godot 4.7.stable, including the new planned-reversal suites), including
 desktop-size UI fixtures, fullscreen/platform checks, automatic switches and
 tool reset, click/hold/drag removal, saved curved-junction layouts and safe route-copy drafts, in Godot 4.6.3
 (the platform update was previously tested on 4.7.stable).
@@ -230,7 +230,7 @@ must be labelled estimates.
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Timetables and service frequencies | Set exact departures or recurring frequencies. Early and late arrivals affect passenger satisfaction and freight contract payouts. | Recurring headway controls are implemented (target gap, actual vs target, infeasibility explanation; see [headway](HEADWAY.md)); exact departure timetables remain. Record actual versus target intervals and explain infeasible targets; multiple trains per service depend on Phase 1B body/platform safety. Exact schedules, punctuality penalties, missed services and recovery follow passenger destinations and reliable dwell rules. |
+| Timetables and service frequencies | Set exact departures or recurring frequencies. Early and late arrivals affect passenger satisfaction and freight contract payouts. | Recurring headway controls are implemented (target gap, actual vs target, infeasibility explanation; see [headway](HEADWAY.md)); exact departure timetables are implemented for the first stop with a 24-minute game day ([timetables](TIMETABLES.md)); timetables at later stops and satisfaction effects remain. Record actual versus target intervals and explain infeasible targets; multiple trains per service depend on Phase 1B body/platform safety. Exact schedules, punctuality penalties, missed services and recovery follow passenger destinations and reliable dwell rules. |
 | Passenger destinations and transfers | Reward networks that connect useful places, including journeys requiring a change of train. | Replace the current next-stop passenger model with origins, destinations and journey planning. |
 | Platform preferences | Prefer a platform by service, direction, train length, electrification, cargo access or transfer convenience, with safe fallback. | Basic platform infrastructure and assignment belong to Phase 1B. Phase 2A adds service/direction preferences, passenger transfer convenience and safe compatible fallback. Electrification and cargo-access preferences wait for those systems. Platform selection never overrides reservations. |
 | Holding rules and timed transfers | Wait for a connection or a target load, avoid early departure and cap waiting time. Protect transfers within configurable windows and warn about missed connections. | Requires timetables, passenger destinations and platform metadata. Avoid indefinite holds and explain knock-on delays. |

@@ -70,3 +70,14 @@ and matching wrapped movement/authority at 30/60/120 FPS.
 `test_loop_consist_integration.gd` exercises full laps, all carriage counts fitting,
 primary/additional service save/load, closing-leg recovery and two same-direction
 carriage services sharing signal blocks without body overlap.
+
+## Figure-eight routes
+
+A carriage train may now cross its own path **at a crossing tile**: the route may visit a
+crossing twice, once along each of its two lines (for example a Loop whose return track
+passes over the outgoing line). Any other repeated tile — ordinary track, a switch, or the
+same line of a crossing twice — is still refused. The body follows the path by distance, so
+it passes through the crossing head first, then each vehicle in turn; the train's own
+reservations never block itself. `Consists.route_shape_error` takes the track map for this
+rule. Test: `tests/test_figure_eight.gd` (a two-coach A–B–C Loop with a return crossing the
+A–B line, two laps).

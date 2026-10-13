@@ -35,7 +35,7 @@ static func stop_clearance(path: Curve2D, distance: float, body: float, tracks: 
 		if not tracks.has(cell) or not Geometry.same_connections(tracks[cell], false):
 			return "Consist needs continuous horizontal straight track on both sides of this stop (missing or incompatible at %d,%d)." % [cell.x, cell.y]
 	return ""
-static func route_shape_error(path: Curve2D, cells: Array, body: float, mode: String) -> String:
+static func route_shape_error(path: Curve2D, cells: Array, body: float, mode: String, tracks: Dictionary = {}) -> String:
 	if body <= Reservations.VEHICLE_LENGTH: return ""
 	if path.point_count < 2: return "Complete the service route before running a consist."
 	var closed := mode == "loop"
@@ -43,13 +43,27 @@ static func route_shape_error(path: Curve2D, cells: Array, body: float, mode: St
 		return "Long Loop consists need a continuous circuit through the first stop, with no reversal at the join and room for the full train. Use Shuttle or revise the closing leg."
 	var marks := RouteBody.folds(path)
 	if not closed and not marks.is_empty(): return _fold_error(path, cells, body, marks)
+	# A crossing may be visited once along each of its two lines (a figure-eight
+	# or any route that crosses its own path); any other revisit is refused.
 	var seen: Dictionary = {}
 	for index in range(cells.size()):
 		var cell: Vector2i = cells[index]
 		if closed and index == cells.size() - 1 and cell == cells[0]: continue
-		if seen.has(cell): return "Long consists need a route that does not revisit track tiles, except the closing first stop of a continuous Loop. Repeated-path body routing comes later."
-		seen[cell] = true
+		var axis := _passage_axis(cells, index, closed)
+		if seen.has(cell):
+			if not (Geometry.is_crossing(tracks.get(cell)) and axis != Vector2i.ZERO and not seen[cell].has(axis) and seen[cell].size() < 2):
+				return "Long consists need a route that does not revisit track tiles, except crossings (a figure-eight) and the closing first stop of a continuous Loop."
+			seen[cell].append(axis)
+		else:
+			seen[cell] = [axis]
 	return ""
+
+## Which line a route uses through cells[index]: |direction| of travel.
+static func _passage_axis(cells: Array, index: int, closed: bool) -> Vector2i:
+	var step := Vector2i.ZERO
+	if index > 0: step = cells[index] - cells[index - 1]
+	elif index + 1 < cells.size(): step = cells[index + 1] - cells[index]
+	return Vector2i(absi(step.x), absi(step.y))
 
 ## Planned reversals (A -> C -> B): every leg must be a simple run of track, the
 ## retraced cells may be shared, and legs must be long enough that the body never

@@ -1642,7 +1642,7 @@ func _load_game(save_path: String = SAVE_PATH) -> void:
 	]
 	for key in loaded_extra: positions.append({"mode": loaded_services[key].get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, key)), "cells": loaded_extra[key].cells, "path": loaded_extra[key].path, "distance": loaded_extra[key].distance})
 	for train in positions:
-		var shape_error := Consists.route_shape_error(train.path, train.cells, train.length, train.get("mode", "shuttle"))
+		var shape_error := Consists.route_shape_error(train.path, train.cells, train.length, train.get("mode", "shuttle"), loaded_tracks)
 		if not shape_error.is_empty():
 			_show_notice(shape_error)
 			return
@@ -5390,7 +5390,7 @@ func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 		path = built.path
 		stops = built.distances
 		cells = built.cells
-	var shape_error := Consists.route_shape_error(path, cells, body, service.get("mode", "shuttle"))
+	var shape_error := Consists.route_shape_error(path, cells, body, service.get("mode", "shuttle"), tracks)
 	if not shape_error.is_empty(): return shape_error
 	for distance in stops:
 		var error := Consists.stop_clearance(path, float(distance), body, tracks, float(TILE_SIZE), track_signals)

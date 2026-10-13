@@ -27,7 +27,7 @@ theme_override_constants/separation = 6
 [node name="Title" type="Label" parent="Interface/HeaderBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "Trainz — Railway Builder"
+text = "MicroRail — Railway Builder"
 
 [node name="Toolbar" type="HFlowContainer" parent="Interface/HeaderBox"]
 layout_mode = 2

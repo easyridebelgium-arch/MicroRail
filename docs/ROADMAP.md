@@ -1,4 +1,4 @@
-# Trainz development roadmap
+# MicroRail development roadmap
 
 This roadmap records the agreed development order, current implementation and
 remaining work. Phases are milestones, not release dates. Preserve completed work
@@ -53,6 +53,11 @@ The existing pressed-button surround is handled at display time; no art refineme
 is required to continue gameplay development. See
 [toolbar graphics](../assets/ui/toolbar/README.md). This presentation update does not
 advance or reorder the gameplay milestones above.
+
+**Rename checkpoint:** the project is now **MicroRail** (formerly "Trainz", a name already in use by another
+game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
+`LegacyMigration` copies saves and settings from the old `Trainz` user-data folder into the new `MicroRail`
+one (copy only, never overwrites, old folder left intact); see [save slots](SAVE_SLOTS.md). All 74 headless suites pass (run `godot --import` once after a fresh clone).
 
 **Resume checkpoint:** maximized startup, adaptive window filling and saved
 fullscreen (Settings/F11) are implemented and confirmed working by the player.

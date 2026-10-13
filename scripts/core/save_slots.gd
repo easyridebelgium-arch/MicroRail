@@ -5,7 +5,7 @@ const COUNT := 4
 static func path(slot: int, kind: String = "save") -> String:
 	assert(slot >= 1 and slot <= COUNT)
 	assert(kind in ["save", "backup", "temp"])
-	var base := "user://trainz_save" if slot == 1 else "user://trainz_save_slot_%d" % slot
+	var base := "user://microrail_save" if slot == 1 else "user://microrail_save_slot_%d" % slot
 	match kind:
 		"backup": return base + ".backup.json"
 		"temp": return base + ".tmp"

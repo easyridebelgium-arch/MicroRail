@@ -79,12 +79,13 @@ const STATION_WAIT: float = 2.0
 const DAY_GAP_LIMIT := 1440
 
 const SaveSlots = preload("res://scripts/core/save_slots.gd")
+const LegacyMigration = preload("res://scripts/core/legacy_migration.gd")
 const SaveSlotsDialog = preload("res://scripts/save_slots_dialog.gd")
 var active_save_slot: int = 1
 var save_slots_dialog: AcceptDialog
 
-const SAVE_PATH: String = "user://trainz_save.json"
-const SAVE_TEMP_PATH: String = "user://trainz_save.tmp"
+const SAVE_PATH: String = "user://microrail_save.json"
+const SAVE_TEMP_PATH: String = "user://microrail_save.tmp"
 const RailRouter = preload("res://scripts/rail_router.gd")
 const TrackGeometry = preload("res://scripts/track_geometry.gd")
 const TrackBuilder = preload("res://scripts/track_builder.gd")
@@ -121,7 +122,7 @@ const KEYBOARD_PAN_SPEED: float = 600.0
 const MIN_ZOOM: float = 0.5
 const MAX_ZOOM: float = 3.0
 const ZOOM_STEP: float = 1.15
-const SAVE_BACKUP_PATH: String = "user://trainz_save.backup.json"
+const SAVE_BACKUP_PATH: String = "user://microrail_save.backup.json"
 const MAX_CAPACITY_LEVEL: int = 3
 const MAX_SPEED_LEVEL: int = 3
 
@@ -350,6 +351,8 @@ func _ready() -> void:
 	get_window().focus_exited.connect(_cancel_right_gesture)
 	header_box.resized.connect(_layout_header)
 
+	# Saves and settings from before the rename (the game was called Trainz).
+	LegacyMigration.run()
 	# Player settings first, so keys, scale and colours are right from frame one.
 	GameSettings.load_settings()
 	InputActions.register_defaults()

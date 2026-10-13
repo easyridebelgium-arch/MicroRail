@@ -24,10 +24,10 @@ state are stored independently.
 
 | Slot | Game file | Previous-save file |
 | --- | --- | --- |
-| 1 | `trainz_save.json` | `trainz_save.backup.json` |
-| 2 | `trainz_save_slot_2.json` | `trainz_save_slot_2.backup.json` |
-| 3 | `trainz_save_slot_3.json` | `trainz_save_slot_3.backup.json` |
-| 4 | `trainz_save_slot_4.json` | `trainz_save_slot_4.backup.json` |
+| 1 | `microrail_save.json` | `microrail_save.backup.json` |
+| 2 | `microrail_save_slot_2.json` | `microrail_save_slot_2.backup.json` |
+| 3 | `microrail_save_slot_3.json` | `microrail_save_slot_3.backup.json` |
+| 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
 schema remains version 25: slots change storage locations, not simulation data.
@@ -41,3 +41,10 @@ Validation: `tests/test_save_slots.gd` exercises four independent worlds, isolat
 backups, malformed loads, failed writes, construction guards, chooser feedback and
 fresh-game reset without overwriting files. Use an isolated `XDG_DATA_HOME` when
 running save-writing tests so they cannot alter your personal game files.
+
+## Rename migration (Trainz → MicroRail)
+
+Godot names the user-data folder after the project, so the rename moves it from `.../app_userdata/Trainz`
+to `.../app_userdata/MicroRail`. On startup `scripts/core/legacy_migration.gd` copies any files the new folder
+lacks, renaming `trainz_save*` to `microrail_save*` and skipping `.tmp` files. It never overwrites and never
+touches the old folder, which can be deleted once the saves are confirmed.

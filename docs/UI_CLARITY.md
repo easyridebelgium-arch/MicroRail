@@ -1,4 +1,4 @@
-# UI clarity: first batch
+# UI clarity
 
 The current UI work sits alongside Phase 1C feedback and Phase 2A gameplay.
 It does not replace the network-safety milestones or passenger-transfer work.
@@ -59,6 +59,11 @@ and readable layouts/Close buttons at 100%, 150% and 200%. Existing toolbar,
 inspection, accessibility and simulation suites remain required.
 
 The remaining current-stage UI work is listed in the roadmap's UI enhancement
-table. Existing Map/Goals toggles already collapse those panels; saving their
-visibility and unifying the station/industry inspector layout are next. Branded
+table. Map/Goals visibility now persists in shared player preferences. Station/industry
+inspectors now show overview, actions and expandable details, with an always-visible
+Close button outside the scrolling region. Their sidebar is clamped in logical UI
+pixels so 200% scaling does not double its width. Existing amenity, train-upgrade
+and freight departure controls remain available. Bank loans are reached through
+Accounts; see [loans](LOANS.md). Cursor-side construction feedback and consistent
+tooltip descriptions are next. Branded
 title-screen actions, save thumbnails and route identity colours are still planned.

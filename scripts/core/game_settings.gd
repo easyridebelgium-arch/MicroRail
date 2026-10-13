@@ -37,6 +37,8 @@ static var _windowed_mode: Window.Mode = Window.MODE_MAXIMIZED
 ## Hides the title and key hints and shortens the status text. Always on at 175%
 ## and above, where the header would otherwise fill the window.
 static var compact_header: bool = false
+static var map_visible: bool = true
+static var goals_visible: bool = true
 
 ## {action name: [key codes]} as saved. Empty means "use the defaults".
 static var key_bindings: Dictionary = {}
@@ -59,6 +61,8 @@ static func load_settings() -> void:
 	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
 	compact_header = bool(config.get_value("display", "compact_header", false))
 	fullscreen = bool(config.get_value("display", "fullscreen", false))
+	map_visible = bool(config.get_value("panels", "map_visible", true))
+	goals_visible = bool(config.get_value("panels", "goals_visible", true))
 
 	notification_rules = NotificationPolicy.normalize(config.get_value("notifications", "rules", {}))
 
@@ -77,6 +81,8 @@ static func save_settings() -> bool:
 	config.set_value("display", "reduced_motion", reduced_motion)
 	config.set_value("display", "compact_header", compact_header)
 	config.set_value("display", "fullscreen", fullscreen)
+	config.set_value("panels", "map_visible", map_visible)
+	config.set_value("panels", "goals_visible", goals_visible)
 	config.set_value("input", "bindings", key_bindings)
 	config.set_value("input", "mouse_bindings", mouse_bindings)
 	config.set_value("notifications", "rules", NotificationPolicy.normalize(notification_rules))

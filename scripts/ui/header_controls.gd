@@ -9,6 +9,7 @@ var deliveries: Label
 var accounts_button: Button
 var accounts_dialog: AcceptDialog
 var accounts_text: Label
+var loans_button: Button
 var separators: Array[TextureRect] = []
 
 func configure(owner_game: Node) -> void:
@@ -50,7 +51,7 @@ func configure(owner_game: Node) -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_PASS
 		status_bar.add_child(label)
 		set(field, label)
-	profit.tooltip_text = "Operating profit = passenger fares + freight income − train running costs. Capital purchases and objective rewards are excluded."
+	profit.tooltip_text = "Operating profit = passenger fares + freight income − train running costs. Capital purchases, financing interest and objective rewards are excluded."
 	accounts_button = Button.new()
 	accounts_button.text = "Accounts"
 	accounts_button.accessibility_name = "Company accounts"
@@ -65,10 +66,24 @@ func configure(owner_game: Node) -> void:
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	accounts_dialog.add_child(scroll)
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(column)
+	loans_button = Button.new()
+	loans_button.text = "Bank loans"
+	loans_button.tooltip_text = "Borrow, view interest and scheduled payments, or repay the full balance early"
+	loans_button.pressed.connect(func() -> void: game.loans_dialog.open_dialog())
+	var loan_icon := "res://assets/ui/toolbar/icons/loans.png"
+	if ResourceLoader.exists(loan_icon):
+		loans_button.icon = load(loan_icon)
+		loans_button.expand_icon = true
+		loans_button.add_theme_constant_override("icon_max_width", 24)
+		loans_button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	column.add_child(loans_button)
 	accounts_text = Label.new()
 	accounts_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	accounts_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(accounts_text)
+	column.add_child(accounts_text)
 	game.get_node("Interface").add_child(accounts_dialog)
 	refresh()
 
@@ -92,11 +107,14 @@ func refresh() -> void:
 	balance.text = "Balance £%d" % game.money
 	profit.text = ("Op. profit £%d" if game.GameSettings.use_compact_header() else "Operating profit £%d") % operating
 	deliveries.text = ("Delivered %d" if game.GameSettings.use_compact_header() else "Delivered %d passengers") % game.passengers_delivered
+	loans_button.text = "Bank loans — overdue £%d" % game.loans.overdue() if game.loans.overdue() > 0 else "Bank loans"
 	if not accounts_dialog.visible: return
 	var amenity_value := 0
 	for station in game.Amenities.STATIONS:
 		for id in game.amenities.owned[station]: amenity_value += int(game.Amenities.DEFS[id].price)
-	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: A %d / B %d / C %d\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes capital purchases, construction refunds, starting cash and objective rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), game.waiting_at_a, game.waiting_at_b, game.waiting_at_c, game.passengers_delivered, game.logs_delivered]
+	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: A %d / B %d / C %d\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes financing interest, capital purchases, construction refunds, starting cash and objective rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), game.waiting_at_a, game.waiting_at_b, game.waiting_at_c, game.passengers_delivered, game.logs_delivered]
+
+	accounts_text.text += "\n\nBank principal outstanding: £%d\nAccrued interest: £%d (early payoff £%d)\nLoan payments overdue: £%d\nLoan interest paid: £%d\nLoan principal repaid: £%d" % [game.loans.state.principal, game.loans.state.interest, game.loans.payoff(), game.loans.overdue(), game.loans.state.interest_paid, game.loans.state.principal_paid]
 
 func open_accounts() -> void:
 	game._cancel_right_gesture()

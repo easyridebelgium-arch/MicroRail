@@ -30,7 +30,8 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 26 (amenities added later): slots change storage locations, not simulation data.
+schema is version 27, including amenities and loan state. Slots choose storage
+locations rather than changing simulation rules.
 Each write uses that slot's temporary file, checks write/backup errors, then
 renames it into place. Failed saves retain the selected session/slot; failed loads
 validate before applying state and cannot switch the current slot. Errors appear
@@ -48,3 +49,7 @@ Godot names the user-data folder after the project, so the rename moves it from 
 to `.../app_userdata/MicroRail`. On startup `scripts/core/legacy_migration.gd` copies any files the new folder
 lacks, renaming `trainz_save*` to `microrail_save*` and skipping `.tmp` files. It never overwrites and never
 touches the old folder, which can be deleted once the saves are confirmed.
+
+Loan balances and repayment schedules are stored independently per slot; old saves
+migrate to zero debt. Map/Goals visibility is shared in player settings, not saved
+per game. See [bank loans](LOANS.md).

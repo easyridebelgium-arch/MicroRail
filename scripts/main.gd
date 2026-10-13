@@ -25,6 +25,10 @@ const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
 const Amenities = preload("res://scripts/core/amenities.gd")
+const Loans = preload("res://scripts/core/loans.gd")
+const LoansDialog = preload("res://scripts/loans_dialog.gd")
+var loans = Loans.new()
+var loans_dialog: AcceptDialog
 const Platforms = preload("res://scripts/core/platforms.gd")
 const SingleTrack = preload("res://scripts/core/single_track.gd")
 const Headway = preload("res://scripts/core/headway.gd")
@@ -284,6 +288,8 @@ var selected_station: Vector2i = Vector2i(-1, -1)
 
 var station_panel: PanelContainer
 var station_title: Label
+var station_summary: Label
+var station_details_toggle: Button
 var station_details: Label
 var capacity_upgrade_level: int = 0
 var speed_upgrade_level: int = 0
@@ -402,6 +408,9 @@ func _ready() -> void:
 	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
+	loans_dialog = LoansDialog.new()
+	loans_dialog.configure(self)
+	$Interface.add_child(loans_dialog)
 	_apply_settings()
 	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
 		window.window_input.connect(_tool_window_input.bind(window))
@@ -457,9 +466,35 @@ func _simulation_step(step_seconds: float) -> void:
 	_update_deadlocks()
 	traffic_metrics.update(sim_clock.tick, reservation_trains.keys(), traffic_wait_samples)
 	_check_scenario_objectives()
+	_advance_loans()
 	_refresh_directional_routes()
 	_flush_notifications()
 
+
+func borrow_money(amount: int) -> String:
+	if not paused: return "Pause before borrowing."
+	if not loans.borrow(amount, sim_clock.tick): return "Repay the active loan before taking another, or select a valid bank offer."
+	money += amount
+	_record_event(EventLog.LOAN_BORROWED, "company", {"amount": amount})
+	_show_notice("Borrowed £%d. First automatic payment in one game hour." % amount)
+	return notice
+
+func repay_loan_early() -> String:
+	if not paused: return "Pause before repaying."
+	var payment: Dictionary = loans.repay_early(money)
+	if payment.is_empty(): return "Not enough cash to repay the full balance, or no active loan."
+	money -= int(payment.paid)
+	_record_event(EventLog.LOAN_PAYMENT, "company", payment)
+	_show_notice("Loan repaid in full for £%d." % int(payment.paid))
+	return notice
+
+func _advance_loans() -> void:
+	var result: Dictionary = loans.advance(sim_clock.tick, money)
+	money -= int(result.paid)
+	for payment in result.payments: _record_event(EventLog.LOAN_PAYMENT, "company", payment)
+	for missed in result.missed:
+		_record_event(EventLog.LOAN_OVERDUE, "company", missed)
+		_show_notice("Loan payment overdue: £%d. Available future income will repay it automatically." % loans.overdue())
 
 func _record_event(type: String, subject: String, data: Dictionary = {}) -> void:
 	var event: Dictionary = event_log.record(sim_clock.tick, type, subject, data)
@@ -795,7 +830,10 @@ func _layout_header() -> void:
 	header_background.offset_bottom = header_height
 
 	if station_panel != null:
-		station_panel.offset_top = header_height + (16.0 * scale)
+		station_panel.offset_left = -minf(320.0, get_viewport_rect().size.x - 12.0)
+		station_panel.offset_right = -12.0
+		station_panel.offset_top = minf(header_height + 8.0, get_viewport_rect().size.y - 100.0)
+		station_panel.offset_bottom = -12.0
 	if inspection_panel != null:
 		# The right column has no bottom toolbar. Let scrolling consume the
 		# available space instead of forcing a minimum beyond the viewport.
@@ -1290,6 +1328,7 @@ func _save_game(slot: int = 0) -> bool:
 		"version": SAVE_VERSION,
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
+		"loans": loans.save_state(),
 		"demand": {"queues": passenger_demand.queues.duplicate(true), "primary": passenger_destinations.duplicate(true)},
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
 		"passenger_services": _saved_passenger_services(),
@@ -1466,6 +1505,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 			return false
 
 	if not Amenities.valid_save(data.get("amenities")): return false
+	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
 	var state: Dictionary = data["state"]
 	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger): return false
 
@@ -1717,6 +1757,7 @@ func _load_game(save_path: String = "") -> bool:
 		passenger_demand.queues[station] = PassengerDemand.normalize(data.demand.queues[station])
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
 	amenities.load_save(data.amenities)
+	loans.restore_state(data.loans)
 	route_distance = loaded_distance
 	is_dragging = false
 	_update_train_transform()
@@ -2142,7 +2183,9 @@ func _setup_station_inspector() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(scroll)
+	var shell := VBoxContainer.new()
+	margin.add_child(shell)
+	shell.add_child(scroll)
 
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2153,22 +2196,27 @@ func _setup_station_inspector() -> void:
 	station_title.add_theme_font_size_override("font_size", 22)
 	content.add_child(station_title)
 
+	station_summary = Label.new()
+	station_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(station_summary)
+	var actions_heading := Label.new()
+	actions_heading.text = "Actions"
+	content.add_child(actions_heading)
 	station_details = Label.new()
 	station_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(station_details)
 	
 	capacity_upgrade_button = Button.new()
-	capacity_upgrade_button.focus_mode = Control.FOCUS_NONE
+	capacity_upgrade_button.focus_mode = Control.FOCUS_ALL
 	capacity_upgrade_button.pressed.connect(_upgrade_capacity)
 	content.add_child(capacity_upgrade_button)
 
 	speed_upgrade_button = Button.new()
-	speed_upgrade_button.focus_mode = Control.FOCUS_NONE
+	speed_upgrade_button.focus_mode = Control.FOCUS_ALL
 	speed_upgrade_button.pressed.connect(_upgrade_speed)
 	content.add_child(speed_upgrade_button)
 	for amenity_id in Amenities.ORDER:
 		var amenity_button := Button.new()
-		amenity_button.focus_mode = Control.FOCUS_NONE
+		amenity_button.focus_mode = Control.FOCUS_ALL
 		amenity_button.pressed.connect(_buy_amenity.bind(amenity_id))
 		content.add_child(amenity_button)
 		amenity_buttons[amenity_id] = amenity_button
@@ -2177,7 +2225,7 @@ func _setup_station_inspector() -> void:
 	content.add_child(freight_rule_label)
 
 	freight_rule_option = OptionButton.new()
-	freight_rule_option.focus_mode = Control.FOCUS_NONE
+	freight_rule_option.focus_mode = Control.FOCUS_ALL
 
 	freight_rule_option.add_item(
 		"Depart with any logs",
@@ -2201,14 +2249,25 @@ func _setup_station_inspector() -> void:
 	freight_rule_label.hide()
 	freight_rule_option.hide()
 	service_button = Button.new()
-	service_button.focus_mode = Control.FOCUS_NONE
+	service_button.focus_mode = Control.FOCUS_ALL
 	service_button.pressed.connect(_toggle_selected_service)
 	content.add_child(service_button)
+	station_details_toggle = Button.new()
+	station_details_toggle.text = "Show details"
+	station_details_toggle.toggle_mode = true
+	station_details_toggle.toggled.connect(func(expanded: bool) -> void:
+		station_details.visible = expanded
+		station_details_toggle.text = "Hide details" if expanded else "Show details"
+	)
+	content.add_child(station_details_toggle)
+	content.add_child(station_details)
+	station_details.hide()
 	var close_button := Button.new()
 	close_button.text = "Close"
-	close_button.focus_mode = Control.FOCUS_NONE
+	close_button.focus_mode = Control.FOCUS_ALL
 	close_button.pressed.connect(_close_station_inspector)
-	content.add_child(close_button)
+	close_button.name = "CloseInspector"
+	shell.add_child(close_button)
 
 	station_panel.hide()
 
@@ -2254,6 +2313,23 @@ func _inspect_station_at(cell: Vector2i) -> void:
 
 
 func _update_station_inspector() -> void:
+	if not station_panel.visible: return
+	_update_station_details()
+	if selected_station == FOREST_SITE:
+		station_summary.text = "Logs stored: %d / %d\nFreight aboard: %d / %d\n%s" % [forest_stock, MAX_FOREST_STOCK, freight_train.cargo, freight_train.get_capacity(), freight_train.status_text()]
+	elif selected_station == CARGO_TERMINAL:
+		station_summary.text = "Logs delivered: %d\nFreight income: £%d\n%s" % [logs_delivered, freight_income, freight_train.status_text()]
+	else:
+		var key := _station_key(selected_station)
+		var count := 0
+		var incoming := 0
+		for service in service_keys():
+			if service != "freight" and services[service].stops.has(key):
+				count += 1
+				incoming += _incoming_passengers(service, key)
+		station_summary.text = "Waiting passengers: %d / %d\nPassengers aboard for here: %d\nServing routes: %d\nPause to build amenities; manage trains in Fleet." % [_waiting(key), amenities.queue_limit(key), incoming, count]
+
+func _update_station_details() -> void:
 	if not station_panel.visible:
 		return
 	_update_service_button()
@@ -3482,7 +3558,8 @@ func _setup_network_map() -> void:
 	map_button = Button.new()
 	map_button.text = "Map"
 	map_button.toggle_mode = true
-	map_button.button_pressed = true
+	map_button.button_pressed = GameSettings.map_visible
+	network_map.visible = GameSettings.map_visible
 	map_button.focus_mode = Control.FOCUS_NONE
 	map_button.tooltip_text = "Show or hide the network map — M"
 	map_button.pressed.connect(_toggle_network_map)
@@ -3536,6 +3613,8 @@ func _toggle_network_map() -> void:
 	network_map.cancel_navigation()
 
 	map_button.set_pressed_no_signal(network_map.visible)
+	GameSettings.map_visible = network_map.visible
+	if not GameSettings.save_settings(): _show_notice("Could not save panel visibility; it applies for this session.")
 func _scenario_metrics() -> Dictionary:
 	return {
 		"passenger_connected": 1 if route_connected else 0,
@@ -3623,7 +3702,8 @@ func _setup_objective_panel() -> void:
 	goals_button = Button.new()
 	goals_button.text = "Goals"
 	goals_button.toggle_mode = true
-	goals_button.button_pressed = true
+	goals_button.button_pressed = GameSettings.goals_visible
+	objective_panel.visible = GameSettings.goals_visible
 	goals_button.focus_mode = Control.FOCUS_NONE
 	goals_button.tooltip_text = "Show or hide scenario objectives — G"
 	goals_button.pressed.connect(_toggle_objective_panel)
@@ -3636,6 +3716,8 @@ func _setup_objective_panel() -> void:
 func _toggle_objective_panel() -> void:
 	objective_panel.visible = not objective_panel.visible
 	goals_button.set_pressed_no_signal(objective_panel.visible)
+	GameSettings.goals_visible = objective_panel.visible
+	if not GameSettings.save_settings(): _show_notice("Could not save panel visibility; it applies for this session.")
 
 
 func _update_objective_panel() -> void:
@@ -3994,7 +4076,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (header_controls != null and header_controls.accounts_dialog.visible) or (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
+	return (loans_dialog != null and loans_dialog.visible) or (header_controls != null and header_controls.accounts_dialog.visible) or (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()

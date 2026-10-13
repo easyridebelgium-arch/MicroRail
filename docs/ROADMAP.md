@@ -16,15 +16,21 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; Transfers, satisfaction, demand balancing, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
-**Latest usability update:** grouped ribbon, compact status/Accounts and summary-first
+**Latest economy/UI update:** fixed-rate bank loans, accruing interest, automatic
+instalments, arrears and early repayment are implemented ([bank loans](LOANS.md)).
+The initial bank offers use one loan at a time, 1% per game hour and ten hourly
+principal instalments. Save version 27 persists debt and migrates older games to
+zero debt. Shared Map/Goals visibility and consistent facility inspectors are also
+implemented. Grouped ribbon, compact status/Accounts and summary-first
 train inspection with expandable reservation details are implemented. Four independent
 manual game slots retain separate backups;
 the slot chooser and fresh-game action remain available. The existing save is Slot 1.
 See [save slots](SAVE_SLOTS.md). Periodic autosaves remain Phase 2C work.
 Toolbar refinement instructions are in the [Krita guide](../assets/ui/toolbar/KRITA_GUIDE.md).
 
-**Next implementation:** continue the current UI clarity workstream below: remember
-Map/Goals visibility and standardize station/industry inspectors. Then resume
+**Next implementation:** continue current UI clarity with cursor-side construction
+feedback and consistent tooltip descriptions/remapped shortcuts. Map/Goals visibility
+and station/industry overview/actions/details are implemented. Then resume
 Phase 2A passenger transfers and satisfaction (waiting-area amenities are done); demand
 factors follow. Direct passenger
 origins/destinations, per-destination queues, through riders and destination-only
@@ -41,12 +47,14 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation passed 75 existing headless suites and 42 new UI clarity
-checks in Godot 4.6.3,
+complete. The latest cloud validation covered 78 passing headless suites in Godot 4.6.3
+(full regression plus the updated migration rerun), including 50 loan checks and
+26 panel-preference/layout checks,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
 departures, blocked-departure accounting and destination/dispatch save/load, passenger conservation, four independent manual slots,
-version-26 station amenities, rename migration and the new header/inspector layouts. Earlier gameplay
+version-26 station amenities, rename migration, version-27 debt persistence and the new
+header/inspector layouts. Earlier gameplay
 updates were also tested in Godot 4.7.stable.
 Tests that change player preferences must
 restore them: a leftover pause-on-deadlock setting once made the deadlock suite fail on
@@ -81,8 +89,8 @@ Accounts and summary-first train inspection. See [UI clarity](UI_CLARITY.md).
 | --- | --- |
 | Grouped toolbar | Implemented: Construction, Operations, Inspection, Games/Settings with supplied separators. Pause/Speed and Save/Load remain adjacent. Flat controls wrap independently; compact mode reduces button size so 200% UI scale still leaves map space. |
 | Compact status bar | Implemented: clock, balance, session operating profit, delivered passengers and Accounts. Detailed revenue/spend/queue figures move to a paused, scrollable Accounts window. Historical dashboard graphs follow measured metrics. |
-| Collapsible panels | Map and Goals already toggle. Next: remember their visibility in player preferences across sessions/slots, keep toggles synchronized and test small-window layouts. |
-| Consistent inspectors | Train overview/advice/actions now precede expandable detail. Next: apply shared spacing, headings and overview/action/detail hierarchy to station and industry panels; retain their existing upgrade/loading controls. |
+| Collapsible panels | Implemented: Map/Goals visibility persists in shared player preferences across sessions/slots; toggles restore in sync. Existing layout reclaims space when panels are hidden. |
+| Consistent inspectors | Implemented: train and facility overviews precede actions and expandable detail. Station/industry upgrades, amenities and loading rules remain available. Facility Close stays outside scrolling content; sidebar width is scaled once and clamped to the logical viewport. Bank uses the same readable, scrollable dialog theme. |
 | Clear waiting explanations | Implemented first batch: current blocker identity in the summary and direct Inspect blocking train action; reservation detail collapses independently. Retain honest stale-allocation warnings and actionable manual-stop/route/dwell explanations. More natural stop/block labels can follow. |
 | Construction feedback near cursor | Planned current-stage batch: price, valid/invalid symbols, cause and affected-service count beside the ghost, clamped to the viewport. Keep full details in Overlays and do not claim predictive conflicts without authority evidence. |
 | Route colours and labels | Planned: stable service colour plus short text identity in Routes, trains, overlays and inspectors. Do not use colour alone or change routing to match visuals. Persist identity choices with validated service definitions. |
@@ -359,7 +367,7 @@ future rival, without adding speculative AI frameworks.
 | Workforce, fatigue and skills (one optional system) | Abstract drivers, conductors, maintenance and station staff into costs, reliability, dwell and service quality. | Merge crew and staff proposals rather than running two management systems. Keep staffing largely automatic; detailed rosters and per-person micromanagement are not core scope. |
 | Shunting, reversing and yard operations | Split/merge consists, reverse at valid facilities, send trains to depots and operate recovery locomotives. | Later extension of safe recovery, depots, consists and temporary reservations. Implement only where it creates useful network decisions. |
 | Rivers, crossings, landmarks and regional themes | Create meaningful bridge placement and recognisable Alpine, desert, tropical, urban, countryside or Nordic maps. | Terrain/visual variety first; add regional cargo, cost or weather modifiers behind explicit settings. Flood simulation is optional later work. |
-| Loans and debt | Borrow to fund expensive infrastructure such as tunnels, with variable interest and repayment obligations. | Show interest terms, rate changes, repayments and projected cash flow clearly. Define insolvency rules and sandbox alternatives. |
+| Loans and debt | Borrow to fund infrastructure, with interest and repayment obligations. | Implemented early at player request: £1,000/£2,500/£5,000 offers, one loan at a time, fixed 1% per game hour, ten hourly principal instalments, tick-based accrual, automatic interest-first payments from available cash, arrears, early full payoff and v27 persistence. See [bank loans](LOANS.md). Variable rates/lenders, forecasts, insolvency and sandbox alternatives remain later work. |
 | Land purchase and transit rights | Buy land or access rights before town growth makes expansion more expensive. | Integrate ownership with construction previews, town growth and infrastructure costs. |
 | Rival bidding and territory pressure (deferred) | Rival companies can bid for limited industry rights or claim territory. | Revisit after contracts, land rights and the economy are stable. Full autonomous railway-building AI is outside the core release scope. |
 

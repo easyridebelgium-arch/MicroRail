@@ -10,6 +10,9 @@ extends RefCounted
 signal event_recorded(event: Dictionary)
 
 # Event types. Add new ones here so names stay consistent.
+const LOAN_BORROWED: String = "loan_borrowed"
+const LOAN_PAYMENT: String = "loan_payment"
+const LOAN_OVERDUE: String = "loan_overdue"
 const TRAIN_DEPARTED: String = "train_departed"
 const DEADLOCK_DETECTED: String = "deadlock_detected"
 const DEADLOCK_CLEARED: String = "deadlock_cleared"
@@ -120,6 +123,12 @@ static func summary(event: Dictionary) -> String:
 	var who: String = str(event.get("subject", ""))
 
 	match kind:
+		LOAN_BORROWED:
+			return "Borrowed £%d from the bank" % int(data.get("amount", 0))
+		LOAN_PAYMENT:
+			return "Loan payment £%d" % int(data.get("paid", 0))
+		LOAN_OVERDUE:
+			return "Loan payment overdue: £%d" % int(data.get("due", 0))
 		DEADLOCK_DETECTED:
 			return "Deadlock detected: open Traffic for recovery"
 		DEADLOCK_CLEARED:

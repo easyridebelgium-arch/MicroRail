@@ -133,3 +133,7 @@ surround. Large replacements with changed bounds need their BOUNDS entry updated
 compact native-size replacements are detected automatically.
 
 Step-by-step refinement/export instructions: [Krita guide](KRITA_GUIDE.md).
+
+Optional Bank loans action icon: `icons/loans.png` (24 × 24 with alpha). The Bank
+button in Accounts uses it when present; its readable label remains. Prompt and
+finance rules: [bank loans](../../../docs/LOANS.md).

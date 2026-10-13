@@ -40,7 +40,7 @@ func _run() -> void:
 	bad.owned.c = ["fountain"]
 	check(not Amenities.valid_save(bad) and not Amenities.valid_save(null), "unknown amenity or missing block rejected")
 	var old := Migrations.migrate({"version": 25, "demand": {}})
-	check(old.ok and old.data.version == 26 and Amenities.valid_save(old.data.amenities), "version 25 migrates with no amenities")
+	check(old.ok and old.data.version == Migrations.CURRENT_VERSION and old.data.amenities == Amenities.default_save(), "version 25 migrates with no amenities")
 
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	root.add_child(game)

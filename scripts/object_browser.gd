@@ -32,7 +32,7 @@ func configure(owner_game: Node) -> void:
 	var filters := HFlowContainer.new()
 	box.add_child(filters)
 	kind = OptionButton.new()
-	for text in ["All types", "Train", "Service", "Station", "Industry"]: kind.add_item(text)
+	for text in ["All types", "Train", "Service", "Station", "Industry", "City"]: kind.add_item(text)
 	kind.item_selected.connect(func(_index: int) -> void: refresh())
 	filters.add_child(kind)
 	pinned_only = CheckButton.new()

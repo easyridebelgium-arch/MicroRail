@@ -3,11 +3,13 @@
 The saved catalog foundation and flat-grid candidate generator are implemented
 ([world catalog](WORLD_CATALOG.md), [generator](SEEDED_LAYOUT_GENERATOR.md));
 City-linked station preview/purchase rules are also implemented
-([construction backend](CITY_STATION_CONSTRUCTION.md)); playable seeded starts,
-the station placement UI and growth remain planned gameplay.
+([construction backend](CITY_STATION_CONSTRUCTION.md)); the
+[main-scene preview](CITY_SCENE_PREVIEW.md) now connects startup, editors and station
+placement. Fully saved seeded starts and growth remain planned gameplay.
 The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes the
 generated world without default stations/trains and safely extends station-owned
-state as stations are purchased. Main-scene startup/editor integration remains pending.
+state as stations are purchased. Main-scene startup/editor integration is available
+in the development preview; normal new-game selection awaits persistence.
 The fixed three-station map remains the tutorial and supports existing saves.
 New sandbox layouts will instead contain cities and industries, with the player
 building stations beside cities and connecting useful services.
@@ -37,8 +39,9 @@ building stations beside cities and connecting useful services.
 3. **Station construction and catchments (backend implemented, UI pending):**
    horizontal five-tile platform previews, itemized purchase costs, exclusive nearest-city
    links and stale/safety checks are implemented ([details](CITY_STATION_CONSTRUCTION.md)).
-   Empty-start and station-owned state expansion are implemented. Connect them to
-   main-scene startup/editors and the fixed-tick placement tool.
+   Empty-start, station-owned state expansion, main-scene editors and fixed-tick
+   placement are connected in the development preview. Complete generated persistence
+   before exposing them through the normal New Game flow.
    The full tool will show price, supported orientation, platform
    footprint, building clearance and population served once population exists. A passenger station must
    connect to a nearby city's catchment. Cities own trip origins/destinations;

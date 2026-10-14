@@ -16,7 +16,9 @@ var rename_button: Button
 var status: Label
 var assignment_choice: OptionButton
 var start_station: OptionButton
+var start_destination: OptionButton
 var start_button: Button
+var freight_start_button: Button
 var start_copy: OptionButton
 var store_button: Button
 var capacity_button: Button
@@ -89,12 +91,17 @@ func configure(owner_game: Node) -> void:
 		start_station.add_item("Start at " + game.station_definitions()[key].name)
 		start_station.set_item_metadata(start_station.item_count - 1, key)
 	start_row.add_child(start_station)
+	start_destination = OptionButton.new()
+	start_destination.tooltip_text = "Destination for a new passenger route. The departure station is chosen separately."
+	start_row.add_child(start_destination)
+	start_station.item_selected.connect(func(_index: int) -> void: _refresh_start_destinations())
 	start_copy = OptionButton.new()
 	start_copy.tooltip_text = "Start with the default route, or copy an existing passenger service's stops, mode, waypoints and platforms. A copy starts at that service's first stop."
 	start_copy.clip_text = true
 	start_copy.custom_minimum_size.x = 170
 	start_row.add_child(start_copy)
 	start_button = _button(start_row, "Start new passenger service", _start_service)
+	freight_start_button = _button(start_row, "Start freight service", _start_freight)
 	store_button = _button(start_row, "Store & remove route", _store_service)
 	var upgrades := HFlowContainer.new()
 	box.add_child(upgrades)
@@ -130,6 +137,7 @@ func _button(parent: Node, title_text: String, callback: Callable) -> Button:
 
 func open_editor() -> void:
 	game.refresh_station_choices(start_station, "Start at ")
+	_refresh_start_destinations()
 	status.text = "Choose a model to buy or select an owned train to manage it."
 	refresh()
 	popup_centered_clamped(Vector2i(700, 620), 0.95)
@@ -145,7 +153,7 @@ func refresh() -> void:
 		train_list.set_item_metadata(train_list.item_count - 1, int(train["id"]))
 		if int(train["id"]) == selected_id:
 			selection = train_list.item_count - 1
-	train_list.select(selection)
+	if train_list.item_count > 0: train_list.select(selection)
 	_select_train(selection)
 	_model_changed(model_choice.selected)
 
@@ -155,6 +163,16 @@ func _model_changed(_index: int) -> void:
 	buy_button.disabled = game.money < int(model["price"]) or game.fleet["trains"].size() >= Fleet.MAX_TRAINS
 
 func _select_train(index: int) -> void:
+	if index < 0 or index >= train_list.item_count:
+		selected_id = -1
+		details.text = "No trains owned. Build and connect stations, then buy a train. Stored trains cost nothing to run."
+		name_field.text = ""
+		assignment_choice.clear()
+		start_copy.clear()
+		wagon_choice.clear()
+		wagon_details.text = ""
+		for button in [rename_button, assign_button, sell_button, service_button, start_button, freight_start_button, store_button, capacity_button, speed_button, attach_button, detach_button]: button.disabled = true
+		return
 	selected_id = int(train_list.get_item_metadata(index))
 	var train: Dictionary = Fleet.find(game.fleet, selected_id)
 	var model: Dictionary = Fleet.MODELS[train["model"]]
@@ -169,13 +187,18 @@ func _select_train(index: int) -> void:
 		assignment_choice.set_item_metadata(assignment_choice.item_count - 1, key)
 		if key == previous: assignment_choice.select(assignment_choice.item_count - 1)
 	assign_button.text = "Replace route's train"
-	start_button.disabled = service != "" or model.kind != "passenger"
+	start_button.disabled = service != "" or model.kind != "passenger" or game.station_definitions().size() < 2
+	freight_start_button.disabled = service != "" or model.kind != "freight" or game.services.has("freight")
+	freight_start_button.visible = game.city_builder.is_city_game()
+	rename_button.disabled = false
 	start_station.disabled = start_button.disabled
+	start_destination.disabled = start_button.disabled
 	var chosen_copy: String = str(start_copy.get_selected_metadata()) if start_copy.item_count > 0 else ""
 	start_copy.clear()
 	start_copy.add_item("Default route")
 	start_copy.set_item_metadata(0, "")
-	for key in game.additional_service_keys() + ["passenger"]:
+	for key in game.service_keys():
+		if not game.ServiceRoutes.is_passenger_key(key): continue
 		for linked in [false, true]:
 			if linked and game.services[key].has("link"): continue
 			start_copy.add_item(("Linked to " if linked else "Copy of ") + str(game.services[key].name))
@@ -200,7 +223,7 @@ func _select_train(index: int) -> void:
 		wagon_choice.add_item(Fleet.Consists.STOCK[stock].name)
 		wagon_choice.set_item_metadata(wagon_choice.item_count - 1, stock)
 	_describe_wagon()
-	assign_button.disabled = service != ""
+	assign_button.disabled = service != "" or assignment_choice.item_count == 0
 	sell_button.text = "Sell (£%d)" % Fleet.sale_price(train)
 	sell_button.disabled = service != ""
 	sell_button.tooltip_text = "Only stored trains can be sold. Refund: half the model and upgrade purchase costs."
@@ -237,8 +260,22 @@ func _toggle_service() -> void:
 func _start_service() -> void:
 	var source: String = str(start_copy.get_selected_metadata()) if start_copy.item_count > 0 else ""
 	if source != "": status.text = game.duplicate_passenger_service(selected_id, source.trim_prefix("link:"), source.begins_with("link:"))
-	else: status.text = game.start_passenger_service(selected_id, start_station.get_selected_metadata())
+	else: status.text = game.start_passenger_service(selected_id, start_station.get_selected_metadata(), str(start_destination.get_selected_metadata()) if start_destination.item_count > 0 else "")
 	refresh()
+
+func _start_freight() -> void:
+	status.text = game.start_freight_service(selected_id)
+	refresh()
+
+func _refresh_start_destinations() -> void:
+	var selected: String = str(start_destination.get_selected_metadata()) if start_destination.item_count > 0 else ""
+	var origin: String = str(start_station.get_selected_metadata()) if start_station.item_count > 0 else ""
+	start_destination.clear()
+	for key in game.station_definitions():
+		if key == origin: continue
+		start_destination.add_item("To " + str(game.station_definitions()[key].name))
+		start_destination.set_item_metadata(start_destination.item_count - 1, key)
+		if key == selected: start_destination.select(start_destination.item_count - 1)
 
 func _store_service() -> void:
 	status.text = game.remove_passenger_service(selected_id)

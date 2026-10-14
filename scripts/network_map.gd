@@ -100,6 +100,9 @@ func _draw() -> void:
 		var world_position: Vector2 = (
 			Vector2(cell) + Vector2(0.5, 0.5)
 		) * world_tile_size
+		if facility.get("settlement", false):
+			draw_rect(Rect2(_world_to_map(world_position) - Vector2(4, 4), Vector2(8, 8)), color, false, 1)
+			continue
 
 		draw_rect(
 			Rect2(

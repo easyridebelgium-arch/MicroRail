@@ -3,8 +3,9 @@
 `scripts/core/sandbox_start.gd` initializes the construction-stage state of a
 seeded game without instantiating the legacy main scene or its default actors.
 It connects generated geometry, RNG continuation and station purchase rules to
-station-owned passenger state. It is not yet a playable new-game mode or a game
-save format.
+station-owned passenger state. It now drives the
+[main-scene development preview](CITY_SCENE_PREVIEW.md), but is not yet a normal
+New Game choice or a game save format.
 
 ## Initial state
 
@@ -69,8 +70,8 @@ initial state, no phantom queues, first/second/third station purchases, preserva
 of nonempty passenger/measurement/journey state, cost accounting, failed-purchase
 atomicity, independent starts and JSON-safe RNG continuation.
 
-Next, adapt main-scene startup, editor controls and actor access to absent primary
-services, then connect station placement and dynamic state adoption to its fixed-tick
-commands. Preserve active physical trains when adding later stations. Add city
-rendering and full generated-game save validation before exposing the new-game
-selector. Root save version 39 and tutorial loading remain unchanged in this batch.
+Main-scene startup/editor controls and actor access now support absent primary
+services. Station placement, city rendering and dynamic state adoption are connected
+to fixed-tick commands, preserving active physical trains. Next, add full
+generated-game save validation/restoration before exposing the normal new-game
+selector. Root save version 39 and tutorial loading remain unchanged.

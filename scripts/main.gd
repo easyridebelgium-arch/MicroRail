@@ -2,6 +2,10 @@ extends Node2D
 
 const WorldCatalog = preload("res://scripts/core/world_catalog.gd")
 var world = WorldCatalog.new()
+const CityBuildTool = preload("res://scripts/city_build_tool.gd")
+var city_builder: RefCounted
+@export var startup_city_seed := ""
+@export_range(3, 8, 1) var startup_city_count := 4
 
 const TILE_SIZE: int = 32
 
@@ -403,17 +407,12 @@ func _ready() -> void:
 	InputActions.apply_mouse_bindings(GameSettings.mouse_bindings)
 	GameSettings.apply(get_window())
 
-	# A new game gets a fresh seed; loading a save restores the saved one.
-	sim_rng.randomize_seed()
-
-	# Each station includes a horizontal platform track.
-	tracks[STATION_A] = false
-	tracks[STATION_B] = false
-	tracks[STATION_C] = false
-	tracks[FOREST_SITE] = false
-	tracks[CARGO_TERMINAL] = false
-
-	train_position = _cell_center(STATION_A)
+	city_builder = CityBuildTool.new(self)
+	if not city_builder.prepare():
+		# Tutorial startup remains unchanged.
+		sim_rng.randomize_seed()
+		for cell in [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]: tracks[cell] = false
+		train_position = _cell_center(STATION_A)
 	_update_instructions()
 	queue_redraw()
 	_setup_toolbar()
@@ -437,6 +436,7 @@ func _ready() -> void:
 	_setup_signal_tool()
 	_setup_speed_control()
 	_setup_waypoint_tool()
+	city_builder.configure()
 	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
@@ -490,7 +490,7 @@ func _simulation_step(step_seconds: float) -> void:
 	movement_conflicts.clear()
 	movement_blocks.clear()
 	traffic_wait_samples.clear()
-	forest_stock -= freight_train.advance(step_seconds, forest_stock)
+	if services.has("freight"): forest_stock -= freight_train.advance(step_seconds, forest_stock)
 
 	if _passenger_service_is_active():
 		_move_train(step_seconds)
@@ -603,6 +603,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed(InputActions.CANCEL):
+		if city_builder.active:
+			_reset_track_tools()
+			return
 		if right_pending:
 			_reset_track_tools()
 			return
@@ -633,6 +636,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_reset_track_tools()
 				return
 			_clear_direct_inspection()
+			if city_builder.active:
+				city_builder.submit(cell)
+				return
 			if demolition_mode:
 				if _is_inside_map(cell):
 					is_dragging = true
@@ -685,6 +691,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_finish_track_drag(cell)
 
 func _check_route(force_reset: bool = false) -> void:
+	if not services.has("passenger"):
+		for key in additional_service_keys(): passenger_services[key].rebuild_at_home(self)
+		_refresh_freight_route([])
+		_refresh_switch_states([])
+		_refresh_directional_routes()
+		_rebuild_reservations()
+		return
 	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}), station_definitions())
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
@@ -810,6 +823,9 @@ func facility_cells(installed_override: int = -1, factory_override: int = -1, ca
 	return cells
 
 func _is_station_space(cell: Vector2i, installed_override: int = -1, factory_override: int = -1, catalog: RefCounted = null) -> bool:
+	var source = world if catalog == null else catalog
+	for town in source.state.settlements:
+		if CityBuildTool.Generator.town_bounds(Vector2i(int(town.cell[0]), int(town.cell[1]))).has_point(cell): return true
 	for station in facility_cells(installed_override, factory_override, catalog):
 		var inside_columns: bool = (
 			cell.x >= station.x - 1
@@ -833,7 +849,9 @@ func _can_build_at(cell: Vector2i) -> bool:
 
 func _update_instructions() -> void:
 	var direction: String = "Draw track: follow the mouse" if draw_track_mode else "Connect track: drag between two points"
-	if inspect_mode:
+	if city_builder != null and city_builder.active:
+		direction = "Station: " + str(city_builder.preview(hovered_cell).message)
+	elif inspect_mode:
 		direction = "Inspect: click a train, station or industry"
 	elif waypoint_tool_mode:
 		direction = "Waypoints: click track, then choose service/leg in Routes"
@@ -958,13 +976,16 @@ func _set_top_left_rect(control: Control, top: float, bottom: float) -> void:
 
 func _draw() -> void:
 	_draw_grid()
+	city_builder.draw_cities()
 	for cell in tracks:
 		_draw_track(cell, tracks[cell], false)
 	_draw_construction_draft()
 	_draw_inspection_paths()
 	for row in world.facilities():
 		_draw_station(row.cell, row.name)
-	if inspect_mode:
+	if city_builder.active:
+		city_builder.draw_preview()
+	elif inspect_mode:
 		if selected_station != Vector2i(-1, -1):
 			draw_rect(Rect2(Vector2(selected_station) * TILE_SIZE, Vector2.ONE * TILE_SIZE).grow(3.0), Color(1.0, 0.85, 0.25), false, 2.0)
 	elif is_dragging and demolition_mode:
@@ -983,8 +1004,8 @@ func _draw() -> void:
 	_draw_waypoints()
 	_draw_signals()
 	_draw_train()
-	_draw_route_badge("passenger", train_position)
-	_draw_route_badge("freight", freight_train.position)
+	if services.has("passenger"): _draw_route_badge("passenger", train_position)
+	if services.has("freight"): _draw_route_badge("freight", freight_train.position)
 	for key in additional_service_keys():
 		var running = passenger_services[key]
 		_draw_passenger_consist(key, running.path, running.distance, running.position, running.heading, running.forward)
@@ -1126,6 +1147,7 @@ func _draw_station(cell: Vector2i, station_name: String) -> void:
 
 
 func _draw_train() -> void:
+	if not services.has("passenger"): return
 	_draw_passenger_consist("passenger", route_path, route_distance, train_position, train_heading, travelling_to_b)
 
 func _draw_passenger_vehicle(at: Vector2, angle: float, id: int) -> void:
@@ -1202,6 +1224,8 @@ func _execute_command(command: Dictionary) -> void:
 	var data: Dictionary = command["data"]
 
 	match str(command["type"]):
+		"build_station":
+			city_builder.execute(data)
 		"build":
 			_execute_build(data)
 		"demolish":
@@ -1297,6 +1321,10 @@ func _execute_build(data: Dictionary) -> void:
 			return
 	var transaction = ConstructionPlan.new({"track": TRACK_BUILD_COST, "refund": TRACK_REFUND, "switch": SWITCH_COST})
 	transaction.stage(changes, tracks)
+	var loading_error := _loading_edits_error(changes)
+	if not loading_error.is_empty():
+		_show_notice(loading_error)
+		return
 	var error: String = transaction.validate(tracks, reservations.owners, track_signals, Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected, money)
 	if not error.is_empty():
 		_show_notice(error)
@@ -1457,6 +1485,9 @@ func _start_new_game(slot: int) -> void:
 
 
 func _save_game(slot: int = 0) -> bool:
+	if city_builder.is_city_game():
+		_show_notice("Development city mode: generated-game save/load is not enabled yet. Tutorial save slots remain available.")
+		return false
 	if slot == 0: slot = active_save_slot
 	if slot < 1 or slot > SaveSlots.COUNT: return false
 	var save_path := SaveSlots.path(slot)
@@ -2009,6 +2040,7 @@ func _is_valid_track_type(value: Variant) -> bool:
 
 
 func _update_train_transform() -> void:
+	if not services.has("passenger"): return
 	if route_path.point_count < 2:
 		train_position = _cell_center(ServiceRoutes.stop_cell(services["passenger"].get("platforms", {}), services["passenger"]["stops"][0], station_definitions()))
 		train_heading = 0.0
@@ -2065,6 +2097,7 @@ func _setup_toolbar() -> void:
 
 
 func _reset_track_tools(keep_right_gesture: bool = false) -> void:
+	if city_builder != null: city_builder.active = false
 	if not keep_right_gesture:
 		right_pending = false
 		right_removing = false
@@ -2171,6 +2204,7 @@ func _select_remove_tool() -> void:
 
 
 func _select_straight_track() -> void:
+	if city_builder != null: city_builder.active = false
 	demolition_mode = false
 	inspect_mode = false
 	switch_tool_mode = false
@@ -2184,6 +2218,7 @@ func _select_straight_track() -> void:
 
 
 func _select_curved_track() -> void:
+	if city_builder != null: city_builder.active = false
 	demolition_mode = false
 	inspect_mode = false
 	switch_tool_mode = false
@@ -2197,6 +2232,7 @@ func _select_curved_track() -> void:
 
 
 func _toggle_switch_tool() -> void:
+	if city_builder != null: city_builder.active = false
 	demolition_mode = false
 	signal_tool_mode = false
 	waypoint_tool_mode = false
@@ -2228,15 +2264,16 @@ func _open_save_folder() -> void:
 
 
 func _update_toolbar() -> void:
+	if city_builder != null: city_builder.refresh()
 	inspect_button.set_pressed_no_signal(inspect_mode)
 	if clock_label != null: clock_label.text = game_clock_text()
 
 	straight_button.set_pressed_no_signal(
-		not demolition_mode and not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and not draw_track_mode
+		not demolition_mode and not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and not draw_track_mode and not city_builder.active
 	)
 
 	curve_button.set_pressed_no_signal(
-		not demolition_mode and not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and draw_track_mode
+		not demolition_mode and not inspect_mode and not switch_tool_mode and not signal_tool_mode and not waypoint_tool_mode and draw_track_mode and not city_builder.active
 	)
 
 	if waypoint_button != null:
@@ -2258,7 +2295,9 @@ func _update_toolbar() -> void:
 		InputActions.key_label(InputActions.TOGGLE_PAUSE)
 	]
 
-	save_button.disabled = is_dragging
+	save_button.disabled = is_dragging or city_builder.is_city_game()
+	if city_builder.is_city_game(): save_button.tooltip_text = "Development city mode: generated-game saving is pending."
+	else: save_button.tooltip_text = str(save_button.get_meta("toolbar_label", "Save")) + "\nChoose one of four save slots. Its previous save becomes that slot's backup. Opens paused."
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
@@ -2330,6 +2369,9 @@ func _input(event: InputEvent) -> void:
 func _reset_camera() -> void:
 	camera.zoom = Vector2.ONE / applied_ui_scale
 	camera.position = get_viewport_rect().size / camera.zoom / 2.0
+	if city_builder != null and city_builder.is_city_game() and not world.state.settlements.is_empty():
+		var first: Array = world.state.settlements[0].cell
+		camera.position = _cell_center(Vector2i(int(first[0]), int(first[1])))
 	camera.force_update_scroll()
 
 
@@ -2480,6 +2522,7 @@ func _setup_station_inspector() -> void:
 
 
 func _toggle_inspect_mode() -> void:
+	if city_builder != null: city_builder.active = false
 	demolition_mode = false
 	_clear_direct_inspection()
 	inspect_mode = not inspect_mode
@@ -2563,7 +2606,7 @@ func _update_station_details() -> void:
 	sawmill_button.tooltip_text = build_sawmill_reason()
 	_update_amenity_buttons(_station_key(selected_station))
 
-	if not passenger_services.is_empty():
+	if not passenger_services.is_empty() or not services.has("passenger"):
 		capacity_upgrade_button.hide()
 		speed_upgrade_button.hide()
 		service_button.hide()
@@ -2717,10 +2760,12 @@ func _remove_station_space_tracks(track_data: Dictionary) -> int:
 
 	return removed_count
 func _get_train_capacity() -> int:
+	if Fleet.assigned(fleet, "passenger").is_empty(): return 0
 	return int(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["capacity"]) + capacity_upgrade_level * CAPACITY_PER_UPGRADE + Consists.extra_capacity(Fleet.assigned(fleet, "passenger"))
 
 
 func _get_train_speed() -> float:
+	if Fleet.assigned(fleet, "passenger").is_empty(): return 0.0
 	return minf(float(Fleet.MODELS[Fleet.assigned(fleet, "passenger")["model"]]["speed"]) + speed_upgrade_level * SPEED_PER_UPGRADE, Consists.speed_limit(Fleet.assigned(fleet, "passenger")))
 
 func _get_capacity_upgrade_price() -> int:
@@ -2808,6 +2853,15 @@ func _produce_logs(delta: float) -> void:
 			logs_produced += produced
 
 func _update_freight_inspector() -> void:
+	if not services.has("freight"):
+		capacity_upgrade_button.hide()
+		speed_upgrade_button.hide()
+		service_button.hide()
+		freight_rule_label.hide()
+		freight_rule_option.hide()
+		station_title.text = "Freight facilities"
+		station_details.text = "No freight train assigned. Connect forest and terminal loading tiles, buy a freight locomotive in Fleet, then start its freight service."
+		return
 	capacity_upgrade_button.show()
 	speed_upgrade_button.show()
 
@@ -2966,6 +3020,8 @@ func _setup_freight_train() -> void:
 	freight_train.logs_received.connect(func(amount: int) -> void: _record_event(EventLog.CARGO_DELIVERED, "freight", {"logs": amount, "stop": "sawmill", "payment": 0}))
 	freight_train.timber_received.connect(func(amount: int) -> void: _record_event(EventLog.CARGO_DELIVERED, "freight", {"timber": amount, "stop": "factory", "payment": 0}))
 	add_child(freight_train)
+	freight_train.visible = services.has("freight")
+	freight_train.service_enabled = services.has("freight")
 	_refresh_freight_route(route_cells)
 
 
@@ -2973,6 +3029,7 @@ func _find_freight_route(
 	track_data: Dictionary,
 	_passenger_cells: Array[Vector2i]
 ) -> Array[Vector2i]:
+	if not services.has("freight"): return []
 	return WaypointRouter.find_route(track_data, FOREST_SITE, CARGO_TERMINAL, services["freight"].get("waypoints", {}).get("forest>terminal", []))
 
 func _refresh_freight_route(passenger_cells: Array[Vector2i]) -> void:
@@ -3287,6 +3344,7 @@ func _update_history_controls() -> void:
 		undo_button.tooltip_text = "Undo the latest paused construction action."
 		redo_button.tooltip_text = "Repeat the latest undone construction action."
 func _passenger_service_is_active() -> bool:
+	if not services.has("passenger"): return false
 	if passenger_held:
 		return false
 	if not route_connected:
@@ -3307,6 +3365,7 @@ func _passenger_service_is_active() -> bool:
 
 
 func _passenger_service_status() -> String:
+	if not services.has("passenger"): return "City development mode — build stations, connect track and start trains in Fleet. Saving pending."
 	var title: String = services["passenger"]["name"]
 	if not route_connected:
 		return title + ": " + passenger_route_error
@@ -3380,6 +3439,7 @@ func _update_service_button() -> void:
 				"Resume service, or cancel a pending withdrawal."
 			)
 func _can_demolish(cell: Vector2i) -> bool:
+	if city_builder.platform_protected(cell): return false
 	if planning_mode:
 		return _is_inside_map(cell) and not _plan_protected(cell) and construction_plan.projected(tracks).has(cell)
 	if not _is_inside_map(cell):
@@ -3628,6 +3688,8 @@ func _apply_settings() -> void:
 
 func _facility_markers() -> Array[Dictionary]:
 	var markers: Array[Dictionary] = []
+	for town in world.state.settlements:
+		markers.append({"id": town.id, "cell": Vector2i(int(town.cell[0]), int(town.cell[1])), "color": Color("#d9c5a4"), "settlement": true})
 	for row in world.facilities():
 		var role := Palette.Role.FACILITY_STATION
 		if row.kind == "forest": role = Palette.Role.FACILITY_FOREST
@@ -3683,14 +3745,11 @@ func _update_network_map() -> void:
 
 	network_map.track_data = tracks
 
-	network_map.train_positions = [
-		train_position,
-		freight_train.position
-	]
-
-	for key in additional_service_keys(): network_map.train_positions.append(passenger_services[key].position)
-	network_map.train_kinds = ["passenger", "freight"]
-	for key in additional_service_keys(): network_map.train_kinds.append("passenger")
+	network_map.train_positions = []
+	network_map.train_kinds = []
+	for key in service_keys():
+		network_map.train_positions.append(train_position if key == "passenger" else freight_train.position if key == "freight" else passenger_services[key].position)
+		network_map.train_kinds.append("freight" if key == "freight" else "passenger")
 	var visible_world_size: Vector2 = (
 		get_viewport_rect().size / camera.zoom
 	)
@@ -3735,6 +3794,7 @@ func _scenario_metrics() -> Dictionary:
 
 
 func _check_scenario_objectives() -> void:
+	if city_builder.is_city_game(): return
 	if scenario_goals.is_complete():
 		return
 
@@ -3829,6 +3889,13 @@ func _toggle_objective_panel() -> void:
 
 
 func _update_objective_panel() -> void:
+	if city_builder.is_city_game():
+		objective_heading.text = "CITY DEVELOPMENT PREVIEW"
+		objective_description.text = "Build stations beside cities, connect track, then buy and start trains in Fleet."
+		objective_details.text = "Seed %s | %d cities | Save/load pending" % [world.state.layout_seed, world.state.settlements.size()]
+		objective_progress.max_value = world.state.settlements.size()
+		objective_progress.value = world.stations().size()
+		return
 	if not objective_panel.visible:
 		return
 
@@ -3881,6 +3948,10 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 		return
 	build_last_hover = target
 	var fixed: Array[Vector2i] = facility_cells()
+	if city_builder.is_city_game():
+		for station in world.stations().values():
+			for platform_cell in CityBuildTool.Construction.platform_cells(station.cell):
+				if not fixed.has(platform_cell): fixed.append(platform_cell)
 	var cells: Array[Vector2i]
 	if draw_track_mode:
 		if build_stroke.is_empty():
@@ -3959,11 +4030,13 @@ func _station_key(cell: Vector2i) -> String:
 
 
 func _next_passenger_stop() -> int:
+	if not services.has("passenger"): return -1
 	if passenger_returning: return passenger_return_stop
 	if _passenger_is_loop(): return (passenger_stop_index + 1) % services["passenger"]["stops"].size()
 	return passenger_stop_index + (1 if travelling_to_b else -1)
 
 func _passenger_is_loop() -> bool:
+	if not services.has("passenger"): return false
 	return services["passenger"].get("mode", "shuttle") == "loop"
 
 func _passenger_target_distance() -> float:
@@ -4126,7 +4199,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 	return {"configuration": resolved, "notes": notes}
 
 func apply_service_routes(configuration: Dictionary) -> String:
-	if ServiceRoutes.is_valid(configuration, station_definitions(), world.industry_positions()): configuration = ServiceRoutes.propagate(configuration)
+	if ServiceRoutes.is_valid(configuration, station_definitions(), world.industry_positions(), not city_builder.is_city_game()): configuration = ServiceRoutes.propagate(configuration)
 	var auto_resolved := _resolve_auto_platforms(configuration)
 	configuration = auto_resolved["configuration"]
 	var result := _apply_resolved_routes(configuration)
@@ -4135,7 +4208,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	return result
 
 func _apply_resolved_routes(configuration: Dictionary) -> String:
-	if not ServiceRoutes.is_valid(configuration, station_definitions(), world.industry_positions()):
+	if not ServiceRoutes.is_valid(configuration, station_definitions(), world.industry_positions(), not city_builder.is_city_game()):
 		return "Use a name of 1–40 characters and at least two different passenger stops."
 	if not paused:
 		return "Pause before changing routes."
@@ -4162,8 +4235,8 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 		var built := ServiceRoutes.build(tracks, proposed.stops, float(TILE_SIZE), proposed.get("waypoints", {}), proposed.get("mode", "shuttle"), proposed.get("platforms", {}), station_definitions())
 		if built.cells.is_empty(): return "%s: complete the new route before applying." % current.name
 		extra_built[key] = built
-	var changed: bool = configuration["passenger"].get("mode", "shuttle") != services["passenger"].get("mode", "shuttle") or configuration["passenger"]["stops"] != services["passenger"]["stops"] or configuration["passenger"].get("waypoints", {}) != services["passenger"].get("waypoints", {}) or configuration["passenger"].get("platforms", {}) != services["passenger"].get("platforms", {})
-	var freight_changed: bool = configuration["freight"].get("waypoints", {}) != services["freight"].get("waypoints", {})
+	var changed: bool = configuration.has("passenger") and (configuration["passenger"].get("mode", "shuttle") != services["passenger"].get("mode", "shuttle") or configuration["passenger"]["stops"] != services["passenger"]["stops"] or configuration["passenger"].get("waypoints", {}) != services["passenger"].get("waypoints", {}) or configuration["passenger"].get("platforms", {}) != services["passenger"].get("platforms", {}))
+	var freight_changed: bool = configuration.has("freight") and configuration["freight"].get("waypoints", {}) != services["freight"].get("waypoints", {})
 	if freight_changed:
 		if freight_train.distance_along_route > 0.001 or freight_train.recovery_returning:
 			return "Freight waypoint edits require the train physically at the forest. Hold or withdraw it first."
@@ -4192,7 +4265,8 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	_update_instructions()
 	_update_station_inspector()
 	queue_redraw()
-	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected else "Routes applied. " + passenger_route_error
+	if city_builder.is_city_game(): return "Routes applied. Close and resume. Development city changes cannot be saved yet."
+	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected or not services.has("passenger") else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
 	return (loans_dialog != null and loans_dialog.visible) or (header_controls != null and header_controls.accounts_dialog.visible) or (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
@@ -4224,19 +4298,27 @@ func _open_fleet_editor() -> void:
 	fleet_editor.open_editor()
 
 func _sync_fleet_upgrades() -> void:
+	if not services.has("passenger") and not services.has("freight"): return
 	var passenger: Dictionary = Fleet.assigned(fleet, "passenger")
-	passenger["capacity_level"] = capacity_upgrade_level
-	passenger["speed_level"] = speed_upgrade_level
+	if not passenger.is_empty():
+		passenger["capacity_level"] = capacity_upgrade_level
+		passenger["speed_level"] = speed_upgrade_level
 	if freight_train != null:
 		var freight: Dictionary = Fleet.assigned(fleet, "freight")
-		freight["capacity_level"] = freight_train.capacity_level
-		freight["speed_level"] = freight_train.speed_level
+		if not freight.is_empty():
+			freight["capacity_level"] = freight_train.capacity_level
+			freight["speed_level"] = freight_train.speed_level
 
 func _apply_fleet_specs() -> void:
 	var passenger: Dictionary = Fleet.assigned(fleet, "passenger")
-	capacity_upgrade_level = int(passenger["capacity_level"])
-	speed_upgrade_level = int(passenger["speed_level"])
+	if not passenger.is_empty():
+		capacity_upgrade_level = int(passenger["capacity_level"])
+		speed_upgrade_level = int(passenger["speed_level"])
 	var freight: Dictionary = Fleet.assigned(fleet, "freight")
+	freight_train.visible = not freight.is_empty()
+	if freight.is_empty():
+		freight_train.service_enabled = false
+		return
 	var model: Dictionary = Fleet.MODELS[freight["model"]]
 	freight_train.base_capacity = int(model["capacity"]) + Consists.extra_capacity(freight)
 	freight_train.base_speed = float(model["speed"])
@@ -4395,10 +4477,9 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 	authority_tick = sim_clock.tick
 	var passenger := Fleet.assigned(fleet, "passenger")
 	var freight := Fleet.assigned(fleet, "freight")
-	var trains: Array = [
-		{"id": int(passenger["id"]), "length": _fleet_length(passenger), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0 and not section_held.has(int(passenger["id"])) and not _scheduled_departure_hold("passenger")},
-		{"id": int(freight["id"]), "length": _fleet_length(freight), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.ready_to_move(forest_stock)}
-	]
+	var trains: Array = []
+	if not passenger.is_empty(): trains.append({"id": int(passenger["id"]), "length": _fleet_length(passenger), "cells": route_cells, "path": _reservation_path(route_path, train_position), "distance": route_distance if route_path.point_count >= 2 else 0.0, "forward": travelling_to_b, "moving": (allow_movement or not paused) and _passenger_service_is_active() and wait_remaining <= 0.0 and not section_held.has(int(passenger["id"])) and not _scheduled_departure_hold("passenger")})
+	if not freight.is_empty(): trains.append({"id": int(freight["id"]), "length": _fleet_length(freight), "cells": freight_train.route_cells, "path": _reservation_path(freight_train.route_path, freight_train.position), "distance": freight_train.distance_along_route, "forward": freight_train.to_terminal, "moving": (allow_movement or not paused) and freight_train.ready_to_move(forest_stock)})
 	for key in additional_service_keys():
 		var running = passenger_services[key]
 		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0 and not section_held.has(int(Fleet.assigned(fleet, key).id)) and not _scheduled_departure_hold(key)})
@@ -5006,6 +5087,7 @@ func _setup_signal_tool() -> void:
 	signal_button.focus_mode = Control.FOCUS_NONE
 	signal_button.tooltip_text = "Click straight track: automatic block signal → manual stop → remove. Signals apply in both directions."
 	signal_button.pressed.connect(func() -> void:
+		city_builder.active = false
 		demolition_mode = false
 		signal_tool_mode = not signal_tool_mode
 		waypoint_tool_mode = false
@@ -5126,6 +5208,7 @@ func _setup_waypoint_tool() -> void:
 	waypoint_button.focus_mode = Control.FOCUS_NONE
 	waypoint_button.tooltip_text = "Select a track cell, then assign it to a service leg in Routes."
 	waypoint_button.pressed.connect(func() -> void:
+		city_builder.active = false
 		demolition_mode = false
 		waypoint_tool_mode = not waypoint_tool_mode
 		signal_tool_mode = false
@@ -5160,7 +5243,10 @@ func additional_service_keys() -> Array:
 	return keys
 
 func service_keys() -> Array:
-	return ["passenger", "freight"] + additional_service_keys()
+	var keys: Array = []
+	for key in ["passenger", "freight"]:
+		if services.has(key): keys.append(key)
+	return keys + additional_service_keys()
 
 func _saved_passenger_services() -> Dictionary:
 	var result: Dictionary = {}
@@ -5174,17 +5260,27 @@ func _valid_service_assignments(configuration: Dictionary, owned: Dictionary) ->
 		if train.service != "" and not configuration.has(train.service): return false
 	return true
 
-func start_passenger_service(id: int, home: String = "a") -> String:
+func start_passenger_service(id: int, home: String = "a", destination: String = "") -> String:
 	if not paused: return "Pause before starting a service."
 	var train := Fleet.find(fleet, id)
 	if train.is_empty() or train.service != "" or Fleet.MODELS[train.model].kind != "passenger": return "Choose a stored passenger train."
 	if not station_definitions().has(home): return "Choose a passenger starting station."
-	if services.size() >= ServiceRoutes.MAX_PASSENGER_SERVICES + 1: return "This prototype supports up to eight active passenger services."
+	if station_definitions().size() < 2: return "Build at least two passenger stations first."
+	if service_keys().filter(func(key: String) -> bool: return key != "freight").size() >= ServiceRoutes.MAX_PASSENGER_SERVICES: return "This prototype supports up to eight active passenger services."
 	var service_id := id
 	# Replacement can leave the original service attached to a different train.
 	while services.has("passenger_%d" % service_id): service_id = service_id % 999999999 + 1
 	var key := "passenger_%d" % service_id
-	var configuration := {"name": "Passenger Service %d" % id, "stops": [home, "b" if home == "a" else "a"], "mode": "shuttle", "waypoints": {}}
+	var other: String = "b" if home == "a" else "a"
+	if not station_definitions().has(other):
+		var keys: Array = station_definitions().keys()
+		keys.sort()
+		keys.erase(home)
+		other = str(keys[0])
+	if not destination.is_empty():
+		if not station_definitions().has(destination) or destination == home: return "Choose a different passenger destination."
+		other = destination
+	var configuration := {"name": "Passenger Service %d" % id, "stops": [home, other], "mode": "shuttle", "waypoints": {}}
 	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE), {}, "shuttle", {}, station_definitions())
 	if built.cells.is_empty(): return "Complete track from the starting station to %s first." % station_definitions()[configuration.stops[1]].name
 	var fit := _consist_service_fit(train, configuration)
@@ -5204,13 +5300,39 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	queue_redraw()
 	return "%s started at %s. Choose it in Routes to edit stops, mode and waypoints." % [configuration.name, station_definitions()[home].name]
 
+func start_freight_service(id: int) -> String:
+	if not paused: return "Pause before starting a service."
+	if not city_builder.is_city_game() or services.has("freight"): return "The freight service already exists."
+	var train := Fleet.find(fleet, id)
+	if train.is_empty() or train.service != "" or Fleet.MODELS[train.model].kind != "freight": return "Choose a stored freight locomotive."
+	var cells := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, [])
+	if cells.is_empty(): return "Connect the forest loading tile to the terminal loading tile first."
+	var configuration: Dictionary = ServiceRoutes.defaults().freight.duplicate(true)
+	var fit := _consist_service_fit(train, configuration)
+	if not fit.is_empty(): return fit
+	var path := RailRouter.make_path(cells, float(TILE_SIZE))
+	_rebuild_reservations()
+	for cell in reservations.footprint(path, 0, float(TILE_SIZE), Fleet.length(train)):
+		if reservations.owners.has(cell): return "The forest loading area is occupied or reserved. Let it clear first."
+	services["freight"] = configuration
+	train.service = "freight"
+	freight_train.set_route(cells, float(TILE_SIZE))
+	_apply_fleet_specs()
+	freight_train.service_enabled = true
+	_check_route()
+	_reset_traffic_state("Freight service started")
+	_rebuild_reservations()
+	_record_event(EventLog.ROUTE_CHANGED, str(id), {"service": "freight", "action": "created"})
+	queue_redraw()
+	return "Freight service started. Close and resume to run."
+
 ## Starts a stored train as a copy of an existing passenger service: same stops,
 ## mode, waypoints and platforms, its own name. It starts at the source's first
 ## stop on platform 1; if the copy cannot be applied the default service stays.
 func duplicate_passenger_service(id: int, source: String, linked: bool = false) -> String:
 	var original: Dictionary = services.get(source, {})
 	if original.is_empty() or not ServiceRoutes.is_passenger_key(source): return "Choose a passenger service to copy."
-	var message := start_passenger_service(id, str(original.stops[0]))
+	var message := start_passenger_service(id, str(original.stops[0]), str(original.stops[1]))
 	if not message.contains("started"): return message
 	var key: String = str(Fleet.find(fleet, id).service)
 	var copy: Dictionary = original.duplicate(true)
@@ -5572,9 +5694,16 @@ func _flush_notifications() -> void:
 
 
 func _plan_protected(cell: Vector2i) -> bool:
-	return _is_station_space(cell) or cell in facility_cells()
+	return _is_station_space(cell) or (cell in facility_cells() and (tracks.has(cell) or not city_builder.is_city_game())) or city_builder.platform_protected(cell)
+
+func _loading_edits_error(changes: Dictionary) -> String:
+	if not city_builder.is_city_game(): return ""
+	for cell in changes:
+		if cell in facility_cells() and not tracks.has(cell) and not TrackGeometry.same_connections(changes[cell], false): return "Industry loading tiles need horizontal track."
+	return ""
 
 func _set_planning_mode(enabled: bool) -> void:
+	city_builder.active = false
 	_clear_direct_inspection()
 	if not enabled and not construction_plan.is_empty():
 		inspection_panel.plan_toggle.set_pressed_no_signal(true)
@@ -5606,6 +5735,14 @@ func _apply_draft() -> bool:
 	paused = true
 	is_dragging = false
 	_rebuild_reservations()
+	for cell in construction_plan.signal_changes:
+		if cell in facility_cells():
+			_show_notice("Signals cannot be placed on facility loading tiles.")
+			return false
+	var loading_error := _loading_edits_error(construction_plan.changes)
+	if not loading_error.is_empty():
+		_show_notice(loading_error)
+		return false
 	var error: String = construction_plan.validate(tracks, reservations.owners, track_signals, Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected, money)
 	if not error.is_empty():
 		_show_notice(error)
@@ -5826,6 +5963,9 @@ func _setup_object_browser() -> void:
 
 func object_rows() -> Array:
 	var result: Array = []
+	var catchments: Dictionary = CityBuildTool.Construction.catchments(world.save_state())
+	for town in world.state.settlements:
+		result.append({"key": town.id, "kind": "City", "id": -1, "service": "", "title": town.name, "details": "%s\n%s\nBuild a station within six tiles of the city center. One station per city in this version." % [town.name, "No station built" if catchments[town.id] == "" else "Station: " + str(catchments[town.id])], "cell": Vector2i(int(town.cell[0]), int(town.cell[1]))})
 	var trains: Array = fleet.trains.duplicate()
 	trains.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.id) < int(b.id))
 	for train in trains:
@@ -5935,6 +6075,7 @@ func edit_consist(id: int, wagon: String, remove: bool = false) -> String:
 
 func _draw_passenger_consist(service: String, path: Curve2D, distance: float, position_at: Vector2, heading: float, forward: bool) -> void:
 	var train := Fleet.assigned(fleet, service)
+	if train.is_empty(): return
 	var offsets := Consists.offsets(train)
 	if offsets.size() == 1 or path.point_count < 2:
 		_draw_passenger_vehicle(position_at, heading, int(train.id))

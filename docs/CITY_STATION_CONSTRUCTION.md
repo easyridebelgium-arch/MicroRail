@@ -3,7 +3,8 @@
 `scripts/core/station_construction.gd` provides pure placement previews, catchment
 ownership and purchase transactions for the `seeded_flat` city profile. This
 increment does not add a station tool to the current tutorial or enable generated
-games in New Game. The placement UI and starting with no network/services come next.
+games in New Game. Placement UI and empty startup are now connected in the
+[main-scene development preview](CITY_SCENE_PREVIEW.md); generated-game saving is pending.
 
 ## First station rules
 
@@ -77,6 +78,7 @@ UI behavior is claimed by these backend tests.
 
 The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes an
 empty fleet/network and safely extends station-owned state during purchases.
-Next: connect that model to main-scene startup/editors, city rendering and an
-authoritative placement tool using these previews. Then enable a playable seeded start and its persistence.
+Main-scene startup/editors, city rendering and an authoritative placement tool are
+now connected in the development preview above. Next, finish generated-game save
+validation/restoration before exposing a normal seeded New Game choice.
 Service-driven city growth/decline follows those foundations.

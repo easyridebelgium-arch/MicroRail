@@ -40,6 +40,8 @@ var copy_source: OptionButton
 var copy_button: Button
 var directive_warning: Label
 var removed_waypoint_legs: Dictionary = {}
+var body: VBoxContainer
+var empty_label: Label
 
 func configure(owner_game: Node) -> void:
 	game = owner_game
@@ -53,9 +55,15 @@ func configure(owner_game: Node) -> void:
 	scroll.custom_minimum_size.y = 100
 	add_child(scroll)
 	var box := VBoxContainer.new()
+	body = box
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 10)
 	scroll.add_child(box)
+	empty_label = Label.new()
+	empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	empty_label.text = "No routes yet. Build and connect two passenger stations, buy a locomotive in Fleet, then choose Start new passenger service. A stored freight locomotive can start the forest–terminal service after its track is connected."
+	empty_label.hide()
+	box.add_child(empty_label)
 	service_choice = OptionButton.new()
 	service_choice.add_item("Passenger service")
 	service_choice.add_item("Freight service")
@@ -252,8 +260,15 @@ func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 		var train: Dictionary = game.Fleet.assigned(game.fleet, key)
 		service_choice.add_item("%s — #%d" % [game.services[key].name, int(train.id)])
 		service_choice.set_item_metadata(service_choice.item_count - 1, key)
+	for control in body.get_children(): control.visible = control != empty_label
+	get_ok_button().disabled = draft.is_empty()
+	if draft.is_empty():
+		for control in body.get_children(): control.visible = control == empty_label
+		selected_service_key = ""
+		popup_centered_clamped(Vector2i(680, 620), 0.95)
+		return
 	service_choice.select(0)
-	selected_service_key = "passenger"
+	selected_service_key = str(service_choice.get_item_metadata(0))
 	_show_service()
 	if cell.x >= 0:
 		waypoint_x.value = cell.x
@@ -265,6 +280,7 @@ func _key() -> String:
 	return selected_service_key
 
 func _capture_name(key: String) -> void:
+	if not draft.has(key): return
 	draft[key]["name"] = name_field.text.strip_edges()
 
 func _select_service(index: int) -> void:

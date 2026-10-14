@@ -267,7 +267,7 @@ var right_elapsed: float = 0.0
 var right_start_point: Vector2 = Vector2.ZERO
 var right_start_cell: Vector2i = Vector2i.ZERO
 
-var passenger_demand = PassengerDemand.new()
+var passenger_demand = PassengerDemand.new(world.stations().keys())
 var amenities = Amenities.new()
 var amenity_buttons: Dictionary = {}
 var passenger_destinations: Dictionary = {}
@@ -683,7 +683,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_finish_track_drag(cell)
 
 func _check_route(force_reset: bool = false) -> void:
-	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}))
+	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}), station_definitions())
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
 	for cell in track_signals.keys():
@@ -1321,7 +1321,7 @@ func _generate_passengers(delta: float) -> void:
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
 		var network := _passenger_network()
-		for key in PassengerDemand.STATIONS:
+		for key in passenger_demand.station_ids:
 			var experience: Dictionary = satisfaction.station(key, passenger_demand.waiting_groups(key, sim_clock.tick), sim_clock.tick, amenities.owned[key])
 			var arrivals: int = demand_response.arrivals(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), int(experience.rating), int(experience.boarded), not network[key].is_empty())
 			passenger_demand.generate(key, arrivals, amenities.queue_limit(key), sim_rng, sim_clock.tick, true)
@@ -1335,7 +1335,7 @@ func _passenger_network() -> Dictionary:
 		else:
 			if passenger_services[key].held or passenger_services[key].returning: continue
 		var config: Dictionary = services[key]
-		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), config.get("platforms", {}))
+		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), config.get("platforms", {}), station_definitions())
 		if not built.cells.is_empty(): available[key] = config
 	return PassengerJourneys.graph(available)
 
@@ -1609,7 +1609,11 @@ func _is_valid_number(value: Variant) -> bool:
 
 
 func _is_valid_save(data: Dictionary) -> bool:
-	if not ServiceRoutes.is_valid(data.get("services")) or not Fleet.is_valid(data.get("fleet")):
+	if not Sawmill.valid(data.get("sawmill")) or not Factory.valid(data.get("factory")): return false
+	if not WorldCatalog.valid_tutorial(data.get("world"), data.sawmill.installed, data.factory.installed): return false
+	var saved_catalog := WorldCatalog.new()
+	saved_catalog.restore_state(data.world)
+	if not ServiceRoutes.is_valid(data.get("services"), saved_catalog.stations()) or not Fleet.is_valid(data.get("fleet")):
 		return false
 	if not _valid_service_assignments(data["services"], data["fleet"]): return false
 	var extra: Variant = data.get("passenger_services")
@@ -1617,7 +1621,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	for key in data["services"]:
 		if key in ["passenger", "freight"]: continue
 		var assigned := Fleet.assigned(data["fleet"], key)
-		if PassengerService.from_save(key, extra.get(key), data["services"][key], Fleet.capacity(assigned)) == null: return false
+		if PassengerService.from_save(key, extra.get(key), data["services"][key], Fleet.capacity(assigned), saved_catalog.stations()) == null: return false
 	if extra.size() != data["services"].size() - 2: return false
 	var sim: Variant = data.get("sim")
 	if not sim is Dictionary:
@@ -1644,7 +1648,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if version_number != float(SAVE_VERSION):
 		return false
 
-	if not RuntimeRoutes.valid_state(data.get("runtime"), data.get("services", {})):
+	if not RuntimeRoutes.valid_state(data.get("runtime"), data.get("services", {}), saved_catalog.stations()):
 		return false
 	if not data.get("signals") is Array:
 		return false
@@ -1674,15 +1678,13 @@ func _is_valid_save(data: Dictionary) -> bool:
 		if train_x > _cell_center(STATION_B).x:
 			return false
 
-	if not Sawmill.valid(data.get("sawmill")) or not Factory.valid(data.get("factory")): return false
-	if not WorldCatalog.valid_tutorial(data.get("world"), data.sawmill.installed, data.factory.installed): return false
 	if not DemandResponse.valid_state(data.get("demand_response")): return false
 	if not Satisfaction.valid_state(data.get("satisfaction"), int(sim.clock.tick)): return false
 	if not Amenities.valid_save(data.get("amenities")): return false
 	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
 	if not Presentation.valid(data.get("presentation"), data.services): return false
 	var state: Dictionary = data["state"]
-	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger, int(sim.clock.tick)): return false
+	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger, int(sim.clock.tick), saved_catalog.stations().keys()): return false
 	if not PassengerClasses.valid_progress(data.demand.get("class_progress")): return false
 	if not JourneyLedger.valid_save(data.get("journeys"), data, int(sim.clock.tick)): return false
 
@@ -1836,6 +1838,8 @@ func _load_game(save_path: String = "") -> bool:
 	if not _is_valid_save(data):
 		_show_notice("The save file is damaged or incompatible.")
 		return false
+	var saved_catalog := WorldCatalog.new()
+	saved_catalog.restore_state(data.world)
 	var loaded_tracks: Dictionary = {}
 	for entry in data["tracks"]:
 		var cell := Vector2i(int(entry[0]), int(entry[1]))
@@ -1845,7 +1849,7 @@ func _load_game(save_path: String = "") -> bool:
 		loaded_tracks[cell] = entry[2]
 	var runtime: Dictionary = data["runtime"]
 	var saved_passenger := RuntimeRoutes.decode(runtime["passenger_cells"])
-	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {})) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {}))
+	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {}), saved_catalog.stations()) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {}), saved_catalog.stations())
 	var loaded_cells: Array[Vector2i] = []
 	loaded_cells.assign(built["cells"])
 	var loaded_path: Curve2D = built["path"]
@@ -1890,12 +1894,12 @@ func _load_game(save_path: String = "") -> bool:
 	var loaded_services := ServiceRoutes.from_save(data["services"])
 	var loaded_extra: Dictionary = {}
 	for key in data["passenger_services"]:
-		loaded_extra[key] = PassengerService.from_save(key, data["passenger_services"][key], loaded_services[key], Fleet.capacity(Fleet.assigned(data["fleet"], key)))
+		loaded_extra[key] = PassengerService.from_save(key, data["passenger_services"][key], loaded_services[key], Fleet.capacity(Fleet.assigned(data["fleet"], key)), saved_catalog.stations())
 	# Validate full bodies even when only the original passenger/freight pair exists.
 	var footprints: Dictionary = {}
 	var helper := Reservations.new()
 	var positions: Array = [
-		{"mode": loaded_services.passenger.get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, "passenger")), "cells": loaded_cells, "path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.stop_cell(loaded_services.passenger.get("platforms", {}), loaded_services.passenger.stops[0]))), "distance": loaded_distance},
+		{"mode": loaded_services.passenger.get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, "passenger")), "cells": loaded_cells, "path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.stop_cell(loaded_services.passenger.get("platforms", {}), loaded_services.passenger.stops[0], saved_catalog.stations()))), "distance": loaded_distance},
 		{"length": Fleet.length(Fleet.assigned(data.fleet, "freight")), "cells": loaded_freight_cells, "path": _reservation_path(loaded_freight_path, _cell_center(FOREST_SITE)), "distance": float(data["freight"]["distance"])}
 	]
 	for key in loaded_extra: positions.append({"mode": loaded_services[key].get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, key)), "cells": loaded_extra[key].cells, "path": loaded_extra[key].path, "distance": loaded_extra[key].distance})
@@ -1935,7 +1939,7 @@ func _load_game(save_path: String = "") -> bool:
 			TYPE_BOOL: set(field, state[field])
 	world.restore_state(data.world)
 	network_map.facilities = _facility_markers()
-	passenger_demand.restore_state(data.demand)
+	passenger_demand.restore_state(data.demand, saved_catalog.stations().keys())
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
 	amenities.load_save(data.amenities)
 	loans.restore_state(data.loans)
@@ -2002,7 +2006,7 @@ func _is_valid_track_type(value: Variant) -> bool:
 
 func _update_train_transform() -> void:
 	if route_path.point_count < 2:
-		train_position = _cell_center(ServiceRoutes.stop_cell(services["passenger"].get("platforms", {}), services["passenger"]["stops"][0]))
+		train_position = _cell_center(ServiceRoutes.stop_cell(services["passenger"].get("platforms", {}), services["passenger"]["stops"][0], station_definitions()))
 		train_heading = 0.0
 		return
 
@@ -4004,7 +4008,7 @@ func _buy_amenity(id: String) -> void:
 func _destination_queue_text(station: String) -> String:
 	var lines: PackedStringArray = ["Waiting capacity: %d / %d" % [_waiting(station), amenities.queue_limit(station)]]
 	var network := _passenger_network()
-	for destination in PassengerDemand.STATIONS:
+	for destination in passenger_demand.station_ids:
 		if destination == station: continue
 		var journey := PassengerJourneys.plan(network, station, destination)
 		var connection := " — no enabled connection"
@@ -4050,7 +4054,7 @@ const FIRST_PLATFORM_MESSAGE := "The first stop's platform cannot change while t
 # fixed while the same station remains the first stop.
 func _first_platform_changed(proposed: Dictionary, current: Dictionary) -> bool:
 	if proposed.stops[0] != current.stops[0]: return false
-	return ServiceRoutes.stop_cell(proposed.get("platforms", {}), proposed.stops[0]) != ServiceRoutes.stop_cell(current.get("platforms", {}), current.stops[0])
+	return ServiceRoutes.stop_cell(proposed.get("platforms", {}), proposed.stops[0], station_definitions()) != ServiceRoutes.stop_cell(current.get("platforms", {}), current.stops[0], station_definitions())
 
 ## Replaces "Auto" (0) platform choices in a draft with concrete numbers.
 ## Returns {"configuration", "notes": PackedStringArray}. Stored services never
@@ -4102,7 +4106,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 				trial[stop] = number
 				for other in trial.keys():
 					if int(trial[other]) == 0: trial[other] = 1
-				return not ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), trial)["cells"].is_empty()
+				return not ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), trial, station_definitions())["cells"].is_empty()
 			var number := Platforms.choose(options, body, float(TILE_SIZE), busy, probe)
 			if number == 0:
 				number = 1
@@ -4118,7 +4122,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 	return {"configuration": resolved, "notes": notes}
 
 func apply_service_routes(configuration: Dictionary) -> String:
-	if ServiceRoutes.is_valid(configuration): configuration = ServiceRoutes.propagate(configuration)
+	if ServiceRoutes.is_valid(configuration, station_definitions()): configuration = ServiceRoutes.propagate(configuration)
 	var auto_resolved := _resolve_auto_platforms(configuration)
 	configuration = auto_resolved["configuration"]
 	var result := _apply_resolved_routes(configuration)
@@ -4127,7 +4131,7 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	return result
 
 func _apply_resolved_routes(configuration: Dictionary) -> String:
-	if not ServiceRoutes.is_valid(configuration):
+	if not ServiceRoutes.is_valid(configuration, station_definitions()):
 		return "Use a name of 1–40 characters and at least two different passenger stops."
 	if not paused:
 		return "Pause before changing routes."
@@ -4148,10 +4152,10 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 		if proposed.stops == current.stops and proposed.get("mode", "shuttle") == current.get("mode", "shuttle") and proposed.get("waypoints", {}) == current.get("waypoints", {}) and proposed.get("platforms", {}) == current.get("platforms", {}): continue
 		var running = passenger_services[key]
 		if _first_platform_changed(proposed, current): return FIRST_PLATFORM_MESSAGE
-		var home: Vector2 = _cell_center(ServiceRoutes.stop_cell(proposed.get("platforms", {}), proposed.stops[0]))
+		var home: Vector2 = _cell_center(ServiceRoutes.stop_cell(proposed.get("platforms", {}), proposed.stops[0], station_definitions()))
 		if running.passengers > 0 or running.returning or running.position.distance_to(home) > 0.1:
 			return "%s: finish the trip or reverse back first. Edit with an empty train at its first stop." % current.name
-		var built := ServiceRoutes.build(tracks, proposed.stops, float(TILE_SIZE), proposed.get("waypoints", {}), proposed.get("mode", "shuttle"), proposed.get("platforms", {}))
+		var built := ServiceRoutes.build(tracks, proposed.stops, float(TILE_SIZE), proposed.get("waypoints", {}), proposed.get("mode", "shuttle"), proposed.get("platforms", {}), station_definitions())
 		if built.cells.is_empty(): return "%s: complete the new route before applying." % current.name
 		extra_built[key] = built
 	var changed: bool = configuration["passenger"].get("mode", "shuttle") != services["passenger"].get("mode", "shuttle") or configuration["passenger"]["stops"] != services["passenger"]["stops"] or configuration["passenger"].get("waypoints", {}) != services["passenger"].get("waypoints", {}) or configuration["passenger"].get("platforms", {}) != services["passenger"].get("platforms", {})
@@ -4163,10 +4167,10 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 			return "Complete a valid freight path through the selected waypoints before applying."
 	if changed:
 		if _first_platform_changed(configuration["passenger"], services["passenger"]): return FIRST_PLATFORM_MESSAGE
-		var new_home: Vector2 = _cell_center(ServiceRoutes.stop_cell(configuration["passenger"].get("platforms", {}), configuration["passenger"]["stops"][0]))
+		var new_home: Vector2 = _cell_center(ServiceRoutes.stop_cell(configuration["passenger"].get("platforms", {}), configuration["passenger"]["stops"][0], station_definitions()))
 		if passengers_on_train > 0 or passenger_returning or train_position.distance_to(new_home) > 0.1:
 			return "Finish the trip or reverse back first. Route mode, stops and waypoints can only change with an empty train at the first stop."
-		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE), configuration["passenger"].get("waypoints", {}), configuration["passenger"].get("mode", "shuttle"), configuration["passenger"].get("platforms", {}))["cells"].is_empty():
+		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE), configuration["passenger"].get("waypoints", {}), configuration["passenger"].get("mode", "shuttle"), configuration["passenger"].get("platforms", {}), station_definitions())["cells"].is_empty():
 			return "Complete the new route before changing the stop order."
 		# Reparameterise a path only when its origin is this exact physical spot.
 		route_cells.clear()
@@ -4484,12 +4488,12 @@ func _maybe_reroute_platform(service: String) -> void:
 	for platform in ordered:
 		var number := int(platform.number)
 		if not Platforms.fits(platform, body, float(TILE_SIZE)): continue
-		if not _platform_free(id, ServiceRoutes.stop_cell({stop: number}, stop)): continue
+		if not _platform_free(id, ServiceRoutes.stop_cell({stop: number}, stop, station_definitions())): continue
 		if number == planned: return
 		var trial: Dictionary = config.get("platforms", {}).duplicate()
 		if number == 1: trial.erase(stop)
 		else: trial[stop] = number
-		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), "shuttle", trial)
+		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), "shuttle", trial, station_definitions())
 		if built.cells.is_empty() or built.distances.size() != distances.size(): continue
 		config["platforms"] = trial
 		if service == "passenger":
@@ -4648,7 +4652,7 @@ func arrival_target_guidance(group: String, configuration: Dictionary, leg: Stri
 		var route: Dictionary = resolved[key]
 		for number in route.get("platforms", {}).values():
 			if int(number) == 0: return {"known": false, "text": "Journey guidance unavailable until Auto platforms resolve on Apply; select fixed platforms for a draft estimate."}
-		var built := ServiceRoutes.build(tracks, route.stops, float(TILE_SIZE), route.get("waypoints", {}), route.get("mode", "shuttle"), route.get("platforms", {}))
+		var built := ServiceRoutes.build(tracks, route.stops, float(TILE_SIZE), route.get("waypoints", {}), route.get("mode", "shuttle"), route.get("platforms", {}), station_definitions())
 		if built.cells.is_empty(): return {"known": false, "text": "Journey guidance unavailable: complete the draft track and waypoint route for " + str(route.name) + "."}
 		var from_index: int = route.stops.find(leg.get_slice(">", 0))
 		var to_index: int = route.stops.find(leg.get_slice(">", 1))
@@ -5090,7 +5094,7 @@ func _set_game_speed(index: int) -> void:
 func _refresh_directional_routes(notify: bool = true) -> void:
 	var passenger_was_clear := route_connected
 	var next_stop := _next_passenger_stop()
-	route_connected = next_stop >= 0 and next_stop < stop_distances.size() and passenger_travel.is_clear(route_cells, route_path, route_distance, _passenger_target_distance(), tracks, float(TILE_SIZE))
+	route_connected = next_stop >= 0 and next_stop < stop_distances.size() and passenger_travel.is_clear(route_cells, route_path, route_distance, _passenger_target_distance(), tracks, float(TILE_SIZE), station_definitions())
 	if route_connected and Fleet.length(Fleet.assigned(fleet, "passenger")) > Reservations.VEHICLE_LENGTH:
 		route_connected = Consists.stop_clearance(route_path, _passenger_target_distance(), Fleet.length(Fleet.assigned(fleet, "passenger")), tracks, float(TILE_SIZE), track_signals).is_empty()
 	passenger_route_error = "" if route_connected else "Route incomplete ahead — stopped here. Repair the path to the next destination."
@@ -5098,7 +5102,7 @@ func _refresh_directional_routes(notify: bool = true) -> void:
 	if freight_train == null: return
 	var freight_was_clear: bool = freight_train.route_valid
 	var target: float = freight_train.target_distance()
-	freight_train.route_valid = freight_travel.is_clear(freight_train.route_cells, freight_train.route_path, freight_train.distance_along_route, target, tracks, float(TILE_SIZE))
+	freight_train.route_valid = freight_travel.is_clear(freight_train.route_cells, freight_train.route_path, freight_train.distance_along_route, target, tracks, float(TILE_SIZE), station_definitions())
 	if freight_train.route_valid and Fleet.length(Fleet.assigned(fleet, "freight")) > Reservations.VEHICLE_LENGTH:
 		freight_train.route_valid = Consists.stop_clearance(freight_train.route_path, target, Fleet.length(Fleet.assigned(fleet, "freight")), tracks, float(TILE_SIZE), track_signals).is_empty()
 	if notify:
@@ -5177,7 +5181,7 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	while services.has("passenger_%d" % service_id): service_id = service_id % 999999999 + 1
 	var key := "passenger_%d" % service_id
 	var configuration := {"name": "Passenger Service %d" % id, "stops": [home, "b" if home == "a" else "a"], "mode": "shuttle", "waypoints": {}}
-	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE))
+	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE), {}, "shuttle", {}, station_definitions())
 	if built.cells.is_empty(): return "Complete track from the starting station to %s first." % station_definitions()[configuration.stops[1]].name
 	var fit := _consist_service_fit(train, configuration)
 	if not fit.is_empty(): return fit
@@ -5872,7 +5876,7 @@ func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 			if factory_index <= cells.find(Sawmill.CELL) or cells.count(Factory.CELL) != 1: return "Freight must visit the factory at 23,24 after the sawmill."
 			stops.append(RailRouter.make_path(cells.slice(0, factory_index + 1), float(TILE_SIZE)).get_baked_length())
 	else:
-		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}))
+		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}), station_definitions())
 		path = built.path
 		stops = built.distances
 		cells = built.cells
@@ -5965,7 +5969,7 @@ func inspect_train(id: int) -> bool:
 
 func _inspect_train_at(cell: Vector2i) -> bool:
 	for train in inspection_trains():
-		var path: Curve2D = _reservation_path(train.path, _cell_center(ServiceRoutes.stop_cell(services[train.key].get("platforms", {}), services[train.key].stops[0])) if train.key != "freight" else freight_train.position)
+		var path: Curve2D = _reservation_path(train.path, _cell_center(ServiceRoutes.stop_cell(services[train.key].get("platforms", {}), services[train.key].stops[0], station_definitions())) if train.key != "freight" else freight_train.position)
 		if reservations.footprint(path, train.distance, float(TILE_SIZE), Fleet.length(Fleet.find(fleet, train.id))).has(cell): return inspect_train(train.id)
 	return false
 

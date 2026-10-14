@@ -12,7 +12,10 @@ building stations beside cities and connecting useful services.
    positions, names and content versions. Routes, passenger destinations, station
    inspectors, demand and save validation must use this catalog instead of fixed
    A/B/C entries. Rendering, markers and station labels now use it; route/platform
-   builders and passenger-demand/journey validators are the next integration.
+   builders and passenger-demand/journey validators are integrated in stages.
+   Route/platform, retained-path and Local queue adapters are now implemented
+   ([details](CATALOG_ROUTING_AND_DEMAND.md)); station-owned metrics, journey
+   validation, class policy and facility geometry remain before generated starts.
    Old tutorial saves migrate without moving platforms, trains or passengers.
 2. **Seeded layouts:** deterministically place a bounded number of cities and
    industries on buildable land. Validate spacing, station approaches and feasible

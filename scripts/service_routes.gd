@@ -16,31 +16,32 @@ const PLATFORM_ROWS: Dictionary = {1: 0, 2: 1, 3: -1}
 
 ## Stop tile used by a service for a station: platform 1 (the default) is the
 ## station tile itself; platforms 2 and 3 are sidings beside it.
-static func stop_cell(platforms: Dictionary, stop: String) -> Vector2i:
-	return STATIONS[stop]["cell"] + Vector2i(0, int(PLATFORM_ROWS.get(int(platforms.get(stop, 1)), 0)))
+static func stop_cell(platforms: Dictionary, stop: String, station_catalog: Dictionary = STATIONS) -> Vector2i:
+	if not station_catalog.has(stop): return Vector2i(-1, -1)
+	return station_catalog[stop]["cell"] + Vector2i(0, int(PLATFORM_ROWS.get(int(platforms.get(stop, 1)), 0)))
 
-static func is_stop_cell(cell: Vector2i) -> bool:
-	for key in STATIONS:
+static func is_stop_cell(cell: Vector2i, station_catalog: Dictionary = STATIONS) -> bool:
+	for key in station_catalog:
 		for row in PLATFORM_ROWS.values():
-			if cell == STATIONS[key]["cell"] + Vector2i(0, int(row)): return true
+			if cell == station_catalog[key]["cell"] + Vector2i(0, int(row)): return true
 	return false
 
-static func valid_platforms(service: Dictionary) -> bool:
+static func valid_platforms(service: Dictionary, station_catalog: Dictionary = STATIONS) -> bool:
 	var chosen: Variant = service.get("platforms", {})
 	if not chosen is Dictionary: return false
 	for key in chosen:
-		if not key is String or not service.stops.has(key) or not STATIONS.has(key): return false
+		if not key is String or not service.stops.has(key) or not station_catalog.has(key): return false
 		var number: Variant = chosen[key]
 		if typeof(number) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(number)) or float(number) != floor(float(number)) or not PLATFORM_ROWS.has(int(number)): return false
 	return true
 
 ## Stops whose platform is chosen automatically at each departure ("auto":
 ## {stop: true}); the stored `platforms` entry is the platform in use right now.
-static func valid_auto(service: Dictionary) -> bool:
+static func valid_auto(service: Dictionary, station_catalog: Dictionary = STATIONS) -> bool:
 	var marks: Variant = service.get("auto", {})
 	if not marks is Dictionary: return false
 	for key in marks:
-		if not key is String or not service.stops.has(key) or not STATIONS.has(key) or marks[key] != true: return false
+		if not key is String or not service.stops.has(key) or not station_catalog.has(key) or marks[key] != true: return false
 	return true
 
 ## Target seconds between departures from the first stop (0 = off); kept on
@@ -133,7 +134,8 @@ static func defaults() -> Dictionary:
 		"freight": {"name": "Timber Service", "stops": ["forest", "terminal"], "waypoints": {}, "mode": "shuttle"},
 	}
 
-static func is_valid(value: Variant) -> bool:
+static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS) -> bool:
+	if not valid_catalog(station_catalog): return false
 	if not value is Dictionary or not value.has("passenger") or not value.has("freight") or value.size() > MAX_PASSENGER_SERVICES + 1: return false
 	for key in value:
 		if key != "freight" and not is_passenger_key(key): return false
@@ -149,23 +151,27 @@ static func is_valid(value: Variant) -> bool:
 			if service.get("stop_timetables", {}) != {}: return false
 		else:
 			var stops: Array = service.stops
-			if stops.size() < 2 or stops.size() > STATIONS.size(): return false
+			if stops.size() < 2 or stops.size() > station_catalog.size(): return false
 			var seen: Dictionary = {}
 			for stop in stops:
-				if not stop is String or not STATIONS.has(stop) or seen.has(stop): return false
+				if not stop is String or not station_catalog.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
+		if not valid_waypoints(service, station_catalog) or not valid_platforms(service, station_catalog) or not valid_auto(service, station_catalog) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
 	return true
 
-static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}) -> Dictionary:
+static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}, station_catalog: Dictionary = STATIONS) -> Dictionary:
 	var cells: Array[Vector2i] = []
 	var path := Curve2D.new()
 	path.bake_interval = 1.0
 	var distances: Array[float] = [0.0]
+	if not valid_catalog(station_catalog) or stops.size() < 2 or mode not in ["shuttle", "loop"]:
+		return {"cells": [], "path": path, "distances": [], "error": "Invalid station catalog or stop sequence"}
+	for stop in stops:
+		if not station_catalog.has(stop): return {"cells": [], "path": path, "distances": [], "error": "Unknown station stop: %s" % str(stop)}
 	for index in range(leg_count(stops, mode)):
-		var from_stop: Dictionary = STATIONS[stops[index]]
-		var to_stop: Dictionary = STATIONS[stops[(index + 1) % stops.size()]]
-		var leg: Array[Vector2i] = WaypointRouter.find_route(tracks, stop_cell(platforms, stops[index]), stop_cell(platforms, stops[(index + 1) % stops.size()]), waypoints.get(leg_key(stops, index), []))
+		var from_stop: Dictionary = station_catalog[stops[index]]
+		var to_stop: Dictionary = station_catalog[stops[(index + 1) % stops.size()]]
+		var leg: Array[Vector2i] = WaypointRouter.find_route(tracks, stop_cell(platforms, stops[index], station_catalog), stop_cell(platforms, stops[(index + 1) % stops.size()], station_catalog), waypoints.get(leg_key(stops, index), []))
 		if leg.is_empty():
 			return {"cells": [], "path": Curve2D.new(), "distances": [], "error": "Missing track or waypoint path: %s → %s" % [from_stop["name"], to_stop["name"]]}
 		for cell in leg:
@@ -187,7 +193,9 @@ static func leg_key(stops: Array, index: int) -> String:
 static func leg_count(stops: Array, mode: String) -> int:
 	return stops.size() if mode == "loop" else stops.size() - 1
 
-static func valid_waypoints(service: Dictionary) -> bool:
+static func valid_waypoints(service: Dictionary, station_catalog: Dictionary = STATIONS) -> bool:
+	var protected: Array = [Vector2i(8, 24), Vector2i(28, 24)]
+	for station in station_catalog.values(): protected.append(station.cell)
 	var directives: Variant = service.get("waypoints", {})
 	if not directives is Dictionary: return false
 	var legs: Array[String] = []
@@ -201,7 +209,7 @@ static func valid_waypoints(service: Dictionary) -> bool:
 				if typeof(number) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(number)) or float(number) != floor(float(number)): return false
 			if point[0] < 0 or point[0] >= 80 or point[1] < 0 or point[1] >= 50: return false
 			var cell := Vector2i(int(point[0]), int(point[1]))
-			if seen.has(cell) or cell in [Vector2i(4, 8), Vector2i(20, 8), Vector2i(36, 8), Vector2i(8, 24), Vector2i(28, 24)]: return false
+			if seen.has(cell) or cell in protected: return false
 			seen[cell] = true
 	return true
 
@@ -249,3 +257,10 @@ static func from_save(value: Dictionary) -> Dictionary:
 		if marks.is_empty(): result[service].erase("auto")
 		else: result[service]["auto"] = marks
 	return result
+
+static func valid_catalog(value: Dictionary) -> bool:
+	if value.is_empty() or value.size() > 64: return false
+	for key in value:
+		if not key is String or key.is_empty() or key.length() > 64 or not value[key] is Dictionary: return false
+		if not value[key].get("cell") is Vector2i or not value[key].get("name") is String: return false
+	return true

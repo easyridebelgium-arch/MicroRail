@@ -17,6 +17,9 @@ static func make_train(id: int, model: String, service: String = "") -> Dictiona
 static func defaults() -> Dictionary:
 	return {"next_id": 3, "trains": [make_train(1, "passenger_standard", "passenger"), make_train(2, "freight_standard", "freight")]}
 
+static func empty() -> Dictionary:
+	return {"next_id": 1, "trains": []}
+
 static func from_save(value: Dictionary) -> Dictionary:
 	# JSON numbers are floats; keep stable IDs and levels as integers in memory.
 	# Call only after is_valid has checked the complete save.
@@ -48,10 +51,11 @@ static func _whole(value: Variant, lower: int, upper: int) -> bool:
 	var number: float = float(value)
 	return is_finite(number) and number == floor(number) and number >= lower and number <= upper
 
-static func is_valid(value: Variant) -> bool:
-	if not value is Dictionary or not value.get("trains") is Array or not _whole(value.get("next_id"), 3, 1000000000):
+## Default save policy requires both original assignments; sandbox opts in explicitly.
+static func is_valid(value: Variant, require_primary: bool = true) -> bool:
+	if not value is Dictionary or not value.get("trains") is Array or not _whole(value.get("next_id"), 3 if require_primary else 1, 1000000000):
 		return false
-	if value["trains"].size() < 2 or value["trains"].size() > MAX_TRAINS:
+	if value["trains"].size() < (2 if require_primary else 0) or value["trains"].size() > MAX_TRAINS:
 		return false
 	var ids: Dictionary = {}
 	var assignments: Dictionary = {}
@@ -73,7 +77,7 @@ static func is_valid(value: Variant) -> bool:
 			if MODELS[train["model"]]["kind"] != Services.kind(service) or assignments.has(service):
 				return false
 			assignments[service] = true
-	return assignments.has("passenger") and assignments.has("freight")
+	return not require_primary or (assignments.has("passenger") and assignments.has("freight"))
 
 static func capacity(train: Dictionary) -> int:
 	return int(MODELS[train["model"]]["capacity"]) + int(train["capacity_level"]) * 10 + Consists.extra_capacity(train)

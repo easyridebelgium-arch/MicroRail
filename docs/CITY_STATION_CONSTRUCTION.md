@@ -75,7 +75,8 @@ consumer visibility. It also builds all 264 proposed stations across 48 seeded m
 and checks their costs and exclusive city links. No station tool or generated-game
 UI behavior is claimed by these backend tests.
 
-Next: empty-network/service initialization, city rendering and an authoritative
-placement tool using these previews; station-owned state must extend safely when a
-station is purchased. Then enable a playable seeded start and its persistence.
+The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes an
+empty fleet/network and safely extends station-owned state during purchases.
+Next: connect that model to main-scene startup/editors, city rendering and an
+authoritative placement tool using these previews. Then enable a playable seeded start and its persistence.
 Service-driven city growth/decline follows those foundations.

@@ -134,11 +134,16 @@ static func defaults() -> Dictionary:
 		"freight": {"name": "Timber Service", "stops": ["forest", "terminal"], "waypoints": {}, "mode": "shuttle"},
 	}
 
-static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS, positions: Dictionary = {}) -> bool:
-	if not valid_catalog(station_catalog): return false
-	if not value is Dictionary or not value.has("passenger") or not value.has("freight") or value.size() > MAX_PASSENGER_SERVICES + 1: return false
+## Existing saves keep the strict default; sandbox startup explicitly passes false.
+static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS, positions: Dictionary = {}, require_primary: bool = true) -> bool:
+	if (require_primary or not station_catalog.is_empty()) and not valid_catalog(station_catalog): return false
+	if not value is Dictionary or value.size() > MAX_PASSENGER_SERVICES + 1: return false
+	if require_primary and (not value.has("passenger") or not value.has("freight")): return false
+	var passenger_count := 0
 	for key in value:
 		if key != "freight" and not is_passenger_key(key): return false
+		if key != "freight": passenger_count += 1
+		if passenger_count > MAX_PASSENGER_SERVICES: return false
 		if not value[key] is Dictionary: return false
 		var service: Dictionary = value[key]
 		if not service.get("name") is String or not service.get("stops") is Array: return false

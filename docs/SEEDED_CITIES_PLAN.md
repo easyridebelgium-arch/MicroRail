@@ -5,6 +5,9 @@ The saved catalog foundation and flat-grid candidate generator are implemented
 City-linked station preview/purchase rules are also implemented
 ([construction backend](CITY_STATION_CONSTRUCTION.md)); playable seeded starts,
 the station placement UI and growth remain planned gameplay.
+The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes the
+generated world without default stations/trains and safely extends station-owned
+state as stations are purchased. Main-scene startup/editor integration remains pending.
 The fixed three-station map remains the tutorial and supports existing saves.
 New sandbox layouts will instead contain cities and industries, with the player
 building stations beside cities and connecting useful services.
@@ -34,7 +37,8 @@ building stations beside cities and connecting useful services.
 3. **Station construction and catchments (backend implemented, UI pending):**
    horizontal five-tile platform previews, itemized purchase costs, exclusive nearest-city
    links and stale/safety checks are implemented ([details](CITY_STATION_CONSTRUCTION.md)).
-   Connect them to the fixed-tick placement tool and station-owned state initialization.
+   Empty-start and station-owned state expansion are implemented. Connect them to
+   main-scene startup/editors and the fixed-tick placement tool.
    The full tool will show price, supported orientation, platform
    footprint, building clearance and population served once population exists. A passenger station must
    connect to a nearby city's catchment. Cities own trip origins/destinations;

@@ -11,13 +11,14 @@ var batches: Dictionary = {}
 var last_boarding: Array = []
 var last_journeys: Array = []
 
-func _init(ids: Array = STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> void:
+## Tutorial keeps eight starter passengers; empty sandbox construction passes zero.
+func _init(ids: Array = STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG, initial_waiting: int = 8) -> void:
 	station_catalog = catalog.duplicate(true)
 	class_progress = Classes.progress_defaults(station_catalog)
 	station_ids.assign(ids)
 	station_ids.sort()
 	for station in station_ids:
-		queues[station] = distribute(station, 8, station_ids)
+		queues[station] = distribute(station, maxi(0, initial_waiting), station_ids)
 		batches[station] = make_batches(queues[station], 0, station, true, station_ids)
 
 static func total(counts: Dictionary) -> int:

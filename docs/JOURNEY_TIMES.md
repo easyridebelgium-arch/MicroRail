@@ -60,3 +60,9 @@ train runtimes, save/load, physical reversal/recovery/reboarding, final-only far
 origin-destination display, corrupt-load atomicity, legacy migration and identical
 30/60/120 FPS results (29 checks). Existing destination, fairness, demand response,
 consist, signalling and save suites remain regression requirements.
+
+Express/Local preference now stays on journey groups alongside original origins
+and starts, including partial boarding and physical recovery. Version 35 stores
+that metadata; older passengers migrate to Local. Completed timing remains
+passenger-weighted and class groups remain distinct. See
+[passenger classes](PASSENGER_CLASSES.md).

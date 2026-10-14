@@ -315,6 +315,8 @@ func _refresh_arrival_hint() -> void:
 	if not headway_controls.visible or timetable_leg.item_count == 0: return
 	var result: Dictionary = game.arrival_target_guidance(_key(), draft, str(timetable_leg.get_selected_metadata()))
 	arrival_hint.text = str(result.text)
+	var leg: String = timetable_leg.get_selected_metadata()
+	arrival_hint.text += "\nPassenger eligibility: " + ("Local and Express on this direct A ↔ C leg." if game.PassengerClasses.distant(leg.get_slice(">", 0), leg.get_slice(">", 1)) else "Local only on this leg; Express waits for direct A ↔ C service.")
 
 func _select_timetable_leg(_index: int) -> void:
 	# The text field's focus-exit captures the previous leg before this click.

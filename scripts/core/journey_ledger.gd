@@ -1,6 +1,7 @@
 extends RefCounted
 ## Original journey clock survives vehicle changes and physical recovery.
 const Demand = preload("res://scripts/core/passenger_demand.gd")
+const Classes = preload("res://scripts/core/passenger_classes.gd")
 const LIMIT := 128
 var aboard: Dictionary = {}
 var completed: Array = []
@@ -15,12 +16,12 @@ func ensure(key: String, manifest: Dictionary, tick: int) -> void:
 		return
 	aboard[key] = []
 	for destination in Demand.STATIONS:
-		if int(manifest.get(destination, 0)) > 0: aboard[key].append({"destination": destination, "origin": "unknown", "start": tick, "known": false, "count": int(manifest[destination])})
+		if int(manifest.get(destination, 0)) > 0: aboard[key].append({"destination": destination, "origin": "unknown", "start": tick, "known": false, "count": int(manifest[destination]), "class": Classes.LOCAL})
 func board(key: String, groups: Array) -> void:
 	for group in groups:
 		var merged := false
 		for row in aboard[key]:
-			if row.destination == group.destination and row.origin == group.origin and row.start == group.start and row.known == group.known:
+			if row.destination == group.destination and row.origin == group.origin and row.start == group.start and row.known == group.known and row.get("class", Classes.LOCAL) == group.get("class", Classes.LOCAL):
 				row.count += int(group.count)
 				merged = true
 				break
@@ -94,7 +95,7 @@ func restore_state(data: Dictionary) -> void:
 static func integer(value: Variant, low: int, high: int) -> bool:
 	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and float(value) >= low and float(value) <= high
 static func valid_row(row: Variant, tick: int, finished: bool = false) -> bool:
-	if not row is Dictionary or not Demand.STATIONS.has(row.get("destination")): return false
+	if not row is Dictionary or not Demand.STATIONS.has(row.get("destination")) or not Classes.valid(row): return false
 	if not integer(row.get("count"), 1, 1000000000) or not integer(row.get("start"), 0, tick): return false
 	if finished:
 		return Demand.STATIONS.has(row.get("origin")) and row.origin != row.destination and integer(row.get("end"), int(row.start), tick)
@@ -123,6 +124,7 @@ static func valid_save(value: Variant, data: Dictionary, tick: int) -> bool:
 		if not rows is Array or rows.size() > Demand.total(loads[key]): return false
 		for row in rows:
 			if not valid_row(row, tick): return false
+			if row.get("class", Classes.LOCAL) == Classes.EXPRESS and not Classes.service_can_carry(data.services[key], row.origin, row.destination): return false
 		if Demand.normalize(counts(rows)) != Demand.normalize(loads[key]): return false
 	var delivered := int(value.unknown_completed)
 	var previous := 0

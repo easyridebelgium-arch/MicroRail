@@ -1,6 +1,8 @@
 extends RefCounted
 ## Destination counts are authoritative. Aggregate counters remain views for UI
 ## and legacy fixtures. Final destinations persist across transfers.
+const Classes = preload("res://scripts/core/passenger_classes.gd")
+var class_progress: Dictionary = {"a": 0, "c": 0}
 const STATIONS: Array[String] = ["a", "b", "c"]
 var queues: Dictionary = {}
 var batches: Dictionary = {}
@@ -32,7 +34,7 @@ func reset_total(station: String, count: int, tick: int = 0) -> void:
 		queues[station] = distribute(station, maxi(0, count))
 		batches[station] = make_batches(queues[station], tick, station)
 
-func generate(station: String, batch: int, capacity: int, rng: RefCounted, tick: int = 0) -> int:
+func generate(station: String, batch: int, capacity: int, rng: RefCounted, tick: int = 0, classify: bool = false) -> int:
 	_sync_batches(station, tick)
 	var room := maxi(0, mini(batch, capacity - waiting(station)))
 	var choices := STATIONS.duplicate()
@@ -40,7 +42,11 @@ func generate(station: String, batch: int, capacity: int, rng: RefCounted, tick:
 	for _passenger in range(room):
 		var destination: String = choices[rng.randi_range(0, choices.size() - 1)]
 		queues[station][destination] = int(queues[station].get(destination, 0)) + 1
-		_add_batch(station, destination, 1, tick)
+		var kind := Classes.LOCAL
+		if classify and Classes.distant(station, destination):
+			class_progress[station] = (int(class_progress[station]) + 1) % 4
+			if class_progress[station] == 0: kind = Classes.EXPRESS
+		_add_batch(station, destination, 1, tick, "", -1, true, kind)
 	return room
 
 static func future_stops(stops: Array, index: int, forward: bool, mode: String) -> Array:
@@ -54,7 +60,7 @@ static func future_stops(stops: Array, index: int, forward: bool, mode: String) 
 		result.reverse()
 	return result
 
-func board(station: String, destinations: Array, capacity: int, manifest: Dictionary, tick: int = 0) -> int:
+func board(station: String, destinations: Array, capacity: int, manifest: Dictionary, tick: int = 0, express_destinations: Array = []) -> int:
 	last_boarding.clear()
 	last_journeys.clear()
 	var boarding_groups: Dictionary = {}
@@ -62,12 +68,13 @@ func board(station: String, destinations: Array, capacity: int, manifest: Dictio
 	var room := maxi(0, capacity - total(manifest))
 	var candidates: Array = []
 	for batch in batches[station]:
-		if destinations.has(batch.destination): candidates.append(batch)
+		if Classes.eligible(batch, destinations, express_destinations): candidates.append(batch)
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if a.tick != b.tick: return a.tick < b.tick
 		if a.destination != b.destination: return destinations.find(a.destination) < destinations.find(b.destination)
 		if a.start != b.start: return a.start < b.start
-		return str(a.origin) < str(b.origin)
+		if a.origin != b.origin: return str(a.origin) < str(b.origin)
+		return a.get("class", Classes.LOCAL) == Classes.LOCAL and b.get("class", Classes.LOCAL) != Classes.LOCAL
 	)
 	var count := 0
 	for batch in candidates:
@@ -79,7 +86,7 @@ func board(station: String, destinations: Array, capacity: int, manifest: Dictio
 		else:
 			boarding_groups[identity] = last_boarding.size()
 			last_boarding.append({"count": take, "wait": maxi(0, tick - int(batch.tick))})
-		last_journeys.append({"destination": destination, "origin": batch.origin, "start": int(batch.start), "known": batch.known, "count": take})
+		last_journeys.append({"destination": destination, "origin": batch.origin, "start": int(batch.start), "known": batch.known, "class": batch.get("class", Classes.LOCAL), "count": take})
 		batch.count -= take
 		queues[station][destination] -= take
 		if queues[station][destination] == 0: queues[station].erase(destination)
@@ -87,6 +94,12 @@ func board(station: String, destinations: Array, capacity: int, manifest: Dictio
 		count += take
 		room -= take
 	batches[station] = batches[station].filter(func(batch: Dictionary) -> bool: return batch.count > 0)
+	return count
+
+func eligible_waiting(station: String, destinations: Array, express_destinations: Array, tick: int) -> int:
+	var count := 0
+	for row in waiting_groups(station, tick):
+		if Classes.eligible(row, destinations, express_destinations): count += int(row.count)
 	return count
 
 static func alight(manifest: Dictionary, station: String) -> int:
@@ -164,7 +177,7 @@ static func migrate(data: Dictionary) -> Dictionary:
 static func make_batches(counts: Dictionary, tick: int, origin: String = "unknown", known: bool = false) -> Array:
 	var result: Array = []
 	for destination in STATIONS:
-		if int(counts.get(destination, 0)) > 0: result.append({"destination": destination, "count": int(counts[destination]), "tick": tick, "origin": origin, "start": tick, "known": known})
+		if int(counts.get(destination, 0)) > 0: result.append({"destination": destination, "count": int(counts[destination]), "tick": tick, "origin": origin, "start": tick, "known": known, "class": Classes.LOCAL})
 	return result
 
 func waiting_groups(station: String, tick: int) -> Array:
@@ -178,15 +191,15 @@ func waiting_groups(station: String, tick: int) -> Array:
 func _sync_batches(station: String, tick: int) -> void:
 	batches[station] = waiting_groups(station, tick)
 
-func _add_batch(station: String, destination: String, count: int, tick: int, origin: String = "", start: int = -1, known: bool = true) -> void:
+func _add_batch(station: String, destination: String, count: int, tick: int, origin: String = "", start: int = -1, known: bool = true, kind: String = Classes.LOCAL) -> void:
 	if count <= 0: return
 	if origin.is_empty(): origin = station
 	if start < 0: start = tick
 	for batch in batches[station]:
-		if batch.destination == destination and batch.tick == tick and batch.origin == origin and batch.start == start and batch.known == known:
+		if batch.destination == destination and batch.tick == tick and batch.origin == origin and batch.start == start and batch.known == known and batch.get("class", Classes.LOCAL) == kind:
 			batch.count += count
 			return
-	batches[station].append({"destination": destination, "count": count, "tick": tick, "origin": origin, "start": start, "known": known})
+	batches[station].append({"destination": destination, "count": count, "tick": tick, "origin": origin, "start": start, "known": known, "class": kind})
 
 func oldest_seconds(station: String, tick: int, destination: String = "") -> float:
 	if waiting(station) == 0 or (not destination.is_empty() and int(queues[station].get(destination, 0)) == 0): return 0.0
@@ -197,13 +210,15 @@ func oldest_seconds(station: String, tick: int, destination: String = "") -> flo
 
 func save_state(primary: Dictionary, tick: int) -> Dictionary:
 	for station in STATIONS: _sync_batches(station, tick)
-	return {"queues": queues.duplicate(true), "primary": primary.duplicate(true), "batches": batches.duplicate(true)}
+	return {"queues": queues.duplicate(true), "primary": primary.duplicate(true), "batches": batches.duplicate(true), "class_progress": class_progress.duplicate()}
 
 func restore_state(data: Dictionary) -> void:
+	var progress: Dictionary = data.get("class_progress", {"a": 0, "c": 0})
+	for station in progress: class_progress[station] = int(progress[station])
 	for station in STATIONS:
 		queues[station] = normalize(data.queues[station])
 		batches[station] = []
-		for batch in data.batches[station]: batches[station].append({"destination": batch.destination, "tick": int(batch.tick), "count": int(batch.count), "origin": batch.origin, "start": int(batch.start), "known": batch.known})
+		for batch in data.batches[station]: batches[station].append({"destination": batch.destination, "tick": int(batch.tick), "count": int(batch.count), "origin": batch.origin, "start": int(batch.start), "known": batch.known, "class": batch.get("class", Classes.LOCAL)})
 
 static func valid_batches(value: Variant, saved_queues: Dictionary, tick: int) -> bool:
 	if not value is Dictionary or value.size() != STATIONS.size(): return false
@@ -213,7 +228,8 @@ static func valid_batches(value: Variant, saved_queues: Dictionary, tick: int) -
 		var counts: Dictionary = {}
 		var seen: Dictionary = {}
 		for batch in rows:
-			if not batch is Dictionary or not batch.get("destination") is String: return false
+			if not batch is Dictionary or not batch.get("destination") is String or not Classes.valid(batch): return false
+			if batch.get("class", Classes.LOCAL) == Classes.EXPRESS and batch.get("origin") != station: return false
 			var destination: String = batch.destination
 			if destination == station or not STATIONS.has(destination): return false
 			if not valid_counts({destination: batch.get("count")}, STATIONS) or int(batch.count) <= 0: return false
@@ -225,7 +241,7 @@ static func valid_batches(value: Variant, saved_queues: Dictionary, tick: int) -
 			if batch.known:
 				if not STATIONS.has(batch.origin) or batch.origin == destination: return false
 			elif batch.origin != "unknown" and not STATIONS.has(batch.origin): return false
-			var key: String = destination + ":" + str(int(time)) + ":" + batch.origin + ":" + str(int(birth)) + ":" + str(batch.known)
+			var key: String = destination + ":" + str(int(time)) + ":" + batch.origin + ":" + str(int(birth)) + ":" + str(batch.known) + ":" + str(batch.get("class", Classes.LOCAL))
 			if seen.has(key): return false
 			seen[key] = true
 			counts[destination] = int(counts.get(destination, 0)) + int(batch.count)
@@ -251,4 +267,4 @@ func _returned_groups(station: String, destination: String, count: int, tick: in
 	if sum != count:
 		_add_batch(station, destination, count, tick, "unknown", tick, false)
 		return
-	for row in matched: _add_batch(station, destination, int(row.count), tick, row.origin, int(row.start), row.known)
+	for row in matched: _add_batch(station, destination, int(row.count), tick, row.origin, int(row.start), row.known, str(row.get("class", Classes.LOCAL)))

@@ -40,8 +40,10 @@ This rating covers station waiting, not unique passengers' complete journey time
 Complete journey elapsed time is now measured separately ([journey times](JOURNEY_TIMES.md));
 it does not yet change this rating. [Occupancy and eligible capacity denials](PASSENGER_OCCUPANCY.md)
 are also measured separately without changing this rating. [Optional arrival punctuality](ARRIVAL_TARGETS.md) is also measured separately.
-Onboard delays, timetable punctuality, classes, fares and company reputation are
-not scored here. Existing amenities retain their published
+Express/Local [passenger classes](PASSENGER_CLASSES.md) affect boarding eligibility.
+All waiting classes still contribute to the existing waiting score; there is no
+new class-specific penalty. Onboard delays, timetable punctuality, fares and
+company reputation are not scored here. Existing amenities retain their published
 capacity/demand effects. Waiting-based demand response is now implemented as a
 separate, bounded factor;
 see [demand response](DEMAND_RESPONSE.md). Fares, movement and reservations remain

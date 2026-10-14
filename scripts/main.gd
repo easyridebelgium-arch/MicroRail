@@ -23,6 +23,7 @@ const STATION_A: Vector2i = Vector2i(4, 8)
 const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
+const PassengerClasses = preload("res://scripts/core/passenger_classes.gd")
 const PassengerJourneys = preload("res://scripts/core/passenger_journeys.gd")
 const JourneyLedger = preload("res://scripts/core/journey_ledger.gd")
 var journey_ledger = JourneyLedger.new()
@@ -1293,7 +1294,7 @@ func _generate_passengers(delta: float) -> void:
 		for key in PassengerDemand.STATIONS:
 			var experience: Dictionary = satisfaction.station(key, passenger_demand.waiting_groups(key, sim_clock.tick), sim_clock.tick, amenities.owned[key])
 			var arrivals: int = demand_response.arrivals(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), int(experience.rating), int(experience.boarded), not network[key].is_empty())
-			passenger_demand.generate(key, arrivals, amenities.queue_limit(key), sim_rng, sim_clock.tick)
+			passenger_demand.generate(key, arrivals, amenities.queue_limit(key), sim_rng, sim_clock.tick, true)
 
 func _passenger_network() -> Dictionary:
 	var available: Dictionary = {}
@@ -1321,14 +1322,14 @@ func _transfer_passengers(key: String, station: String, manifest: Dictionary) ->
 
 func _board_waiting(station: String, destinations: Array, capacity: int, manifest: Dictionary, key: String = "passenger") -> int:
 	journey_ledger.ensure(key, manifest, sim_clock.tick)
-	var boarded: int = passenger_demand.board(station, destinations, capacity, manifest, sim_clock.tick)
+	var context := _departure_context(key)
+	var direct: Array = PassengerClasses.direct(station, [str(context.leg).get_slice(">", 1)]) if not context.returning and str(context.leg).get_slice(">", 0) == station else []
+	var boarded: int = passenger_demand.board(station, destinations, capacity, manifest, sim_clock.tick, direct)
 	satisfaction.record(station, passenger_demand.last_boarding, sim_clock.tick, amenities.owned[station])
 	journey_ledger.board(key, passenger_demand.last_journeys)
 	var train: Dictionary = Fleet.assigned(fleet, key)
 	if not train.is_empty():
-		var eligible_left := 0
-		for destination in destinations:
-			eligible_left += int(passenger_demand.queues[station].get(destination, 0))
+		var eligible_left := passenger_demand.eligible_waiting(station, destinations, direct, sim_clock.tick)
 		passenger_occupancy.boarding(sim_clock.tick, int(train.id), station, boarded, eligible_left, PassengerDemand.total(manifest), capacity)
 	return boarded
 
@@ -1646,6 +1647,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not Presentation.valid(data.get("presentation"), data.services): return false
 	var state: Dictionary = data["state"]
 	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger, int(sim.clock.tick)): return false
+	if not PassengerClasses.valid_progress(data.demand.get("class_progress")): return false
 	if not JourneyLedger.valid_save(data.get("journeys"), data, int(sim.clock.tick)): return false
 
 	for field in SAVE_FIELDS:
@@ -2509,6 +2511,7 @@ func _update_station_details() -> void:
 		station_title.text = ServiceRoutes.STATIONS[key].name
 		station_details.text = "Services: %s\n\nWaiting passengers: %d\nPassengers aboard for this station: %d\n\n%s\n\nManage individual trains and upgrades in Fleet." % [", ".join(serving) if not serving.is_empty() else "None", _waiting(key), incoming, "\n".join(states)]
 		station_details.text += "\n\n" + _destination_queue_text(key)
+		station_details.text += "\n" + PassengerClasses.describe(passenger_demand.waiting_groups(key, sim_clock.tick))
 		station_details.text += "\n\n" + _platform_text(selected_station)
 		return
 	capacity_upgrade_button.show()
@@ -2558,6 +2561,7 @@ func _update_station_details() -> void:
 		service_status
 	]
 	station_details.text += "\n\n" + _destination_queue_text(station_key)
+	station_details.text += "\n" + PassengerClasses.describe(passenger_demand.waiting_groups(station_key, sim_clock.tick))
 	station_details.text += "\n\n" + _platform_text(selected_station)
 
 	_update_upgrade_button(

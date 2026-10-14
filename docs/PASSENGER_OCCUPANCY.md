@@ -22,8 +22,9 @@ their first stop. Stored trains and freight are excluded. Pausing adds no sample
 2x/5x/10x advances measurements in simulation time, not wall-clock time.
 
 Each actual boarding opportunity records boarded passengers and eligible people
-left in the queue **only if all seats are occupied**. Wrong-direction and
-unreachable destinations do not count as denied seats. A full through train can
+left in the queue **only if all seats are occupied**. Wrong-direction, class-ineligible and
+unreachable destinations do not count as denied seats. Express people waiting
+for a direct A↔C leg are not capacity denials for a stopping/transfer departure. A full through train can
 leave people behind even when nobody boards. History retains the latest 128
 opportunities across services, including opportunities with no capacity denial.
 

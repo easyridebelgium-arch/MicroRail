@@ -118,3 +118,13 @@ Check this against your target, especially for linked trains with different spee
 Add margin for traffic and departure delays. Routes and Accounts also break down
 punctuality by direction, separating running time from scheduled departure delay.
 No measured arrivals means there is no result yet.
+
+## Serve Express passengers
+
+Station Details now splits waiting people into Local and Express. Express demand
+appears gradually between A and C. Set a service to **A–C** to carry both classes;
+**A–B–C** carries Local passengers while Express keeps waiting. A waypoint or
+passing loop is allowed; a station call at B prevents Express eligibility.
+Routes shows eligibility for the selected direction, and clicking a train shows
+its onboard class counts. Both classes currently pay £5 at their final destination.
+See [passenger classes](PASSENGER_CLASSES.md).

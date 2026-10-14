@@ -33,7 +33,8 @@ already on the map in a row, and each ticket pays £5. You start with £1,000 an
    first. Click a station to see connections, oldest waits and **Waiting satisfaction**.
    **Accounts** explains the company score; more useful service reduces waits, and
    amenities add a small comfort bonus. The station's **Demand response** shows how
-   arrivals gradually adapt (50–125%); growth needs actual boarding evidence.
+   arrivals gradually adapt (50–125%); growth needs actual boarding evidence. Train inspectors show tracked elapsed
+   journeys; **Accounts** shows completed trip times, including transfers and recovery.
 4. If a train stops, open **Problems** (toolbar) to see why, or use the alert banner's **Inspect**. **Acknowledge** hides that alert while keeping the problem visible.
 5. Signal letters mean S = manual stop, H = current held request, R = reserved tile, A = automatic/unrequested. The train inspector explains actual permission to move.
 

@@ -117,6 +117,7 @@ func refresh() -> void:
 	accounts_text.text += "\n\nBank principal outstanding: £%d\nAccrued interest: £%d (early payoff £%d)\nLoan payments overdue: £%d\nLoan interest paid: £%d\nLoan principal repaid: £%d" % [game.loans.state.principal, game.loans.state.interest, game.loans.payoff(), game.loans.overdue(), game.loans.state.interest_paid, game.loans.state.principal_paid]
 
 	accounts_text.text += "\n\n" + waiting_summary()
+	accounts_text.text += "\n\n" + game.journey_ledger.summary()
 
 func open_accounts() -> void:
 	game._cancel_right_gesture()

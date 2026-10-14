@@ -84,7 +84,7 @@ func run() -> void:
 	payload.version = 30
 	payload.erase("satisfaction")
 	var migrated := Migrations.migrate(payload)
-	check(migrated.ok and migrated.data.version == Migrations.CURRENT_VERSION and migrated.data.satisfaction == Stats.defaults() and migrated.data.demand == payload.demand and game._is_valid_save(migrated.data), "v30 migration preserves arrival groups and starts history empty")
+	check(migrated.ok and migrated.data.version == Migrations.CURRENT_VERSION and migrated.data.satisfaction == Stats.defaults() and migrated.data.demand.queues == payload.demand.queues and migrated.data.demand.primary == payload.demand.primary and game._is_valid_save(migrated.data), "v30 migration preserves arrival groups and starts history empty")
 	var settings = game.GameSettings
 	var old_scale: float = settings.ui_scale
 	for scale_value in [1.0, 1.5, 2.0]:

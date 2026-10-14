@@ -30,10 +30,12 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 32, including amenities, loan state, route appearance,
+schema is version 33, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
-history, plus the gradual demand factor and fractional carry. Version 31 migration
+history, gradual demand factor/carry, and original journey clocks with recent
+completed timing. Version 32 migration keeps queue ages and marks unknown
+legacy journey origins unmeasured. Version 31 migration
 starts response at 100%, preserving queues and satisfaction history. Version 30 migration preserves arrival groups and starts unknown
 boarding history empty. Version 29
 initializes unknown waiting ages at its saved clock without changing counts.

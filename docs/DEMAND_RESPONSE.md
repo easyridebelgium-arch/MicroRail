@@ -48,8 +48,9 @@ and attraction effects. New passengers still need actual service to reach their
 final destination and pay a fare.
 
 This increment balances arrivals against the measured station waiting experience.
-Town population/growth, passenger classes, fare elasticity, journey time and
-punctuality do not affect this factor until their measurements and rules exist.
+Town population/growth, passenger classes, fare elasticity, journey-time scoring and
+punctuality do not affect this factor until their benchmarks and rules exist.
+Complete journey elapsed time is now recorded separately; see [journey times](JOURNEY_TIMES.md).
 
 ## Saves and tests
 

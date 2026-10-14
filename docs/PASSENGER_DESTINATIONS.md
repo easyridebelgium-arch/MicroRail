@@ -114,8 +114,8 @@ It grows with the fixed simulation clock, including accelerated play, and stops
 while paused. Arrival groups are saved, so reloading does not reset priority.
 Passengers reaching an interchange or physically returning after recovery join
 that station's queue at the current tick, behind its existing older groups. This
-measures the current station wait, not total journey time; waiting-experience satisfaction is now measured; end-to-end passenger-history
-tracking follows separately.
+measures the current station wait, not total journey time; waiting-experience satisfaction is now measured; end-to-end journey clocks now survive transfers and recovery; see
+[journey times](JOURNEY_TIMES.md).
 
 Counts remain aggregated; no individual passenger nodes or RNG draws are added.
 `test_passenger_age.gd` covers older versus newer demand, partial boarding,
@@ -126,3 +126,8 @@ invalid/duplicate/future cohorts, legacy migration, station wording and equal
 Waiting satisfaction now uses these arrival groups and actual boarded counts;
 click a station or open Accounts for its score and explanation. See
 [passenger waiting satisfaction](PASSENGER_SATISFACTION.md).
+
+Original journey origins and start ticks are now tracked separately from each
+station's queue arrival. Train inspectors and Accounts expose current/recent
+journey times; see [journey tracking](JOURNEY_TIMES.md). Legacy unknown origins
+are excluded from measured complete-trip averages.

@@ -24,6 +24,8 @@ const STATION_B: Vector2i = Vector2i(20, 8)
 const STATION_C: Vector2i = Vector2i(36, 8)
 const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerJourneys = preload("res://scripts/core/passenger_journeys.gd")
+const JourneyLedger = preload("res://scripts/core/journey_ledger.gd")
+var journey_ledger = JourneyLedger.new()
 const DemandResponse = preload("res://scripts/core/demand_response.gd")
 var demand_response = DemandResponse.new()
 const Satisfaction = preload("res://scripts/core/passenger_satisfaction.gd")
@@ -1301,15 +1303,27 @@ func _passenger_network() -> Dictionary:
 	return PassengerJourneys.graph(available)
 
 func _transfer_passengers(key: String, station: String, manifest: Dictionary) -> int:
-	var changed: int = passenger_demand.interchange(station, services[key].stops, manifest, sim_clock.tick)
+	journey_ledger.ensure(key, manifest, sim_clock.tick)
+	var destinations: Array = []
+	for destination in manifest:
+		if not services[key].stops.has(destination): destinations.append(destination)
+	var rows: Array = journey_ledger.release(key, destinations)
+	var changed: int = passenger_demand.interchange(station, services[key].stops, manifest, sim_clock.tick, rows)
 	if changed > 0:
 		_record_event(EventLog.PASSENGERS_TRANSFERRED, key, {"stop": station, "passengers": changed})
 	return changed
 
-func _board_waiting(station: String, destinations: Array, capacity: int, manifest: Dictionary) -> int:
+func _board_waiting(station: String, destinations: Array, capacity: int, manifest: Dictionary, key: String = "passenger") -> int:
+	journey_ledger.ensure(key, manifest, sim_clock.tick)
 	var boarded: int = passenger_demand.board(station, destinations, capacity, manifest, sim_clock.tick)
 	satisfaction.record(station, passenger_demand.last_boarding, sim_clock.tick, amenities.owned[station])
+	journey_ledger.board(key, passenger_demand.last_journeys)
 	return boarded
+
+func _saved_journeys() -> Dictionary:
+	var loads: Dictionary = {"passenger": passenger_destinations}
+	for key in additional_service_keys(): loads[key] = passenger_services[key].passenger_destinations
+	return journey_ledger.save_state(loads, sim_clock.tick)
 
 func _board_passengers() -> void:
 	if not passenger_service_enabled or passenger_returning: return
@@ -1319,7 +1333,11 @@ func _board_passengers() -> void:
 	_board_waiting(station, PassengerJourneys.boarding(_passenger_network(), station, future), _get_train_capacity(), passenger_destinations)
 
 func _unload_passengers(station: String) -> int:
-	var arrived := PassengerDemand.alight(passenger_destinations, station)
+	return _finish_passengers("passenger", station, passenger_destinations)
+
+func _finish_passengers(key: String, station: String, manifest: Dictionary) -> int:
+	journey_ledger.finish(key, station, manifest, sim_clock.tick)
+	var arrived := PassengerDemand.alight(manifest, station)
 	passengers_delivered += arrived
 	money += arrived * TICKET_PRICE
 	return arrived
@@ -1415,6 +1433,7 @@ func _save_game(slot: int = 0) -> bool:
 		"loans": loans.save_state(),
 		"satisfaction": satisfaction.save_state(),
 		"demand_response": demand_response.save_state(),
+		"journeys": _saved_journeys(),
 		"presentation": _saved_presentation(),
 		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
@@ -1598,6 +1617,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not Presentation.valid(data.get("presentation"), data.services): return false
 	var state: Dictionary = data["state"]
 	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger, int(sim.clock.tick)): return false
+	if not JourneyLedger.valid_save(data.get("journeys"), data, int(sim.clock.tick)): return false
 
 	for field in SAVE_FIELDS:
 		if not state.has(field):
@@ -1849,6 +1869,7 @@ func _load_game(save_path: String = "") -> bool:
 	loans.restore_state(data.loans)
 	satisfaction.restore_state(data.satisfaction)
 	demand_response.restore_state(data.demand_response)
+	journey_ledger.restore_state(data.journeys)
 	presentation = Presentation.normalize(data.presentation)
 	route_distance = loaded_distance
 	is_dragging = false
@@ -3841,7 +3862,8 @@ func _passenger_target_distance() -> float:
 func _return_onboard_passengers() -> void:
 	var station: String = services.passenger.stops[passenger_stop_index]
 	_unload_passengers(station)
-	passenger_demand.return_to(station, passenger_destinations, sim_clock.tick)
+	var rows: Array = journey_ledger.release("passenger", passenger_destinations.keys())
+	passenger_demand.return_to(station, passenger_destinations, sim_clock.tick, rows)
 
 func _update_amenity_buttons(station: String) -> void:
 	for id in Amenities.ORDER:

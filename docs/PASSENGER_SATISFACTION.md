@@ -37,7 +37,8 @@ record. When old groups leave that window, better new service can lift the ratin
 Transfers and physical recovery start a new station wait on arrival. A passenger
 who changes trains can therefore contribute more than one station experience.
 This rating covers station waiting, not unique passengers' complete journey time.
-Onboard delays, crowding, timetable punctuality, classes, fares and company
+Complete journey elapsed time is now measured separately ([journey times](JOURNEY_TIMES.md));
+it does not yet change this rating. Onboard delays, crowding, timetable punctuality, classes, fares and company
 reputation are not measured here. Existing amenities retain their published
 capacity/demand effects. Waiting-based demand response is now implemented as a
 separate, bounded factor;

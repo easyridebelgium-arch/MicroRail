@@ -93,7 +93,7 @@ func advance(game: Node, delta: float) -> void:
 		if enabled and not returning:
 			var origin: String = configuration.stops[stop_index]
 			var future := Demand.future_stops(configuration.stops, stop_index, forward, configuration.get("mode", "shuttle"))
-			game._board_waiting(origin, game.PassengerJourneys.boarding(game._passenger_network(), origin, future), FleetData.capacity(train), passenger_destinations)
+			game._board_waiting(origin, game.PassengerJourneys.boarding(game._passenger_network(), origin, future), FleetData.capacity(train), passenger_destinations, key)
 		boarding = false
 	game._maybe_reroute_platform(key)
 	var departure: Dictionary = game._departure_context(key)
@@ -108,10 +108,9 @@ func advance(game: Node, delta: float) -> void:
 		distance = target
 		if returning:
 			var origin: String = configuration.stops[stop_index]
-			var arrived := Demand.alight(passenger_destinations, origin)
-			game.passengers_delivered += arrived
-			game.money += arrived * game.TICKET_PRICE
-			game.passenger_demand.return_to(origin, passenger_destinations, game.sim_clock.tick)
+			game._finish_passengers(key, origin, passenger_destinations)
+			var rows: Array = game.journey_ledger.release(key, passenger_destinations.keys())
+			game.passenger_demand.return_to(origin, passenger_destinations, game.sim_clock.tick, rows)
 			returning = false
 			held = true
 			enabled = false
@@ -120,10 +119,8 @@ func advance(game: Node, delta: float) -> void:
 			dwell = 0
 			game._record_event(game.EventLog.TRAIN_RECOVERED, id, {"service": key, "stop": origin, "action": "returned to departure stop"})
 		else:
-			var arrived := Demand.alight(passenger_destinations, configuration.stops[destination])
+			var arrived: int = game._finish_passengers(key, configuration.stops[destination], passenger_destinations)
 			game._transfer_passengers(key, configuration.stops[destination], passenger_destinations)
-			game.passengers_delivered += arrived
-			game.money += arrived * game.TICKET_PRICE
 			game._record_event(game.EventLog.TRAIN_ARRIVED, id, {"service": key, "stop": configuration.stops[destination], "passengers": arrived})
 			stop_index = destination
 			if is_loop():

@@ -78,7 +78,7 @@ func run() -> void:
 	payload.version = 31
 	payload.erase("demand_response")
 	var old := Migrations.migrate(payload)
-	check(old.ok and old.data.version == 32 and old.data.demand_response == Response.defaults() and old.data.demand == payload.demand and old.data.satisfaction == payload.satisfaction and game._is_valid_save(old.data), "v31 migration preserves counts, ages and satisfaction with neutral response")
+	check(old.ok and old.data.version == Migrations.CURRENT_VERSION and old.data.demand_response == Response.defaults() and old.data.demand.queues == payload.demand.queues and old.data.demand.primary == payload.demand.primary and old.data.satisfaction == payload.satisfaction and game._is_valid_save(old.data), "v31 migration preserves counts, ages and satisfaction with neutral response")
 	game.passenger_held = true
 	game._generate_passengers(game.PASSENGER_INTERVAL)
 	check(game.demand_response.state.a.factor == 100, "holding the only connection removes the growth bonus gradually")

@@ -28,8 +28,9 @@ func tick() -> void:
 	state.consumed += DEFINITION.input_per_batch
 	state.timber += DEFINITION.output_per_batch
 	state.produced += DEFINITION.output_per_batch
-func summary() -> String:
-	return "Sawmill: %s\nRecipe: %d logs → %d timber every %.1f simulation seconds\nInput: %d / %d logs; output: %d / %d timber\nProcessing: %d / %d ticks\nReceived %d logs; consumed %d; produced %d timber; loaded %d; delivered %d\nTimber sells for £%d at the terminal. Logs unloaded here do not pay. Storage stalls processing without discarding cargo." % ["operating" if state.installed else "not installed", DEFINITION.input_per_batch, DEFINITION.output_per_batch, DEFINITION.processing_ticks / 60.0, state.logs, DEFINITION.input_capacity, state.timber, DEFINITION.output_capacity, state.progress, DEFINITION.processing_ticks, state.received, state.consumed, state.produced, state.loaded, state.sold, TIMBER.terminal_price]
+func summary(to_factory: bool = false) -> String:
+	var text := "Sawmill: %s\nRecipe: %d logs → %d timber every %.1f simulation seconds\nInput: %d / %d logs; output: %d / %d timber\nProcessing: %d / %d ticks\nReceived %d logs; consumed %d; produced %d timber; loaded %d; delivered %d\nTimber sells for £%d at the terminal. Logs unloaded here do not pay. Storage stalls processing without discarding cargo." % ["operating" if state.installed else "not installed", DEFINITION.input_per_batch, DEFINITION.output_per_batch, DEFINITION.processing_ticks / 60.0, state.logs, DEFINITION.input_capacity, state.timber, DEFINITION.output_capacity, state.progress, DEFINITION.processing_ticks, state.received, state.consumed, state.produced, state.loaded, state.sold, TIMBER.terminal_price]
+	return text.replace("Timber sells for £%d at the terminal." % TIMBER.terminal_price, "Timber goes to the factory; intermediate unloading earns no payment.") if to_factory else text
 func save_state() -> Dictionary: return state.duplicate(true)
 func restore_state(value: Dictionary) -> void:
 	state = value.duplicate(true)
@@ -55,12 +56,12 @@ static func valid_game(data: Dictionary) -> bool:
 	var stock: Dictionary = data.sawmill
 	var freight: Dictionary = data.freight
 	var stage: Variant = freight.get("chain_stage")
-	if typeof(stage) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(stage)) or float(stage) != floor(float(stage)) or stage < 0 or stage > 1: return false
-	if freight.get("recovery_stop") not in ["forest", "sawmill", "terminal"] or freight.get("leg_origin") not in ["forest", "sawmill", "terminal"]: return false
+	if typeof(stage) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(stage)) or float(stage) != floor(float(stage)) or stage < 0 or stage > 2: return false
+	if freight.get("recovery_stop") not in ["forest", "sawmill", "factory", "terminal"] or freight.get("leg_origin") not in ["forest", "sawmill", "factory", "terminal"]: return false
 	var cargo: Variant = freight.get("cargo")
 	if typeof(cargo) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(cargo)) or float(cargo) != floor(float(cargo)) or cargo < 0 or cargo > 1000000000: return false
 	if not stock.installed: return stage == 0
-	if stock.loaded != stock.sold + (int(cargo) if int(stage) == 1 else 0): return false
+	if stock.loaded != stock.sold + int(data.get("factory", {}).get("received", 0)) + (int(cargo) if int(stage) == 1 else 0): return false
 	var cells: Array = data.runtime.freight_cells
 	if count_points(cells) != 1 or count_points(data.services.freight.get("waypoints", {}).get("forest>terminal", [])) != 1: return false
 	var pad := false

@@ -143,3 +143,8 @@ processed timber, sells at the Terminal and returns empty. The sawmill makes one
 timber from two logs every five simulation seconds; each timber sells for £24.
 Click the new industry for stocks and progress. The old direct-log service remains
 available until you install it. See [sawmill chain](SAWMILL_CHAIN.md).
+
+Once the sawmill is operating, you can install a **£800 factory at 23,24** while
+freight is empty at the Forest. Leave its building grounds clear (columns 22–24,
+rows 22–23). It turns one timber into one finished goods every ten simulation
+seconds; the Terminal pays £40 per goods. See [factory chain](FACTORY_CHAIN.md).

@@ -2,8 +2,7 @@
 
 This Phase 2B slice adds an optional sawmill. Existing maps keep direct Forest →
 Terminal log delivery (£8 per log) until you purchase it. The first processing
-chain is Forest → Sawmill → Terminal → Forest. Factory processing and finished
-goods follow in the next increment.
+chain is Forest → Sawmill → Terminal → Forest. The optional [factory](FACTORY_CHAIN.md) now extends it with finished goods.
 
 ## Build and operate
 
@@ -25,7 +24,8 @@ The recipe is **2 logs → 1 timber every 5 simulation seconds**, with 200 units
 input storage and 200 output. Processing uses fixed ticks, pauses with the game,
 and follows simulation speed. It stalls when input is insufficient or output is
 full. Unaccepted logs remain aboard; cargo is never discarded to make space.
-Any can depart with one timber; Half/Full wait for their minimum load. A withdrawn
+Any can depart with one timber; Half/Full wait for their minimum load or finish the available input batch when
+it cannot fill the train. A withdrawn
 empty train waiting at the sawmill returns to the Forest; a withdrawn loaded train
 finishes delivery without collecting extra timber.
 

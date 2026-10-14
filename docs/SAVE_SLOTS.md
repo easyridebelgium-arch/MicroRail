@@ -30,11 +30,15 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 37, including amenities, loan state, route appearance,
+schema is version 38, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
 history, gradual demand factor/carry, and original journey clocks with recent
 completed timing, plus active arrival targets and bounded punctuality history.
+Version 37 migration adds an uninstalled factory, preserving sawmill inventory,
+physical train stages, cash and historical sales. Version 38 retains factory
+processing progress and validates stock transferred between industries and goods
+aboard/delivered at the terminal. See [factory chain](FACTORY_CHAIN.md).
 Version 36 migration adds an uninstalled sawmill and default freight-stage fields,
 preserving the existing log-only service, cash and physical positions. Industrial
 inventories, productive ticks and actual freight departure/recovery stops persist

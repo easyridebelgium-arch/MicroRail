@@ -152,6 +152,9 @@ const BASE_SPEED_UPGRADE_PRICE: int = 200
 const CAPACITY_PER_UPGRADE: int = 10
 const SPEED_PER_UPGRADE: float = 20.0
 
+const Factory = preload("res://scripts/core/factory.gd")
+var factory = Factory.new()
+var factory_button: Button
 const Sawmill = preload("res://scripts/core/sawmill.gd")
 var sawmill = Sawmill.new()
 var sawmill_button: Button
@@ -476,6 +479,7 @@ func _simulation_step(step_seconds: float) -> void:
 	_generate_passengers(step_seconds)
 	_produce_logs(step_seconds)
 	sawmill.tick()
+	factory.tick()
 	_refresh_directional_routes()
 	_rebuild_reservations(true)
 	movement_conflicts.clear()
@@ -779,13 +783,14 @@ func _is_inside_map(cell: Vector2i) -> bool:
 	)
 
 
-func facility_cells(installed_override: int = -1) -> Array[Vector2i]:
+func facility_cells(installed_override: int = -1, factory_override: int = -1) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
 	if (sawmill.state.installed if installed_override < 0 else installed_override == 1): cells.append(Sawmill.CELL)
+	if (factory.state.installed if factory_override < 0 else factory_override == 1): cells.append(Factory.CELL)
 	return cells
 
-func _is_station_space(cell: Vector2i, installed_override: int = -1) -> bool:
-	for station in facility_cells(installed_override):
+func _is_station_space(cell: Vector2i, installed_override: int = -1, factory_override: int = -1) -> bool:
+	for station in facility_cells(installed_override, factory_override):
 		var inside_columns: bool = (
 			cell.x >= station.x - 1
 			and cell.x <= station.x + 1
@@ -943,6 +948,7 @@ func _draw() -> void:
 	_draw_station(FOREST_SITE, "Forest")
 	_draw_station(CARGO_TERMINAL, "Terminal")
 	if sawmill.state.installed: _draw_station(Sawmill.CELL, "Sawmill")
+	if factory.state.installed: _draw_station(Factory.CELL, "Factory")
 	if inspect_mode:
 		if selected_station != Vector2i(-1, -1):
 			draw_rect(Rect2(Vector2(selected_station) * TILE_SIZE, Vector2.ONE * TILE_SIZE).grow(3.0), Color(1.0, 0.85, 0.25), false, 2.0)
@@ -1477,6 +1483,7 @@ func _save_game(slot: int = 0) -> bool:
 		"journeys": _saved_journeys(),
 		"passenger_revenue": passenger_revenue.save_state(),
 		"sawmill": sawmill.save_state(),
+		"factory": factory.save_state(),
 		"arrivals": arrival_targets.save_state(),
 		"presentation": _saved_presentation(),
 		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
@@ -1654,7 +1661,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 		if train_x > _cell_center(STATION_B).x:
 			return false
 
-	if not Sawmill.valid(data.get("sawmill")): return false
+	if not Sawmill.valid(data.get("sawmill")) or not Factory.valid(data.get("factory")): return false
 	if not DemandResponse.valid_state(data.get("demand_response")): return false
 	if not Satisfaction.valid_state(data.get("satisfaction"), int(sim.clock.tick)): return false
 	if not Amenities.valid_save(data.get("amenities")): return false
@@ -1769,12 +1776,12 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 		checked_tracks[cell] = entry[2]
 
-	if not _is_valid_signal_list(data["signals"], checked_tracks, 1 if data.sawmill.installed else 0): return false
+	if not _is_valid_signal_list(data["signals"], checked_tracks, 1 if data.sawmill.installed else 0, 1 if data.factory.installed else 0): return false
 	if not _is_valid_switch_list(data.get("switches"), checked_tracks):
 		return false
 
 	# Every facility must retain its horizontal platform track.
-	for station in facility_cells(1 if data.get("sawmill", {}).get("installed", false) else 0):
+	for station in facility_cells(1 if data.sawmill.installed else 0, 1 if data.factory.installed else 0):
 		if not checked_tracks.has(station):
 			return false
 
@@ -1790,7 +1797,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 	if saved_stage < 0.0 or saved_stage > ScenarioGoals.OBJECTIVES.size():
 		return false
-	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick)) and PassengerRevenue.valid_save(data.get("passenger_revenue"), state.passengers_delivered) and Sawmill.valid_game(data)
+	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick)) and PassengerRevenue.valid_save(data.get("passenger_revenue"), state.passengers_delivered) and Sawmill.valid_game(data) and Factory.valid_game(data)
 	
 func _load_game(save_path: String = "") -> bool:
 	if save_path.is_empty(): save_path = SaveSlots.path(active_save_slot)
@@ -1818,7 +1825,7 @@ func _load_game(save_path: String = "") -> bool:
 	var loaded_tracks: Dictionary = {}
 	for entry in data["tracks"]:
 		var cell := Vector2i(int(entry[0]), int(entry[1]))
-		if not _is_inside_map(cell) or _is_station_space(cell, 1 if data.sawmill.installed else 0):
+		if not _is_inside_map(cell) or _is_station_space(cell, 1 if data.sawmill.installed else 0, 1 if data.factory.installed else 0):
 			_show_notice("Save contains track outside buildable ground.")
 			return false
 		loaded_tracks[cell] = entry[2]
@@ -1863,8 +1870,8 @@ func _load_game(save_path: String = "") -> bool:
 	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"]) + Consists.extra_capacity(Fleet.assigned(data["fleet"], "freight"))):
 		_show_notice("Saved freight train state is invalid.")
 		return false
-	if not FreightTrain.valid_chain(data.freight, loaded_freight_cells, data.sawmill.installed, bool(runtime.freight_returning), float(TILE_SIZE)):
-		_show_notice("Saved sawmill freight stage is incompatible with its physical position.")
+	if not FreightTrain.valid_chain(data.freight, loaded_freight_cells, data.sawmill.installed, bool(runtime.freight_returning), float(TILE_SIZE), data.factory.installed):
+		_show_notice("Saved processing freight stage is incompatible with its physical position.")
 		return false
 	var loaded_services := ServiceRoutes.from_save(data["services"])
 	var loaded_extra: Dictionary = {}
@@ -1921,6 +1928,7 @@ func _load_game(save_path: String = "") -> bool:
 	journey_ledger.restore_state(data.journeys)
 	passenger_revenue.restore_state(data.passenger_revenue)
 	sawmill.restore_state(data.sawmill)
+	factory.restore_state(data.factory)
 	arrival_targets.restore_state(data.arrivals)
 	presentation = Presentation.normalize(data.presentation)
 	route_distance = loaded_distance
@@ -1930,7 +1938,7 @@ func _load_game(save_path: String = "") -> bool:
 	freight_train.route_path = loaded_freight_path
 	freight_train.recovery_returning = runtime["freight_returning"]
 	freight_train.held = runtime["freight_held"]
-	freight_train.configure_industry(sawmill, float(TILE_SIZE))
+	freight_train.configure_industry(sawmill, float(TILE_SIZE), factory)
 	freight_train.restore_state(data["freight"])
 	_refresh_directional_routes(false)
 	_reset_traffic_state()
@@ -2419,6 +2427,10 @@ func _setup_station_inspector() -> void:
 	sawmill_button.text = "Build sawmill — £500"
 	sawmill_button.pressed.connect(func() -> void: _show_notice(build_sawmill()))
 	content.add_child(sawmill_button)
+	factory_button = Button.new()
+	factory_button.text = "Build factory — £800"
+	factory_button.pressed.connect(func() -> void: _show_notice(build_factory()))
+	content.add_child(factory_button)
 	service_button = Button.new()
 	service_button.focus_mode = Control.FOCUS_ALL
 	service_button.pressed.connect(_toggle_selected_service)
@@ -2486,12 +2498,17 @@ func _inspect_station_at(cell: Vector2i) -> void:
 func _update_station_inspector() -> void:
 	if not station_panel.visible: return
 	_update_station_details()
+	factory_button.visible = selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL, Factory.CELL]
+	factory_button.disabled = not build_factory_reason().is_empty()
+	factory_button.tooltip_text = build_factory_reason()
 	if selected_station == FOREST_SITE:
 		station_summary.text = "Logs stored: %d / %d\nFreight aboard: %d / %d\n%s" % [forest_stock, MAX_FOREST_STOCK, freight_train.cargo, freight_train.get_capacity(), freight_train.status_text()]
 	elif selected_station == Sawmill.CELL and sawmill.state.installed:
 		station_summary.text = "Sawmill: %d logs / %d timber\nProcessing: %d / %d ticks\n%s" % [sawmill.state.logs, sawmill.state.timber, sawmill.state.progress, Sawmill.DEFINITION.processing_ticks, freight_train.status_text()]
+	elif selected_station == Factory.CELL and factory.state.installed:
+		station_summary.text = "Factory: %d timber / %d goods\nProcessing: %d / %d ticks\n%s" % [factory.state.input, factory.state.output, factory.state.progress, Factory.DEFINITION.processing_ticks, freight_train.status_text()]
 	elif selected_station == CARGO_TERMINAL:
-		station_summary.text = "Logs delivered: %d\nTimber delivered: %d\nFreight income: £%d\n%s" % [logs_delivered, sawmill.state.sold, freight_income, freight_train.status_text()]
+		station_summary.text = "Logs delivered: %d\nTimber delivered: %d\nGoods delivered: %d\nFreight income: £%d\n%s" % [logs_delivered, sawmill.state.sold, factory.state.sold, freight_income, freight_train.status_text()]
 	else:
 		var key := _station_key(selected_station)
 		var count := 0
@@ -2510,14 +2527,14 @@ func _update_station_details() -> void:
 	_update_service_button()
 	service_button.show()
 
-	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL]:
+	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL, Factory.CELL]:
 		sawmill_button.show()
 		sawmill_button.disabled = not build_sawmill_reason().is_empty()
 		sawmill_button.tooltip_text = build_sawmill_reason()
 		_update_amenity_buttons("")
 		_update_freight_inspector()
 		return
-	sawmill_button.visible = selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL]
+	sawmill_button.visible = selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL, Factory.CELL]
 	sawmill_button.disabled = not build_sawmill_reason().is_empty()
 	sawmill_button.tooltip_text = build_sawmill_reason()
 	_update_amenity_buttons(_station_key(selected_station))
@@ -2630,7 +2647,7 @@ func _update_upgrade_button(
 		return
 
 	if upgrade_name.to_lower() == "speed":
-		var service := "freight" if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL] else "passenger"
+		var service := "freight" if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL, Factory.CELL] else "passenger"
 		var train := Fleet.assigned(fleet, service)
 		var speed := freight_train.get_speed() if service == "freight" else _get_train_speed()
 		if speed >= Consists.speed_limit(train):
@@ -2691,7 +2708,7 @@ func _get_speed_upgrade_price() -> int:
 
 
 func _upgrade_capacity() -> void:
-	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL]:
+	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL, Factory.CELL]:
 		_upgrade_freight_capacity()
 		return
 	if capacity_upgrade_level >= MAX_CAPACITY_LEVEL:
@@ -2722,7 +2739,7 @@ func _upgrade_capacity() -> void:
 
 
 func _upgrade_speed() -> void:
-	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL]:
+	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL, Factory.CELL]:
 		_upgrade_freight_speed()
 		return
 	if _get_train_speed() >= Consists.speed_limit(Fleet.assigned(fleet, "passenger")):
@@ -2776,7 +2793,7 @@ func _update_freight_inspector() -> void:
 		freight_train.capacity_level,
 		FreightTrain.MAX_CAPACITY_LEVEL,
 		freight_train.get_capacity_upgrade_price(),
-		"Adds %d log capacity." % FreightTrain.CAPACITY_PER_UPGRADE
+		"Adds %d cargo capacity." % FreightTrain.CAPACITY_PER_UPGRADE
 	)
 
 	_update_upgrade_button(
@@ -2789,6 +2806,7 @@ func _update_freight_inspector() -> void:
 	)
 	freight_rule_label.show()
 	freight_rule_option.show()
+	freight_rule_option.tooltip_text = "Any/Half/Full applies to departure loads. At processing stops, Half/Full finishes the available input batch if it cannot fill the train; it never leaves empty. Raw logs need at least one complete sawmill recipe."
 
 	var rule_index: int = freight_rule_option.get_item_index(
 		freight_train.loading_rule
@@ -2831,6 +2849,9 @@ func _update_freight_inspector() -> void:
 	elif selected_station == Sawmill.CELL and sawmill.state.installed:
 		station_title.text = "Sawmill"
 		station_details.text = "Accepts logs; loads processed timber.\nFreight train: %s" % train_status
+	elif selected_station == Factory.CELL and factory.state.installed:
+		station_title.text = "Factory"
+		station_details.text = "Accepts timber; loads finished goods.\nFreight train: %s" % train_status
 	else:
 		station_title.text = "Cargo terminal"
 
@@ -2858,9 +2879,12 @@ func _update_freight_inspector() -> void:
 			train_status
 		]
 	if sawmill.state.installed:
-		station_details.text += "\n\n" + sawmill.summary() + "\nOn train: %d %s" % [freight_train.cargo, freight_train.cargo_kind()]
+		station_details.text += "\n\n" + sawmill.summary(factory.state.installed) + "\nOn train: %d %s" % [freight_train.cargo, freight_train.cargo_kind()]
 		if selected_station == Sawmill.CELL: station_title.text = "Sawmill"
 		station_details.text = station_details.text.replace("Destination: cargo terminal", "Destination: sawmill, then timber to terminal").replace("Accepts: logs", "Accepts: timber").replace("Payment: £8 per log", "Payment: £%d per timber" % Sawmill.TIMBER.terminal_price)
+	if factory.state.installed:
+		station_details.text += "\n\n" + factory.summary()
+		station_details.text = station_details.text.replace("then timber to terminal", "then timber to factory and goods to terminal").replace("Accepts: timber", "Accepts: finished goods").replace("Payment: £24 per timber", "Payment: £%d per goods" % Factory.GOODS.terminal_price)
 	station_details.text += (
 		"\n\nCapacity upgrades: %d/%d"
 		+ "\nSpeed: %.0f px/s"
@@ -2914,8 +2938,9 @@ func _setup_freight_train() -> void:
 			_record_event(EventLog.TRAIN_RECOVERED, str(Fleet.assigned(fleet, "freight")["id"]), {"service": "freight", "stop": stop, "action": "returned to departure stop"}))
 
 	freight_train.movement_guard = _freight_reserved_movement
-	freight_train.configure_industry(sawmill, float(TILE_SIZE))
+	freight_train.configure_industry(sawmill, float(TILE_SIZE), factory)
 	freight_train.logs_received.connect(func(amount: int) -> void: _record_event(EventLog.CARGO_DELIVERED, "freight", {"logs": amount, "stop": "sawmill", "payment": 0}))
+	freight_train.timber_received.connect(func(amount: int) -> void: _record_event(EventLog.CARGO_DELIVERED, "freight", {"timber": amount, "stop": "factory", "payment": 0}))
 	add_child(freight_train)
 	_refresh_freight_route(route_cells)
 
@@ -2948,6 +2973,13 @@ func _refresh_switch_states(_passenger_cells: Array[Vector2i]) -> void:
 
 
 func _on_logs_delivered(amount: int) -> void:
+	if factory.state.installed:
+		factory.state.sold += amount
+		var goods_payment: int = amount * Factory.GOODS.terminal_price
+		freight_income += goods_payment
+		money += goods_payment
+		_record_event(EventLog.CARGO_DELIVERED, "freight", {"goods": amount, "payment": goods_payment})
+		return
 	if sawmill.state.installed:
 		sawmill.state.sold += amount
 		var timber_payment: int = amount * Sawmill.TIMBER.terminal_price
@@ -3154,8 +3186,8 @@ func _apply_construction_history(
 
 	_rebuild_reservations()
 	for cell in target:
-		if sawmill.state.installed and ((cell == Sawmill.CELL and target[cell] != false) or (_is_station_space(cell) and target[cell] != null)):
-			_show_notice("Undo/Redo cannot overwrite the installed sawmill platform or building grounds.")
+		if (sawmill.state.installed or factory.state.installed) and ((cell in facility_cells() and target[cell] != false) or (_is_station_space(cell) and target[cell] != null)):
+			_show_notice("Undo/Redo cannot overwrite the installed industry platforms or building grounds.")
 			return false
 		if reservations.owners.has(cell):
 			_show_notice("Cannot undo or redo reserved track; wait until the train clears.")
@@ -3273,6 +3305,7 @@ func _selected_service_is_freight() -> bool:
 		selected_station == FOREST_SITE
 		or selected_station == CARGO_TERMINAL
 		or (selected_station == Sawmill.CELL and sawmill.state.installed)
+		or (selected_station == Factory.CELL and factory.state.installed)
 	)
 
 
@@ -3970,7 +4003,7 @@ func _update_amenity_buttons(station: String) -> void:
 		button.tooltip_text = "Pause the game to build." if not paused else (reason if reason != "" else "Waiting limit +%d, passenger arrivals +%d%%." % [int(def.queue), int(def.demand)])
 
 func _buy_amenity(id: String) -> void:
-	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL]: return
+	if selected_station in [FOREST_SITE, CARGO_TERMINAL, Sawmill.CELL, Factory.CELL]: return
 	if not paused:
 		_show_notice("Pause the game before building.")
 		return
@@ -4116,6 +4149,10 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	if not paused:
 		return "Pause before changing routes."
 	if sawmill.state.installed and Sawmill.count_points(configuration.freight.get("waypoints", {}).get("forest>terminal", [])) != 1: return "Keep the sawmill directive at 18,24 in the freight route."
+	if factory.state.installed and _factory_point_count(configuration.freight.get("waypoints", {}).get("forest>terminal", [])) != 1: return "Keep the factory directive at 23,24 in the freight route."
+	if factory.state.installed:
+		var factory_route := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, configuration.freight.get("waypoints", {}).get("forest>terminal", []))
+		if factory_route.is_empty() or factory_route.find(Factory.CELL) <= factory_route.find(Sawmill.CELL): return "Freight must reach the factory after the sawmill."
 	configuration = ServiceRoutes.from_save(configuration)
 	if not _valid_service_assignments(configuration, fleet): return "Create or remove additional services in Fleet before editing their routes."
 	for key in configuration:
@@ -4401,6 +4438,7 @@ func _freight_reserved_movement(path: Curve2D, current: float, proposed: float) 
 func _leg_stops(service: String, path: Curve2D) -> Array:
 	if service == "passenger": return stop_distances
 	if passenger_services.has(service): return passenger_services[service].distances
+	if service == "freight" and factory.state.installed: return [0.0, freight_train.sawmill_distance, freight_train.factory_distance, path.get_baked_length()]
 	if service == "freight" and sawmill.state.installed: return [0.0, freight_train.sawmill_distance, path.get_baked_length()]
 	return [0.0, path.get_baked_length()]
 
@@ -4958,14 +4996,14 @@ func _saved_signals() -> Array:
 	for cell in track_signals: result.append([cell.x, cell.y, track_signals[cell]])
 	return result
 
-func _is_valid_signal_list(value: Array, checked_tracks: Dictionary, installed_override: int = -1) -> bool:
+func _is_valid_signal_list(value: Array, checked_tracks: Dictionary, installed_override: int = -1, factory_override: int = -1) -> bool:
 	if value.size() > MAP_WIDTH * MAP_HEIGHT: return false
 	var seen: Dictionary = {}
 	for entry in value:
 		if not entry is Array or entry.size() != 3: return false
 		if not RuntimeRoutes.valid_cells([[entry[0], entry[1]]]): return false
 		var cell := Vector2i(int(entry[0]), int(entry[1]))
-		if seen.has(cell) or not checked_tracks.has(cell) or _is_station_space(cell, installed_override) or cell in facility_cells(installed_override): return false
+		if seen.has(cell) or not checked_tracks.has(cell) or _is_station_space(cell, installed_override, factory_override) or cell in facility_cells(installed_override, factory_override): return false
 		if not TrackGeometry.is_straight(checked_tracks[cell]) or entry[2] not in ["auto", "stop"]: return false
 		seen[cell] = true
 	return true
@@ -5817,8 +5855,9 @@ func object_rows() -> Array:
 		var station: Dictionary = ServiceRoutes.STATIONS[key]
 		result.append({"key": "station:" + key, "kind": "Station", "id": -1, "service": "", "title": station.name, "details": "%s\n%d passengers waiting\nMap cell %d,%d" % [station.name, _waiting(key), station.cell.x, station.cell.y], "cell": station.cell})
 	result.append({"key": "industry:forest", "kind": "Industry", "id": -1, "service": "", "title": "Forest", "details": "Forest — produces logs\n%d logs in stock\nMap cell %d,%d" % [forest_stock, FOREST_SITE.x, FOREST_SITE.y], "cell": FOREST_SITE})
-	if sawmill.state.installed: result.append({"key": "industry:sawmill", "kind": "Industry", "id": -1, "service": "", "title": "Sawmill", "details": sawmill.summary(), "cell": Sawmill.CELL})
-	result.append({"key": "industry:terminal", "kind": "Industry", "id": -1, "service": "", "title": "Cargo Terminal", "details": "Cargo Terminal — accepts %s\n%d logs / %d timber delivered\nMap cell %d,%d" % ["timber" if sawmill.state.installed else "logs", logs_delivered, sawmill.state.sold, CARGO_TERMINAL.x, CARGO_TERMINAL.y], "cell": CARGO_TERMINAL})
+	if sawmill.state.installed: result.append({"key": "industry:sawmill", "kind": "Industry", "id": -1, "service": "", "title": "Sawmill", "details": sawmill.summary(factory.state.installed), "cell": Sawmill.CELL})
+	if factory.state.installed: result.append({"key": "industry:factory", "kind": "Industry", "id": -1, "service": "", "title": "Factory", "details": factory.summary(), "cell": Factory.CELL})
+	result.append({"key": "industry:terminal", "kind": "Industry", "id": -1, "service": "", "title": "Cargo Terminal", "details": "Cargo Terminal — accepts %s\n%d logs / %d timber / %d goods delivered\nMap cell %d,%d" % ["goods" if factory.state.installed else "timber" if sawmill.state.installed else "logs", logs_delivered, sawmill.state.sold, factory.state.sold, CARGO_TERMINAL.x, CARGO_TERMINAL.y], "cell": CARGO_TERMINAL})
 	return result
 
 func locate_object(row: Dictionary) -> bool:
@@ -5845,6 +5884,10 @@ func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 			var saw_index: int = cells.find(Sawmill.CELL)
 			if saw_index < 0 or cells.count(Sawmill.CELL) != 1: return "Freight must visit the sawmill at 18,24 exactly once."
 			stops.append(RailRouter.make_path(cells.slice(0, saw_index + 1), float(TILE_SIZE)).get_baked_length())
+		if factory.state.installed:
+			var factory_index: int = cells.find(Factory.CELL)
+			if factory_index <= cells.find(Sawmill.CELL) or cells.count(Factory.CELL) != 1: return "Freight must visit the factory at 23,24 after the sawmill."
+			stops.append(RailRouter.make_path(cells.slice(0, factory_index + 1), float(TILE_SIZE)).get_baked_length())
 	else:
 		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}))
 		path = built.path
@@ -6048,8 +6091,53 @@ func build_sawmill() -> String:
 	services.freight["waypoints"] = {"forest>terminal": points}
 	money -= Sawmill.DEFINITION.build_price
 	total_construction_cost += Sawmill.DEFINITION.build_price
-	freight_train.configure_industry(sawmill, float(TILE_SIZE))
+	freight_train.configure_industry(sawmill, float(TILE_SIZE), factory)
 	_refresh_directional_routes()
 	_update_station_inspector()
 	queue_redraw()
 	return "Sawmill installed at 18,24. Freight delivers logs, waits for timber, then sells timber at Terminal."
+
+func _factory_point_count(points: Array) -> int:
+	var count := 0
+	for point in points:
+		if point is Array and point.size() == 2 and point[0] == Factory.CELL.x and point[1] == Factory.CELL.y: count += 1
+	return count
+func build_factory_reason() -> String:
+	if not sawmill.state.installed: return "Install the sawmill before building a factory."
+	if factory.state.installed: return "Factory already installed."
+	if not paused: return "Pause before building the factory."
+	if money < Factory.DEFINITION.build_price: return "Factory costs £%d." % Factory.DEFINITION.build_price
+	if freight_train.cargo > 0 or freight_train.distance_along_route > 0.001 or freight_train.recovery_returning: return "Withdraw freight and wait until it is empty at the forest before installing the factory."
+	if tracks.get(Factory.CELL) != false or typeof(tracks.get(Factory.CELL)) != TYPE_BOOL: return "Lay a horizontal factory stop at 23,24."
+	if track_signals.has(Factory.CELL): return "Move the signal off the proposed factory stop at 23,24."
+	if freight_train.route_cells.count(Factory.CELL) != 1: return "Connect Forest to Terminal through track 23,24 exactly once."
+	if freight_train.route_cells.find(Factory.CELL) <= freight_train.route_cells.find(Sawmill.CELL): return "Freight must reach the factory after the sawmill."
+	for x in range(Factory.CELL.x - 1, Factory.CELL.x + 2):
+		for y in range(Factory.CELL.y - 2, Factory.CELL.y):
+			if tracks.has(Vector2i(x, y)): return "Clear tracks from the proposed factory building footprint."
+	var distance := RailRouter.make_path(freight_train.route_cells.slice(0, freight_train.route_cells.find(Factory.CELL) + 1), float(TILE_SIZE)).get_baked_length()
+	var fit := Consists.stop_clearance(freight_train.route_path, distance, Fleet.length(Fleet.assigned(fleet, "freight")), tracks, float(TILE_SIZE), track_signals)
+	return fit
+func build_factory() -> String:
+	var reason := build_factory_reason()
+	if not reason.is_empty(): return reason
+	var points: Array = services.freight.get("waypoints", {}).get("forest>terminal", []).duplicate(true)
+	var ordered: Array = []
+	var cells: Array = freight_train.route_cells
+	for point in points: ordered.append({"index": cells.find(Vector2i(int(point[0]), int(point[1]))), "point": point})
+	if _factory_point_count(points) == 0: ordered.append({"index": cells.find(Factory.CELL), "point": [Factory.CELL.x, Factory.CELL.y]})
+	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.index < b.index)
+	points.clear()
+	for row in ordered: points.append(row.point)
+	if points.size() > 16: return "Remove a waypoint to leave room for the factory directive."
+	var candidate := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, points)
+	if candidate != cells: return "Review the route: the factory directive would change its geometry. Install with a simple connected route first."
+	factory.state.installed = true
+	services.freight["waypoints"] = {"forest>terminal": points}
+	money -= Factory.DEFINITION.build_price
+	total_construction_cost += Factory.DEFINITION.build_price
+	freight_train.configure_industry(sawmill, float(TILE_SIZE), factory)
+	_refresh_directional_routes()
+	_update_station_inspector()
+	queue_redraw()
+	return "Factory installed at 23,24. Freight takes timber from Sawmill, loads finished goods at Factory, then sells goods at Terminal."

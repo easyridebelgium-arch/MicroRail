@@ -9,6 +9,6 @@ progress, movement and upgrades belong to separate saved state. Definition schem
 versions are distinct from the root save version. Preserve stable IDs and add a
 migration plus conservation/transport tests when changing saved semantics.
 
-Current slice: logs → sawmill → timber terminal. See
-[operation and persistence](../docs/SAWMILL_CHAIN.md). Rolling-stock resources and
+Current slice: logs → sawmill → timber → optional factory → goods terminal. See
+[operation and persistence](../docs/FACTORY_CHAIN.md). Rolling-stock resources and
 additional industries remain later work; this folder does not replace fleet models.

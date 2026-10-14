@@ -13,7 +13,7 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings and richer measured planning. Alert acknowledgement/persistence and optional incident slowdown are implemented. Unified waiting inspection is implemented. |
-| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phase 2B first processing slice implemented; Phase 2C planned. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
+| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phase 2B first complete freight chain implemented; Phase 2C seeded cities/stations planned. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
 **Current-stage UI work is complete:** all twelve items in the table below are
@@ -120,8 +120,16 @@ Save version 37 retains production progress and freight stages; version 36 migra
 to the unchanged log-only service. Validation: 91 regression suites pass, including
 39 focused sawmill checks. See [sawmill chain](SAWMILL_CHAIN.md).
 
-**Next implementation:** Phase 2B factory processing and finished-goods delivery
-to complete the first vertical slice before generalising cargo types. Player fare controls, richer passenger
+**Latest factory batch:** the optional £800 factory completes the first freight
+vertical slice. Timber is processed into finished goods every ten simulation
+seconds; the terminal pays £40 per goods. Intermediate unloading remains unpaid,
+with saved stock conservation and physical recovery. Save version 38 adds the
+factory; version 37 keeps the existing sawmill service. Validation: 92 regression
+suites pass, plus the final 30 focused factory checks. See [factory chain](FACTORY_CHAIN.md).
+
+**Next implementation:** Phase 2C saved world/station catalogs, seeded settlement
+and industry layouts, then player-built stations/catchments and gradual city
+growth/decline. See [seeded cities plan](SEEDED_CITIES_PLAN.md). Player fare controls, richer passenger
 choices, timed connections and punctuality scoring remain planned refinements. Completed elapsed time is now measured; journey scoring
 still needs explicit benchmarks rather than treating duration alone as lateness. Basic
 waiting-based demand balancing is complete; population, player fare controls and richer
@@ -181,7 +189,7 @@ advance or reorder the gameplay milestones above.
 
 **Amenities checkpoint:** stations can buy a Shelter, Waiting room and Kiosk. Each raises that
 station's waiting limit and passenger arrivals by a small, saved percentage (save version 26); see
-[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction, gradual demand response, complete journey timing and occupancy/capacity-denial measurement are implemented; directional arrival targets and basic punctuality are implemented; advisory feasibility guidance and per-direction reports are implemented; Express/Local classes and direct-leg eligibility are implemented; differentiated fares and recorded revenue are implemented; Phase 2B now has its first playable processing slice.
+[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction, gradual demand response, complete journey timing and occupancy/capacity-denial measurement are implemented; directional arrival targets and basic punctuality are implemented; advisory feasibility guidance and per-direction reports are implemented; Express/Local classes and direct-leg eligibility are implemented; differentiated fares and recorded revenue are implemented; Phase 2B now has its first complete single-shuttle freight chain.
 
 **Rename checkpoint:** the project is now **MicroRail** (formerly "Trainz", a name already in use by another
 game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
@@ -428,22 +436,23 @@ must be labelled estimates.
 
 ### Phase 2B — Freight and supply chains
 
-Logs → sawmill → timber delivery is implemented; next add factory processing and a
-finished-goods destination. Only generalise recipes/cargo behaviour after that full
+Logs → sawmill → timber → factory → finished-goods terminal is implemented as
+one optional single-shuttle chain. Only generalise recipes/cargo behaviour after that full
 chain is playable and its storage, stock compatibility and finances are verified.
 Versioned cargo/industry definitions are implemented with the first processing industry.
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Implemented first slice: optional sawmill, 2:1 log processing, bounded storage, timber loading/payment and physical recovery. Next add a factory and finished-goods destination to complete the logs → sawmill → timber → factory chain. Verify input consumption, production recipes, bounded storage, compatible wagons and delivery accounting before generalising cargo types. |
+| Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Implemented first slice: optional sawmill, 2:1 log processing, bounded storage, timber loading/payment and physical recovery. Optional factory and finished-goods delivery now complete this first single-shuttle chain; general cargo rosters and independent freight services remain extensions. Verify input consumption, production recipes, bounded storage, compatible wagons and delivery accounting before generalising cargo types. |
 | Cargo with distinct behaviours | Perishable cargo spoils over time, hazardous materials need lower speeds or special handling, and high-value express cargo rewards fast delivery. | Track shipment age and delivery terms; connect cargo requirements to rolling stock, facilities and routing. Make spoilage, restrictions and bonuses visible before loading. |
 | Mail and parcels | Add small, fast, high-value consignments, including carriage on compatible passenger trains. | Requires cargo definitions, compatible vehicles and explicit capacity sharing; introduce before complex intermodal logistics. |
 | Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Physical platforms and usable lengths belong to Phase 1B. Phase 2A implements separate waiting-area capacity and demand/amenity purchases; train capacity does not create passengers. Passenger loading facilities follow measured dwell/loading rules; Phase 2B adds cargo warehouses and handling. Fuel depots wait for locomotive technology and energy costs. Each facility needs a clear priced benefit. |
 | Delivery contracts | Earn rewards for specified quantities delivered within deadlines. | Extend the existing objective system with selectable, timed contracts and clear failure conditions. |
 
-### Phase 2C — Growth and persistence
+### Phase 2C — Seeded settlements, station construction, growth and persistence
 
-Connect growth to delivered passenger/cargo service. Offer unlimited money and
+Start with stable world IDs, seeded city/industry layouts and player-built station catchments;
+then connect growth and decline to measured delivered/unmet service. See [seeded cities plan](SEEDED_CITIES_PLAN.md). Offer unlimited money and
 slower/no growth as those systems arrive; expose no-breakdown options when
 maintenance exists. Persist scenario rules and separate challenge eligibility from
 relaxed sandbox play. Autosaves, basic scenario objectives and bounded performance
@@ -451,7 +460,10 @@ history may land earlier once their foundations are reliable.
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Town and industry growth | Let reliable transport increase demand and create expansion opportunities. | Phase 2C: growth responds to measured delivered service and usable passenger/cargo demand. Provide slower-growth and no-growth options; integrate land rights when introduced. Do not couple visual town expansion to unimplemented demand. |
+| Seeded starting layouts | Start new sandbox games with reproducible cities and industries instead of three fixed stations. | First Phase 2C milestone after the freight slice: introduce a saved world catalog with stable settlement/facility IDs, then seeded placement and a seed/map-settings chooser. Validate spacing, buildable station approaches, reachable industries and objective feasibility. Save generated geometry plus seed, generator/content versions and rules. Keep A/B/C as the tutorial/legacy scenario; full terrain generation is later. |
+| Player-built stations and city catchments | Build stations beside cities and make location matter for passenger supply. | Before city growth: replace hard-coded A/B/C lookup with saved station IDs, placement/orientation/platform footprints and city catchment links. Preview construction cost, building clearance and population served; reject overlaps and preserve existing train positions during edits/load. Passenger origins/destinations belong to settlements; no station or no useful service leaves demand unmet. Clarify overlapping catchments so passengers are not generated twice. Support multiple stations per city after the initial one-station slice. |
+| City growth and decline | Cities expand with useful service and contract when sustained passenger demand is unmet. | After seeded settlements, stations and catchments work: use bounded population and measured served/unserved demand over a rolling window, including delivered passengers, capacity, frequency and usable destinations. Grow/shrink gradually with grace periods and visible explanations; unserved new cities must not collapse immediately. Preserve existing buildings/station access during visual expansion; never demolish rail or teleport trains. Add slower/no-growth options and later integrate industry supply/jobs and land rights. |
+| Industry growth | Useful cargo service creates production and expansion opportunities. | Retain the existing Phase 2C plan: measured delivered supply and usable demand support bounded industry growth. Extend the saved world catalog and production definitions; keep storage/recipe accounting valid and explain changes. Integrate land rights later. |
 | Sandbox and scenario modes | Offer relaxed construction alongside structured challenges. | Expose unlimited-money and growth-rate options with the supporting systems. Add no-breakdown and maintenance-pressure controls when maintenance exists. Save rule settings and define challenge/achievement eligibility. Reuse introductory objectives for a small early scenario framework; avoid requiring all later simulation features first. |
 | Operating budgets | Break costs down into maintenance, fuel/energy, workforce, vehicles, construction, interest, station upkeep and penalties. | Expand the company dashboard as each cost system arrives; avoid double-counting the same expense across categories. |
 | Leasing and second-hand stock | Offer low-upfront-cost leases and cheaper used vehicles with clear running-cost or reliability trade-offs. | Build on fleet identities, contracts and vehicle condition. Add simple purchase/lease terms before resale-market simulation. |
@@ -497,7 +509,7 @@ future rival, without adding speculative AI frameworks.
 | --- | --- | --- |
 | Blueprints and copy/paste track designs | Save and reuse junctions, loops and terminal layouts. | Implemented: rectangular capture of built track/switches/signals, relative placement through priced reservation-aware drafts and grouped Undo/Redo. Stations/platforms, rotation and land ownership checks follow their own systems; see [track blueprints](TRACK_BLUEPRINTS.md). |
 | Camera tools, spectator views and traffic overview | Expand existing camera scrolling and the minimap with free-camera controls, train-follow/ride-along mode, close station views with minimal UI, and a network traffic-density heat map. | Use stable train targets and traffic measurements, an easy return to normal controls, and protection against accidental construction while watching. Spectator controls can arrive earlier; the heat map builds on dashboard data. |
-| Procedural maps and shareable seeds | Generate terrain, rivers, towns, industries and resources with adjustable size/density and reproducible starts. | Start with bounded random industry placement for targeted scenarios before a full terrain generator. Validate placement, connectivity and objective feasibility. Share seed, generator/content versions and scenario/modifier rules; a seed alone does not guarantee matching maps across releases. Full terrain, rivers and town generation remain later work. |
+| Procedural maps and shareable seeds | Generate terrain, rivers, towns, industries and resources with adjustable size/density and reproducible starts. | Phase 2C introduces seeded settlement/industry starts with player-built stations before a full terrain generator. Validate placement, connectivity and objective feasibility. Share seed, generator/content versions and scenario/modifier rules; a seed alone does not guarantee matching maps across releases. Full terrain and rivers remain later work; initial city layouts and catchments belong to Phase 2C. |
 | Photo mode and sharing tools | Capture screenshots with optional route-name and train-information overlays for sharing. | Build on camera tools and selectable UI visibility. Start with local image export; keep posting to external services a deliberate player action. Video/GIF export is deferred outside core scope. |
 | Railway sound design | Give locomotives distinct horns and rail sounds, add station announcements, and use ambient audio to make the network feel alive. | Use spatial sound tied to train type, speed, distance and station events; scale platform crowd ambience from visible queues. Provide separate volume controls and visual equivalents for important audio cues; use appropriately licensed or original assets. |
 | Level and scenario editor | Create maps, place industries and define delivery challenges for sharing. | Define a versioned content format, validate maps and objectives, and separate scenario definitions from saved sessions. Start with local import/export and sharing through community forums. Steam Workshop integration is a later distribution-specific option, not a requirement for using the editor. |
@@ -586,8 +598,8 @@ instead of adding a separate campaign simulation.
    occupancy/capacity-denial measurement is implemented; directional arrival targets and basic punctuality are implemented; advisory target-feasibility guidance and per-direction reports are implemented; Express/Local eligibility is implemented; differentiated fares and recorded revenue are implemented; player fare controls, richer choices and scoring remain refinements before full reputation/contract systems. Departure timetables are implemented;
    Arrival targets now measure actual trips; punitive contracts still follow demand/contract rules.
 6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
-   by factory/finished goods (next); the initial sawmill recipe, storage and payments are implemented.
-7. **Growth, sandbox rules and persistence (2C):** service-driven growth,
+   by factory/finished goods (implemented); recipes, storage, physical delivery and conservation are covered.
+7. **Seeded settlements and growth (2C):** stable world IDs → seeded city/industry layouts → player-built stations and catchments → service-driven growth/decline,
    eligibility-aware scenario rules, bounded metrics and reliable rotating saves.
 8. **Later mechanics (3–5):** opt-in maintenance, terrain/economy, research/eras,
    optional weather effects, full scenario/editor/community expansion.

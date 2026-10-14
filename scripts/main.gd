@@ -26,6 +26,8 @@ const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerJourneys = preload("res://scripts/core/passenger_journeys.gd")
 const JourneyLedger = preload("res://scripts/core/journey_ledger.gd")
 var journey_ledger = JourneyLedger.new()
+const PassengerOccupancy = preload("res://scripts/core/passenger_occupancy.gd")
+var passenger_occupancy = PassengerOccupancy.new()
 const DemandResponse = preload("res://scripts/core/demand_response.gd")
 var demand_response = DemandResponse.new()
 const Satisfaction = preload("res://scripts/core/passenger_satisfaction.gd")
@@ -479,6 +481,7 @@ func _simulation_step(step_seconds: float) -> void:
 	for key in additional_service_keys(): passenger_services[key].advance(self, step_seconds)
 	_update_deadlocks()
 	traffic_metrics.update(sim_clock.tick, reservation_trains.keys(), traffic_wait_samples)
+	_sample_passenger_occupancy()
 	_check_scenario_objectives()
 	_advance_loans()
 	_clear_resolved_acknowledgements()
@@ -1318,7 +1321,29 @@ func _board_waiting(station: String, destinations: Array, capacity: int, manifes
 	var boarded: int = passenger_demand.board(station, destinations, capacity, manifest, sim_clock.tick)
 	satisfaction.record(station, passenger_demand.last_boarding, sim_clock.tick, amenities.owned[station])
 	journey_ledger.board(key, passenger_demand.last_journeys)
+	var train: Dictionary = Fleet.assigned(fleet, key)
+	if not train.is_empty():
+		var eligible_left := 0
+		for destination in destinations:
+			eligible_left += int(passenger_demand.queues[station].get(destination, 0))
+		passenger_occupancy.boarding(sim_clock.tick, int(train.id), station, boarded, eligible_left, PassengerDemand.total(manifest), capacity)
 	return boarded
+
+func _sample_passenger_occupancy() -> void:
+	var samples: Array = []
+	for key in service_keys():
+		if not ServiceRoutes.is_passenger_key(key): continue
+		var train: Dictionary = Fleet.assigned(fleet, key)
+		if train.is_empty(): continue
+		var manifest: Dictionary = passenger_destinations if key == "passenger" else passenger_services[key].passenger_destinations
+		var finishing: bool = false
+		if key == "passenger":
+			finishing = passenger_returning or not (route_distance <= 0.001 and travelling_to_b and passengers_on_train == 0)
+		else:
+			finishing = not passenger_services[key].at_home()
+		if not service_enabled(key) and not finishing: continue
+		samples.append({"id": int(train.id), "passengers": PassengerDemand.total(manifest), "capacity": Fleet.capacity(train)})
+	passenger_occupancy.sample(sim_clock.tick, samples)
 
 func _saved_journeys() -> Dictionary:
 	var loads: Dictionary = {"passenger": passenger_destinations}
@@ -1900,6 +1925,7 @@ func _load_game(save_path: String = "") -> bool:
 	planning_mode = false
 	inspection_panel.plan_toggle.set_pressed_no_signal(false)
 	traffic_metrics.reset()
+	passenger_occupancy.reset()
 	traffic_wait_samples.clear()
 
 	if data["sim"].has("commands") and CommandQueue.is_valid_state(data["sim"]["commands"]):

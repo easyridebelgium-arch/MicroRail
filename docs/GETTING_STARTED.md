@@ -93,3 +93,12 @@ Upgrades, amenities and undo only work while paused. Keys can be changed in **Se
 
 Hover toolbar controls for their action and description. Relevant shortcuts and
 mouse controls follow your current Settings bindings; this reference lists defaults.
+
+## Check whether your trains need more seats
+
+Click a passenger train and compare **Seats occupied** with its recent occupancy
+and eligible passengers left behind. Open **Accounts** for company and station
+figures. People whose destination is not served by that departure do not count as
+capacity denials. The boarding count represents opportunities, so repeated full
+departures may count the same person again. Recent measurements restart on load.
+See [occupancy feedback](PASSENGER_OCCUPANCY.md).

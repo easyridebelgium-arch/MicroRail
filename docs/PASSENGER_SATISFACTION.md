@@ -38,8 +38,9 @@ Transfers and physical recovery start a new station wait on arrival. A passenger
 who changes trains can therefore contribute more than one station experience.
 This rating covers station waiting, not unique passengers' complete journey time.
 Complete journey elapsed time is now measured separately ([journey times](JOURNEY_TIMES.md));
-it does not yet change this rating. Onboard delays, crowding, timetable punctuality, classes, fares and company
-reputation are not measured here. Existing amenities retain their published
+it does not yet change this rating. [Occupancy and eligible capacity denials](PASSENGER_OCCUPANCY.md)
+are also measured separately without changing this rating. Onboard delays, timetable
+punctuality, classes, fares and company reputation are not scored here. Existing amenities retain their published
 capacity/demand effects. Waiting-based demand response is now implemented as a
 separate, bounded factor;
 see [demand response](DEMAND_RESPONSE.md). Fares, movement and reservations remain

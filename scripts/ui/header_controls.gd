@@ -118,6 +118,7 @@ func refresh() -> void:
 
 	accounts_text.text += "\n\n" + waiting_summary()
 	accounts_text.text += "\n\n" + game.journey_ledger.summary()
+	accounts_text.text += "\n\n" + game.passenger_occupancy.summary()
 
 func open_accounts() -> void:
 	game._cancel_right_gesture()

@@ -72,8 +72,14 @@ breakdowns; train inspectors show tracked onboard elapsed time. Save version 33
 preserves clocks and validates totals against manifests. Legacy origins remain
 explicitly unmeasured. See [journey times](JOURNEY_TIMES.md).
 
-**Next implementation:** Phase 2A measured occupancy/crowding, then planned arrival
-targets and punctuality. Completed elapsed time is now measured; journey scoring
+**Latest occupancy batch:** passenger train inspectors show live seats used and
+recent seat-time-weighted utilisation. Accounts adds company full-time and station
+left-behind opportunities. Fixed-tick sampling includes enabled service waits and
+dwell, excludes parked withdrawals, and follows permanent vehicle IDs and actual
+capacity. Bounded diagnostics reset on load; save version remains 33. No crowding
+penalty is applied yet. See [occupancy feedback](PASSENGER_OCCUPANCY.md).
+
+**Next implementation:** Phase 2A planned arrival targets and punctuality. Completed elapsed time is now measured; journey scoring
 still needs explicit benchmarks rather than treating duration alone as lateness. Basic
 waiting-based demand balancing is complete; population, classes, fares and richer
 demand factors remain later refinements. Waiting-area amenities and the current UI work are complete.
@@ -94,8 +100,8 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation covers all 85 passing headless suites in Godot 4.6.3
-(full journey-tracking regression plus the expanded 29-check timing rerun), including 50 loan checks and
+complete. The latest cloud validation covers all 86 passing headless suites in Godot 4.6.3
+(full occupancy regression, including 22 capacity-feedback checks and 29 journey-timing checks), including 50 loan checks and
 26 panel-preference/layout checks,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
@@ -132,7 +138,7 @@ advance or reorder the gameplay milestones above.
 
 **Amenities checkpoint:** stations can buy a Shelter, Waiting room and Kiosk. Each raises that
 station's waiting limit and passenger arrivals by a small, saved percentage (save version 26); see
-[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction and gradual demand response and complete journey timing are implemented; occupancy/crowding measurement is next.
+[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction, gradual demand response, complete journey timing and occupancy/capacity-denial measurement are implemented; planned arrival targets and punctuality are next.
 
 **Rename checkpoint:** the project is now **MicroRail** (formerly "Trainz", a name already in use by another
 game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
@@ -389,7 +395,7 @@ Versioned cargo/industry definitions start before the first processing industry.
 | Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Phase 2B first delivers a playable logs → sawmill → timber delivery chain, then adds a factory and finished-goods destination to complete the logs → sawmill → timber → factory chain. Verify input consumption, production recipes, bounded storage, compatible wagons and delivery accounting before generalising cargo types. |
 | Cargo with distinct behaviours | Perishable cargo spoils over time, hazardous materials need lower speeds or special handling, and high-value express cargo rewards fast delivery. | Track shipment age and delivery terms; connect cargo requirements to rolling stock, facilities and routing. Make spoilage, restrictions and bonuses visible before loading. |
 | Mail and parcels | Add small, fast, high-value consignments, including carriage on compatible passenger trains. | Requires cargo definitions, compatible vehicles and explicit capacity sharing; introduce before complex intermodal logistics. |
-| Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Physical platforms and usable lengths belong to Phase 1B. Phase 2A next adds separate waiting-area capacity and demand/amenity purchases; train capacity does not create passengers. Passenger loading facilities follow measured dwell/loading rules; Phase 2B adds cargo warehouses and handling. Fuel depots wait for locomotive technology and energy costs. Each facility needs a clear priced benefit. |
+| Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Physical platforms and usable lengths belong to Phase 1B. Phase 2A implements separate waiting-area capacity and demand/amenity purchases; train capacity does not create passengers. Passenger loading facilities follow measured dwell/loading rules; Phase 2B adds cargo warehouses and handling. Fuel depots wait for locomotive technology and energy costs. Each facility needs a clear priced benefit. |
 | Delivery contracts | Earn rewards for specified quantities delivered within deadlines. | Extend the existing objective system with selectable, timed contracts and clear failure conditions. |
 
 ### Phase 2C — Growth and persistence
@@ -532,9 +538,9 @@ instead of adding a separate campaign simulation.
    Still needed: full service duplication/drag reordering, safe multiple trains per service, then measured
    headways and frequency targets with clear attainable limits.
 5. **Passenger demand (2A, destinations, amenities and basic transfers implemented):**
-   waiting-age fairness and waiting-experience satisfaction are implemented; next
-   waiting-based demand response and complete journey timing are implemented; next
-   measure occupancy/crowding, then add arrival targets, richer choices and scoring. Departure timetables are implemented;
+   waiting-age fairness and waiting-experience satisfaction are implemented;
+   waiting-based demand response and complete journey timing are implemented;
+   occupancy/capacity-denial measurement is implemented; next add arrival targets, richer choices and scoring. Departure timetables are implemented;
    arrival targets and punctuality contracts follow their demand/contract rules.
 6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
    by factory/finished goods; verify stock, recipes, storage and payments first.

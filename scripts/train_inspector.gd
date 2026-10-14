@@ -76,6 +76,9 @@ func open_train(id: int) -> void:
 				destinations.append("%s: %d%s" % [game.ServiceRoutes.STATIONS[station].name, int(manifest[station]), " (change trains)" if not game.services[data.service].stops.has(station) else ""])
 		summary.text += "\nOnboard destinations: " + (", ".join(destinations) if not destinations.is_empty() else "none")
 		summary.text += "\n" + game.journey_ledger.describe_train(str(data.service), manifest, game.sim_clock.tick)
+		var vehicle: Dictionary = game.Fleet.find(game.fleet, id)
+		if not vehicle.is_empty():
+			summary.text += "\nSeats occupied: %d / %d\n" % [game.PassengerDemand.total(manifest), game.Fleet.capacity(vehicle)] + game.passenger_occupancy.describe(id)
 	if int(data.blocker) > 0: summary.text += "\nBlocked by: " + _names([data.blocker])
 	summary.text += "\nRoute identity: [" + str(game.route_identity(str(data.service)).label) + "]" if game.services.has(str(data.service)) else ""
 	var lines: PackedStringArray = ["Physical body now (%d tiles): %s" % [data.occupied.size(), game.TrainDiagnostics.cells_text(data.occupied)], "Last allocation at tick %d:" % data.tick, "Granted tiles (%d): %s" % [data.granted.size(), game.TrainDiagnostics.cells_text(data.granted)], "Attempted tile requests (%d): %s" % [data.requested.size(), game.TrainDiagnostics.cells_text(data.requested)]]

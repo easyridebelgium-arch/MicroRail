@@ -19,6 +19,14 @@ Opening the inspector pauses and cancels active mouse gestures, leaving staged
 construction intact. It preserves the last movement allocation rather than rebuilding
 it with paused trains. Closing or navigating leaves the simulation paused.
 
+## Passenger capacity
+
+Passenger inspectors also show live seats occupied, recent seat-time-weighted
+occupancy, time spent full and eligible passengers left behind at boarding.
+These recent observations reset on load and do not alter fares or satisfaction.
+Use **Accounts** for station and company totals; see
+[occupancy feedback](PASSENGER_OCCUPANCY.md) for the sampling rules.
+
 ## Read the evidence
 
 - **State and reason:** traffic wait, approaching restriction, confirmed deadlock,

@@ -177,6 +177,14 @@ startup is exposed yet. See
 **Next implementation:** empty-network/service startup and the city-linked station
 placement tool, including dynamic station-owned state and finance/objective feasibility
 checks. These must work together before the seeded sandbox chooser is exposed.
+
+**Artwork preparation:** an AI-generated source pack now contains seven sheets
+with 112 proposed terrain, city, facility, vehicle, scenery, railway-equipment and
+people/effect entries. Inventory, prompts, provenance and cleanup notes are in the
+[art pack](../art/generated/microrail_pack_v1/README.md). They are not wired into
+the game. Prepare a small city/station subset alongside the placement work; approve
+scale, footprints, anchors and accessibility before replacing live rendering.
+Seasonal, terrain and stock artwork does not advance those gameplay mechanics.
 Gradual city growth/decline follows measured service and unmet demand. See [seeded cities plan](SEEDED_CITIES_PLAN.md). Player fare controls, richer passenger
 choices, timed connections and punctuality scoring remain planned refinements. Completed elapsed time is now measured; journey scoring
 still needs explicit benchmarks rather than treating duration alone as lateness. Basic

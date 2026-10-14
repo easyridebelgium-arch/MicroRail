@@ -1,5 +1,10 @@
 # Environment asset generation prompts
 
+A first generated source pack is now available at
+[MicroRail art pack v1](../generated/microrail_pack_v1/README.md), including seven
+sheets, the exact prompts used, an entry manifest and review notes. These sources
+need cleanup and sizing before individual exports become approved runtime art.
+
 Use the tile introduction for ground/water, and the object introduction for isolated
 objects/overlays. Append one asset-specific prompt below. Generate each separately.
 Save approved PNGs under `assets/environment/<category>/`; keep editable sources

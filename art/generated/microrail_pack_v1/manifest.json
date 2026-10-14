@@ -1,0 +1,905 @@
+{
+  "pack_id": "microrail_pack_v1",
+  "created": "2026-10-14",
+  "generator": "OpenAI image generation tool (image_gen)",
+  "status": "source_candidates_not_runtime_assets",
+  "runtime_integration": false,
+  "nominal_grid": {
+    "columns": 4,
+    "rows": 4,
+    "exact_regions_verified": false
+  },
+  "sheets": [
+    {
+      "file": "sheets/terrain.png",
+      "category": "terrain",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGB",
+      "alpha_extrema": null,
+      "transparent_background": false,
+      "sha256": "e0eefde5104505c31c7e9247f932c24af1c16d8b514f0e0744de005c4cd08408",
+      "entries": [
+        {
+          "id": "terrain:grass_summer",
+          "row": 1,
+          "column": 1,
+          "suggested_export": "assets/environment/terrain/grass_summer.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:grass_meadow",
+          "row": 1,
+          "column": 2,
+          "suggested_export": "assets/environment/terrain/grass_meadow.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:grass_dry",
+          "row": 1,
+          "column": 3,
+          "suggested_export": "assets/environment/terrain/grass_dry.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:leaf_litter",
+          "row": 1,
+          "column": 4,
+          "suggested_export": "assets/environment/terrain/leaf_litter.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:snow_fresh",
+          "row": 2,
+          "column": 1,
+          "suggested_export": "assets/environment/terrain/snow_fresh.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:snow_patchy",
+          "row": 2,
+          "column": 2,
+          "suggested_export": "assets/environment/terrain/snow_patchy.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:ice_packed",
+          "row": 2,
+          "column": 3,
+          "suggested_export": "assets/environment/terrain/ice_packed.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:mountain_rock",
+          "row": 2,
+          "column": 4,
+          "suggested_export": "assets/environment/terrain/mountain_rock.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:water_deep",
+          "row": 3,
+          "column": 1,
+          "suggested_export": "assets/environment/terrain/water_deep.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:water_shallow",
+          "row": 3,
+          "column": 2,
+          "suggested_export": "assets/environment/terrain/water_shallow.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:sand",
+          "row": 3,
+          "column": 3,
+          "suggested_export": "assets/environment/terrain/sand.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:gravel",
+          "row": 3,
+          "column": 4,
+          "suggested_export": "assets/environment/terrain/gravel.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:soil",
+          "row": 4,
+          "column": 1,
+          "suggested_export": "assets/environment/terrain/soil.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:ploughed_soil",
+          "row": 4,
+          "column": 2,
+          "suggested_export": "assets/environment/terrain/ploughed_soil.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:asphalt",
+          "row": 4,
+          "column": 3,
+          "suggested_export": "assets/environment/terrain/asphalt.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "terrain:station_paving",
+          "row": 4,
+          "column": 4,
+          "suggested_export": "assets/environment/terrain/station_paving.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        }
+      ]
+    },
+    {
+      "file": "sheets/cities_roof_plan.png",
+      "category": "cities_roof_plan",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_background": true,
+      "sha256": "039f175013a4792cc4d1192769047b3e912684ece4a4559b2afd8fbff136c2f7",
+      "entries": [
+        {
+          "id": "cities_roof_plan:cottage_red",
+          "row": 1,
+          "column": 1,
+          "suggested_export": "assets/environment/cities/cottage_red.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:cottage_slate",
+          "row": 1,
+          "column": 2,
+          "suggested_export": "assets/environment/cities/cottage_slate.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:terraced_houses",
+          "row": 1,
+          "column": 3,
+          "suggested_export": "assets/environment/cities/terraced_houses.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:bungalow_green",
+          "row": 1,
+          "column": 4,
+          "suggested_export": "assets/environment/cities/bungalow_green.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:courtyard_block",
+          "row": 2,
+          "column": 1,
+          "suggested_export": "assets/environment/cities/courtyard_block.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:apartments_brick",
+          "row": 2,
+          "column": 2,
+          "suggested_export": "assets/environment/cities/apartments_brick.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:apartments_slate",
+          "row": 2,
+          "column": 3,
+          "suggested_export": "assets/environment/cities/apartments_slate.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:office",
+          "row": 2,
+          "column": 4,
+          "suggested_export": "assets/environment/cities/office.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:town_hall",
+          "row": 3,
+          "column": 1,
+          "suggested_export": "assets/environment/cities/town_hall.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:school",
+          "row": 3,
+          "column": 2,
+          "suggested_export": "assets/environment/cities/school.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:hospital",
+          "row": 3,
+          "column": 3,
+          "suggested_export": "assets/environment/cities/hospital.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:covered_market",
+          "row": 3,
+          "column": 4,
+          "suggested_export": "assets/environment/cities/covered_market.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:corner_shop",
+          "row": 4,
+          "column": 1,
+          "suggested_export": "assets/environment/cities/corner_shop.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:warehouse",
+          "row": 4,
+          "column": 2,
+          "suggested_export": "assets/environment/cities/warehouse.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:church",
+          "row": 4,
+          "column": 3,
+          "suggested_export": "assets/environment/cities/church.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "cities_roof_plan:public_garden",
+          "row": 4,
+          "column": 4,
+          "suggested_export": "assets/environment/cities/public_garden.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        }
+      ]
+    },
+    {
+      "file": "sheets/facilities.png",
+      "category": "facilities",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_background": true,
+      "sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "entries": [
+        {
+          "id": "facilities:station_small",
+          "row": 1,
+          "column": 1,
+          "suggested_export": "assets/environment/facilities/station_small.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:station_medium",
+          "row": 1,
+          "column": 2,
+          "suggested_export": "assets/environment/facilities/station_medium.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:platform_strip",
+          "row": 1,
+          "column": 3,
+          "suggested_export": "assets/environment/facilities/platform_strip.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:platform_canopy",
+          "row": 1,
+          "column": 4,
+          "suggested_export": "assets/environment/facilities/platform_canopy.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:cargo_terminal",
+          "row": 2,
+          "column": 1,
+          "suggested_export": "assets/environment/facilities/cargo_terminal.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:sawmill",
+          "row": 2,
+          "column": 2,
+          "suggested_export": "assets/environment/facilities/sawmill.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:factory",
+          "row": 2,
+          "column": 3,
+          "suggested_export": "assets/environment/facilities/factory.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:timber_yard",
+          "row": 2,
+          "column": 4,
+          "suggested_export": "assets/environment/facilities/timber_yard.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:forestry_yard",
+          "row": 3,
+          "column": 1,
+          "suggested_export": "assets/environment/facilities/forestry_yard.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:container_yard",
+          "row": 3,
+          "column": 2,
+          "suggested_export": "assets/environment/facilities/container_yard.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:maintenance_depot",
+          "row": 3,
+          "column": 3,
+          "suggested_export": "assets/environment/facilities/maintenance_depot.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:fuel_facility",
+          "row": 3,
+          "column": 4,
+          "suggested_export": "assets/environment/facilities/fuel_facility.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:waiting_shelter",
+          "row": 4,
+          "column": 1,
+          "suggested_export": "assets/environment/facilities/waiting_shelter.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:footbridge",
+          "row": 4,
+          "column": 2,
+          "suggested_export": "assets/environment/facilities/footbridge.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:loading_crane",
+          "row": 4,
+          "column": 3,
+          "suggested_export": "assets/environment/facilities/loading_crane.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "facilities:turntable",
+          "row": 4,
+          "column": 4,
+          "suggested_export": "assets/environment/facilities/turntable.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        }
+      ]
+    },
+    {
+      "file": "sheets/rolling_stock.png",
+      "category": "rolling_stock",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_background": true,
+      "sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "entries": [
+        {
+          "id": "rolling_stock:steam_tank",
+          "row": 1,
+          "column": 1,
+          "suggested_export": "assets/rolling_stock/steam_tank.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:steam_mainline",
+          "row": 1,
+          "column": 2,
+          "suggested_export": "assets/rolling_stock/steam_mainline.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:diesel_red",
+          "row": 1,
+          "column": 3,
+          "suggested_export": "assets/rolling_stock/diesel_red.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:diesel_blue",
+          "row": 1,
+          "column": 4,
+          "suggested_export": "assets/rolling_stock/diesel_blue.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:electric_green",
+          "row": 2,
+          "column": 1,
+          "suggested_export": "assets/rolling_stock/electric_green.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:passenger_powercar_red",
+          "row": 2,
+          "column": 2,
+          "suggested_export": "assets/rolling_stock/passenger_powercar_red.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:passenger_powercar_blue",
+          "row": 2,
+          "column": 3,
+          "suggested_export": "assets/rolling_stock/passenger_powercar_blue.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:maintenance_locomotive",
+          "row": 2,
+          "column": 4,
+          "suggested_export": "assets/rolling_stock/maintenance_locomotive.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:coach_red",
+          "row": 3,
+          "column": 1,
+          "suggested_export": "assets/rolling_stock/coach_red.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:coach_green",
+          "row": 3,
+          "column": 2,
+          "suggested_export": "assets/rolling_stock/coach_green.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:coach_express",
+          "row": 3,
+          "column": 3,
+          "suggested_export": "assets/rolling_stock/coach_express.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:luggage_van",
+          "row": 3,
+          "column": 4,
+          "suggested_export": "assets/rolling_stock/luggage_van.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:boxcar",
+          "row": 4,
+          "column": 1,
+          "suggested_export": "assets/rolling_stock/boxcar.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:tank_wagon",
+          "row": 4,
+          "column": 2,
+          "suggested_export": "assets/rolling_stock/tank_wagon.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:coal_hopper",
+          "row": 4,
+          "column": 3,
+          "suggested_export": "assets/rolling_stock/coal_hopper.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "rolling_stock:timber_flatbed",
+          "row": 4,
+          "column": 4,
+          "suggested_export": "assets/rolling_stock/timber_flatbed.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        }
+      ]
+    },
+    {
+      "file": "sheets/scenery.png",
+      "category": "scenery",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_background": true,
+      "sha256": "6012af7ccb89abc590523975fdb540231d53fe4266924598be18336a291a0e28",
+      "entries": [
+        {
+          "id": "scenery:oak_summer",
+          "row": 1,
+          "column": 1,
+          "suggested_export": "assets/environment/scenery/oak_summer.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:birch_summer",
+          "row": 1,
+          "column": 2,
+          "suggested_export": "assets/environment/scenery/birch_summer.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:conifer",
+          "row": 1,
+          "column": 3,
+          "suggested_export": "assets/environment/scenery/conifer.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:beech",
+          "row": 1,
+          "column": 4,
+          "suggested_export": "assets/environment/scenery/beech.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:oak_autumn",
+          "row": 2,
+          "column": 1,
+          "suggested_export": "assets/environment/scenery/oak_autumn.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:birch_autumn",
+          "row": 2,
+          "column": 2,
+          "suggested_export": "assets/environment/scenery/birch_autumn.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:conifer_snow",
+          "row": 2,
+          "column": 3,
+          "suggested_export": "assets/environment/scenery/conifer_snow.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:tree_bare",
+          "row": 2,
+          "column": 4,
+          "suggested_export": "assets/environment/scenery/tree_bare.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:shrubs",
+          "row": 3,
+          "column": 1,
+          "suggested_export": "assets/environment/scenery/shrubs.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:flowering_bush",
+          "row": 3,
+          "column": 2,
+          "suggested_export": "assets/environment/scenery/flowering_bush.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:rock_cluster",
+          "row": 3,
+          "column": 3,
+          "suggested_export": "assets/environment/scenery/rock_cluster.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:boulder",
+          "row": 3,
+          "column": 4,
+          "suggested_export": "assets/environment/scenery/boulder.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:pond",
+          "row": 4,
+          "column": 1,
+          "suggested_export": "assets/environment/scenery/pond.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:wooden_footbridge",
+          "row": 4,
+          "column": 2,
+          "suggested_export": "assets/environment/scenery/wooden_footbridge.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:bench",
+          "row": 4,
+          "column": 3,
+          "suggested_export": "assets/environment/scenery/bench.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "scenery:picnic_table",
+          "row": 4,
+          "column": 4,
+          "suggested_export": "assets/environment/scenery/picnic_table.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        }
+      ]
+    },
+    {
+      "file": "sheets/railway_equipment.png",
+      "category": "railway_equipment",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_background": true,
+      "sha256": "24d6675b444cd1925869eb260bd923384543d1a0d6bd6fa5df20310de6ab0cde",
+      "entries": [
+        {
+          "id": "railway_equipment:signal_clear",
+          "row": 1,
+          "column": 1,
+          "suggested_export": "assets/environment/railway_equipment/signal_clear.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:signal_stop",
+          "row": 1,
+          "column": 2,
+          "suggested_export": "assets/environment/railway_equipment/signal_stop.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:signal_manual_hold",
+          "row": 1,
+          "column": 3,
+          "suggested_export": "assets/environment/railway_equipment/signal_manual_hold.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:one_way_marker",
+          "row": 1,
+          "column": 4,
+          "suggested_export": "assets/environment/railway_equipment/one_way_marker.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:waypoint_marker",
+          "row": 2,
+          "column": 1,
+          "suggested_export": "assets/environment/railway_equipment/waypoint_marker.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:buffer_stop",
+          "row": 2,
+          "column": 2,
+          "suggested_export": "assets/environment/railway_equipment/buffer_stop.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:switch_motor",
+          "row": 2,
+          "column": 3,
+          "suggested_export": "assets/environment/railway_equipment/switch_motor.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:electrical_cabinet",
+          "row": 2,
+          "column": 4,
+          "suggested_export": "assets/environment/railway_equipment/electrical_cabinet.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:water_tower",
+          "row": 3,
+          "column": 1,
+          "suggested_export": "assets/environment/railway_equipment/water_tower.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:silo",
+          "row": 3,
+          "column": 2,
+          "suggested_export": "assets/environment/railway_equipment/silo.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:signal_box",
+          "row": 3,
+          "column": 3,
+          "suggested_export": "assets/environment/railway_equipment/signal_box.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:catenary_mast",
+          "row": 3,
+          "column": 4,
+          "suggested_export": "assets/environment/railway_equipment/catenary_mast.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:crossing_open",
+          "row": 4,
+          "column": 1,
+          "suggested_export": "assets/environment/railway_equipment/crossing_open.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:crossing_closed",
+          "row": 4,
+          "column": 2,
+          "suggested_export": "assets/environment/railway_equipment/crossing_closed.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:maintenance_tools",
+          "row": 4,
+          "column": 3,
+          "suggested_export": "assets/environment/railway_equipment/maintenance_tools.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "railway_equipment:sleepers_stack",
+          "row": 4,
+          "column": 4,
+          "suggested_export": "assets/environment/railway_equipment/sleepers_stack.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        }
+      ]
+    },
+    {
+      "file": "sheets/people_effects.png",
+      "category": "people_effects",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_background": true,
+      "sha256": "5524e7bbdda28180bc0b1fc3d45ce3208cec88788603d756c00aff66bea39725",
+      "entries": [
+        {
+          "id": "people_effects:traveler_north",
+          "row": 1,
+          "column": 1,
+          "suggested_export": "assets/environment/people_effects/traveler_north.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:traveler_east",
+          "row": 1,
+          "column": 2,
+          "suggested_export": "assets/environment/people_effects/traveler_east.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:traveler_south",
+          "row": 1,
+          "column": 3,
+          "suggested_export": "assets/environment/people_effects/traveler_south.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:traveler_west",
+          "row": 1,
+          "column": 4,
+          "suggested_export": "assets/environment/people_effects/traveler_west.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:waiting_traveler_red",
+          "row": 2,
+          "column": 1,
+          "suggested_export": "assets/environment/people_effects/waiting_traveler_red.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:waiting_backpacker",
+          "row": 2,
+          "column": 2,
+          "suggested_export": "assets/environment/people_effects/waiting_backpacker.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:rail_worker",
+          "row": 2,
+          "column": 3,
+          "suggested_export": "assets/environment/people_effects/rail_worker.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:wheelchair_user",
+          "row": 2,
+          "column": 4,
+          "suggested_export": "assets/environment/people_effects/wheelchair_user.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:smoke_small",
+          "row": 3,
+          "column": 1,
+          "suggested_export": "assets/environment/people_effects/smoke_small.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:smoke_large",
+          "row": 3,
+          "column": 2,
+          "suggested_export": "assets/environment/people_effects/smoke_large.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:steam_small",
+          "row": 3,
+          "column": 3,
+          "suggested_export": "assets/environment/people_effects/steam_small.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:steam_large",
+          "row": 3,
+          "column": 4,
+          "suggested_export": "assets/environment/people_effects/steam_large.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:rain_streaks",
+          "row": 4,
+          "column": 1,
+          "suggested_export": "assets/environment/people_effects/rain_streaks.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:snowflakes",
+          "row": 4,
+          "column": 2,
+          "suggested_export": "assets/environment/people_effects/snowflakes.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:loading_dust",
+          "row": 4,
+          "column": 3,
+          "suggested_export": "assets/environment/people_effects/loading_dust.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        },
+        {
+          "id": "people_effects:mechanical_sparks",
+          "row": 4,
+          "column": 4,
+          "suggested_export": "assets/environment/people_effects/mechanical_sparks.png",
+          "status": "requires_manual_selection_cleanup_and_sizing"
+        }
+      ]
+    }
+  ],
+  "reference": {
+    "file": "references/cities_initial.png",
+    "status": "superseded_camera_reference_not_part_of_112_candidates",
+    "sha256": "06dcd978f87b17e14e24276a9d0ca4c2227411bea03058c24548f35146bb3fcd"
+  }
+}

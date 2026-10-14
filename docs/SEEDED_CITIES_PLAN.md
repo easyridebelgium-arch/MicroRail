@@ -2,7 +2,9 @@
 
 The saved catalog foundation and flat-grid candidate generator are implemented
 ([world catalog](WORLD_CATALOG.md), [generator](SEEDED_LAYOUT_GENERATOR.md));
-playable seeded starts, station construction and growth remain planned gameplay.
+City-linked station preview/purchase rules are also implemented
+([construction backend](CITY_STATION_CONSTRUCTION.md)); playable seeded starts,
+the station placement UI and growth remain planned gameplay.
 The fixed three-station map remains the tutorial and supports existing saves.
 New sandbox layouts will instead contain cities and industries, with the player
 building stations beside cities and connecting useful services.
@@ -29,8 +31,12 @@ building stations beside cities and connecting useful services.
    a playable new-game option. Save the actual generated layout as well as seed,
    generator/content versions and rules; regenerate neither geometry nor passengers
    during load. Startup finances/objectives and operating routes still need validation.
-3. **Station construction and catchments:** preview price, orientation, platform
-   footprint, building clearance and population served. A passenger station must
+3. **Station construction and catchments (backend implemented, UI pending):**
+   horizontal five-tile platform previews, itemized purchase costs, exclusive nearest-city
+   links and stale/safety checks are implemented ([details](CITY_STATION_CONSTRUCTION.md)).
+   Connect them to the fixed-tick placement tool and station-owned state initialization.
+   The full tool will show price, supported orientation, platform
+   footprint, building clearance and population served once population exists. A passenger station must
    connect to a nearby city's catchment. Cities own trip origins/destinations;
    stations provide access to services. Start with one station per city, then extend
    to several with explicit catchment allocation to avoid duplicating customers.

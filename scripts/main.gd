@@ -43,6 +43,8 @@ var loans_dialog: AcceptDialog
 const Platforms = preload("res://scripts/core/platforms.gd")
 const SingleTrack = preload("res://scripts/core/single_track.gd")
 const Headway = preload("res://scripts/core/headway.gd")
+const ArrivalTargets = preload("res://scripts/core/arrival_targets.gd")
+var arrival_targets = ArrivalTargets.new()
 const Timetable = preload("res://scripts/core/timetable.gd")
 var notifications = NotificationPolicy.new()
 
@@ -726,6 +728,7 @@ func _move_train(delta: float) -> void:
 			_record_event(EventLog.TRAIN_RECOVERED, str(Fleet.assigned(fleet, "passenger")["id"]), {"service": "passenger", "stop": services["passenger"]["stops"][passenger_stop_index], "action": "returned to departure stop"})
 			_update_train_transform()
 			return
+		arrival_targets.arrive("passenger", services.passenger.stops[next_stop], sim_clock.tick)
 		var unloaded: int = _unload_passengers(services.passenger.stops[next_stop])
 		_transfer_passengers("passenger", services.passenger.stops[next_stop], passenger_destinations)
 		passenger_stop_index = next_stop
@@ -1459,6 +1462,7 @@ func _save_game(slot: int = 0) -> bool:
 		"satisfaction": satisfaction.save_state(),
 		"demand_response": demand_response.save_state(),
 		"journeys": _saved_journeys(),
+		"arrivals": arrival_targets.save_state(),
 		"presentation": _saved_presentation(),
 		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
 		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
@@ -1769,7 +1773,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 	if saved_stage < 0.0 or saved_stage > ScenarioGoals.OBJECTIVES.size():
 		return false
-	return true
+	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick))
 	
 func _load_game(save_path: String = "") -> bool:
 	if save_path.is_empty(): save_path = SaveSlots.path(active_save_slot)
@@ -1895,6 +1899,7 @@ func _load_game(save_path: String = "") -> bool:
 	satisfaction.restore_state(data.satisfaction)
 	demand_response.restore_state(data.demand_response)
 	journey_ledger.restore_state(data.journeys)
+	arrival_targets.restore_state(data.arrivals)
 	presentation = Presentation.normalize(data.presentation)
 	route_distance = loaded_distance
 	is_dragging = false
@@ -4496,6 +4501,14 @@ func _headway_hold(service: String) -> bool:
 
 func _record_departure(service: String) -> void:
 	var group := _headway_group(service)
+	var context := _departure_context(service)
+	var scheduled_tick := -1
+	var schedule_key := _timetable_key(service)
+	if timetable_state.has(schedule_key):
+		var due_slots := Timetable.slots_between(_timetable_times(service), int(timetable_state[schedule_key].last), Timetable.absolute_minute(sim_clock.tick))
+		if not due_slots.is_empty(): scheduled_tick = (int(due_slots.back()) - Timetable.START_MINUTE) * Timetable.TICKS_PER_MINUTE
+	var minutes := int(services[group].get("arrival_targets", {}).get(context.leg, 0))
+	arrival_targets.depart(service, int(Fleet.assigned(fleet, service).id), str(context.leg), sim_clock.tick, minutes, scheduled_tick)
 	if _departure_context(service).index == 0: headway_log[group] = Headway.record(headway_log.get(group, []), sim_clock.tick)
 	var times := _timetable_times(service)
 	var key := _timetable_key(service)
@@ -4565,6 +4578,7 @@ func headway_report(group: String) -> String:
 			var gap_reason := Headway.infeasible_reason(gap, trip, members.size())
 			if not gap_reason.is_empty(): lines.append("Timetable: closest departures are %d min apart. %s" % [gap, gap_reason])
 	if not timetable_text.is_empty(): lines.append(timetable_text)
+	lines.append(arrival_targets.report(group, members))
 	return "\n".join(lines)
 
 ## Cell of the stop a service's train is heading for next (-1,-1 if unknown).
@@ -4800,6 +4814,7 @@ func reverse_train(id: int) -> String:
 		freight_train.dwell = 0.0
 		freight_train._update_transform()
 	else: return "Select an assigned passenger or freight train."
+	arrival_targets.cancel(service)
 	_refresh_directional_routes(false)
 	# Discard only this train's obsolete movement attempt. Other incidents remain.
 	movement_conflicts.erase(id)
@@ -5101,6 +5116,7 @@ func remove_passenger_service(id: int) -> String:
 	if not passenger_services.has(key): return "Only additional passenger services can be removed."
 	var running = passenger_services[key]
 	if running.enabled or not running.at_home(): return "Withdraw this service and let it finish its trip, returning empty to its first station. Then pause and store it."
+	arrival_targets.cancel(key)
 	passenger_services.erase(key)
 	services.erase(key)
 	for other in services:

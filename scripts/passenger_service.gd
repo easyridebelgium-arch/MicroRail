@@ -119,6 +119,7 @@ func advance(game: Node, delta: float) -> void:
 			dwell = 0
 			game._record_event(game.EventLog.TRAIN_RECOVERED, id, {"service": key, "stop": origin, "action": "returned to departure stop"})
 		else:
+			game.arrival_targets.arrive(key, configuration.stops[destination], game.sim_clock.tick)
 			var arrived: int = game._finish_passengers(key, configuration.stops[destination], passenger_destinations)
 			game._transfer_passengers(key, configuration.stops[destination], passenger_destinations)
 			game._record_event(game.EventLog.TRAIN_ARRIVED, id, {"service": key, "stop": configuration.stops[destination], "passengers": arrived})

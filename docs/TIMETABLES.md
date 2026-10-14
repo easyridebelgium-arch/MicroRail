@@ -57,7 +57,9 @@ schedules remain and begin monitoring from the loaded clock time. The complete
 save, including bounded numeric dispatch data, is validated before any world
 state is changed.
 
-Passenger satisfaction, freight contract bonuses/penalties, scheduled arrivals
+Optional [directional arrival targets and basic punctuality](ARRIVAL_TARGETS.md)
+are implemented in version 34, using each served departure slot as their baseline.
+Passenger satisfaction effects, freight contract bonuses/penalties
 and timed transfers remain future work. They require actual passenger destinations,
 contracts and reliable demand/arrival measurements. Weather/art preparation does
 not change the simulation clock or departure rules.

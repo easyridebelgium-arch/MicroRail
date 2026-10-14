@@ -2,6 +2,7 @@ extends RefCounted
 
 const WaypointRouter = preload("res://scripts/waypoint_router.gd")
 const Router = preload("res://scripts/rail_router.gd")
+const ArrivalTargets = preload("res://scripts/core/arrival_targets.gd")
 const Timetable = preload("res://scripts/core/timetable.gd")
 const STATIONS: Dictionary = {
 	"a": {"name": "Station A", "cell": Vector2i(4, 8)},
@@ -83,6 +84,8 @@ static func copy_route(source: Dictionary, target: Dictionary) -> Dictionary:
 	if instructions.has("timetable"): result["timetable"] = instructions.timetable
 	result.erase("stop_timetables")
 	if instructions.has("stop_timetables"): result["stop_timetables"] = instructions.stop_timetables
+	result.erase("arrival_targets")
+	if instructions.has("arrival_targets"): result["arrival_targets"] = instructions.arrival_targets
 	return result
 
 ## A linked service follows another passenger service's route ("link": key of
@@ -151,7 +154,7 @@ static func is_valid(value: Variant) -> bool:
 			for stop in stops:
 				if not stop is String or not STATIONS.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service): return false
+		if not valid_waypoints(service) or not valid_platforms(service) or not valid_auto(service) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
 	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}) -> Dictionary:
@@ -237,6 +240,10 @@ static func from_save(value: Dictionary) -> Dictionary:
 		else: result[service]["stop_timetables"] = later
 		if int(result[service].get("headway", 0)) <= 0: result[service].erase("headway")
 		else: result[service]["headway"] = int(result[service]["headway"])
+		var targets: Dictionary = {}
+		for leg in result[service].get("arrival_targets", {}): targets[leg] = int(result[service].arrival_targets[leg])
+		if targets.is_empty(): result[service].erase("arrival_targets")
+		else: result[service]["arrival_targets"] = targets
 		var marks: Dictionary = {}
 		for stop in result[service].get("auto", {}): marks[stop] = true
 		if marks.is_empty(): result[service].erase("auto")

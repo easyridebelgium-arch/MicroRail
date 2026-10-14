@@ -37,12 +37,14 @@ inspection before buying more seats or adding services.
 Live manifests, capacity, journey clocks and demand remain saved as before.
 Recent occupancy and boarding observations are derived diagnostics, like traffic
 wait samples: a successful load starts them empty. Failed loads leave them intact.
-Save schema remains **33** and no migration is required. The UI explicitly says
+Occupancy introduced no schema change; save version **34** now additionally
+persists separate [arrival targets](ARRIVAL_TARGETS.md). The UI explicitly says
 when no service samples exist.
 
 This increment is observational. It changes no fares, waiting satisfaction,
 demand response, train movement, route choices or reservations. Crowding penalties
-and planned-arrival punctuality need separate documented rules before scoring.
+need separate documented rules before scoring. Arrival punctuality is measured
+separately without changing fares or satisfaction.
 
 `test_passenger_occupancy.gd` checks time weighting, capacity changes, full time,
 identity isolation, bounded history, eligible boarding, held/withdrawn trains,

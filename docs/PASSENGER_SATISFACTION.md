@@ -39,8 +39,9 @@ who changes trains can therefore contribute more than one station experience.
 This rating covers station waiting, not unique passengers' complete journey time.
 Complete journey elapsed time is now measured separately ([journey times](JOURNEY_TIMES.md));
 it does not yet change this rating. [Occupancy and eligible capacity denials](PASSENGER_OCCUPANCY.md)
-are also measured separately without changing this rating. Onboard delays, timetable
-punctuality, classes, fares and company reputation are not scored here. Existing amenities retain their published
+are also measured separately without changing this rating. [Optional arrival punctuality](ARRIVAL_TARGETS.md) is also measured separately.
+Onboard delays, timetable punctuality, classes, fares and company reputation are
+not scored here. Existing amenities retain their published
 capacity/demand effects. Waiting-based demand response is now implemented as a
 separate, bounded factor;
 see [demand response](DEMAND_RESPONSE.md). Fares, movement and reservations remain

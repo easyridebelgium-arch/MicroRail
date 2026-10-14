@@ -31,6 +31,7 @@ var headway_spin: SpinBox
 var headway_label: Label
 var timetable_field: LineEdit
 var timetable_leg: OptionButton
+var arrival_minutes: SpinBox
 var link_controls: HFlowContainer
 var link_label: Label
 var unlink_button: Button
@@ -139,6 +140,19 @@ func configure(owner_game: Node) -> void:
 	timetable_field.text_submitted.connect(func(_text: String) -> void: _set_timetable())
 	timetable_field.focus_exited.connect(_set_timetable)
 	headway_controls.add_child(timetable_field)
+	var arrival_title := Label.new()
+	arrival_title.text = "Journey target (0 = off)"
+	headway_controls.add_child(arrival_title)
+	arrival_minutes = SpinBox.new()
+	arrival_minutes.min_value = 0
+	arrival_minutes.max_value = 1440
+	arrival_minutes.step = 1
+	arrival_minutes.update_on_text_changed = true
+	arrival_minutes.suffix = "game min"
+	arrival_minutes.custom_minimum_size.x = 160
+	arrival_minutes.tooltip_text = "Target journey time for the selected direction. Scheduled departure + target sets the planned arrival; without a timetable use actual departure. One game minute = one simulated second. Reports only, no penalties."
+	arrival_minutes.value_changed.connect(_set_arrival_target)
+	headway_controls.add_child(arrival_minutes)
 	headway_label = Label.new()
 	headway_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	headway_label.custom_minimum_size.x = 540
@@ -282,6 +296,16 @@ func _set_timetable() -> bool:
 	status.text = "Timetable updated in draft. Apply to use it."
 	return true
 
+func _set_arrival_target(value: float) -> void:
+	if not draft.has(_key()) or not headway_controls.visible or timetable_leg.item_count == 0: return
+	var targets: Dictionary = draft[_key()].get("arrival_targets", {}).duplicate(true)
+	var leg: String = timetable_leg.get_selected_metadata()
+	if value <= 0: targets.erase(leg)
+	else: targets[leg] = int(value)
+	if targets.is_empty(): draft[_key()].erase("arrival_targets")
+	else: draft[_key()]["arrival_targets"] = targets
+	status.text = "Arrival target updated in draft. Apply to use on future departures."
+
 func _select_timetable_leg(_index: int) -> void:
 	# The text field's focus-exit captures the previous leg before this click.
 	_show_timetable_times()
@@ -290,6 +314,7 @@ func _show_timetable_times() -> void:
 	if timetable_leg.item_count == 0: return
 	var times: Array = draft[_key()].get("timetable", []) if timetable_leg.selected == 0 else draft[_key()].get("stop_timetables", {}).get(timetable_leg.get_selected_metadata(), [])
 	timetable_field.text = Timetable.to_text(times)
+	arrival_minutes.set_value_no_signal(float(draft[_key()].get("arrival_targets", {}).get(timetable_leg.get_selected_metadata(), 0)))
 
 func _refresh_timetable_legs() -> void:
 	if not Services.is_passenger_key(_key()): return
@@ -308,8 +333,15 @@ func _refresh_timetable_legs() -> void:
 			later.erase(leg)
 	if later.is_empty(): draft[_key()].erase("stop_timetables")
 	else: draft[_key()]["stop_timetables"] = later
+	var targets: Dictionary = draft[_key()].get("arrival_targets", {}).duplicate(true)
+	for leg in targets.keys():
+		if not legs.has(leg):
+			removed.append(str(leg).replace(">", " → ").to_upper() + " (arrival target)")
+			targets.erase(leg)
+	if targets.is_empty(): draft[_key()].erase("arrival_targets")
+	else: draft[_key()]["arrival_targets"] = targets
 	if not removed.is_empty():
-		var warning := "Timetables removed from draft for changed legs: %s. Review departure times before Apply." % ", ".join(removed)
+		var warning := "Timing instructions removed from draft for changed legs: %s. Review departure times and arrival targets before Apply." % ", ".join(removed)
 		removed_waypoint_legs[_key()] = str(removed_waypoint_legs.get(_key(), "")) + "\n" + warning
 		directive_warning.text = removed_waypoint_legs[_key()]
 	_show_timetable_times()
@@ -330,7 +362,7 @@ func _show_service() -> void:
 		headway_spin.set_value_no_signal(float(draft[_key()].get("headway", 0)))
 		timetable_field.text = Timetable.to_text(draft[_key()].get("timetable", []))
 		headway_label.text = game.headway_report(_key())
-	if linked: link_label.text = "Linked to %s — its route, headway and departure timetables follow that source." % draft[str(draft[_key()]["link"])].name
+	if linked: link_label.text = "Linked to %s — its route, headway, departure timetables and arrival targets follow that source." % draft[str(draft[_key()]["link"])].name
 	directive_warning.text = str(removed_waypoint_legs.get(_key(), ""))
 	name_field.text = draft[_key()]["name"]
 	var identity: Dictionary = game.route_identity(_key())

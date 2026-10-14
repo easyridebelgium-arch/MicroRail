@@ -102,3 +102,13 @@ figures. People whose destination is not served by that departure do not count a
 capacity denials. The boarding count represents opportunities, so repeated full
 departures may count the same person again. Recent measurements restart on load.
 See [occupancy feedback](PASSENGER_OCCUPANCY.md).
+
+## Set and measure an arrival target
+
+Pause and open **Routes**, choose a departure direction under **Timetable**, set
+**Journey target (0 = off)** in game minutes, then **Apply**. Set each return
+direction separately. Click a moving train for its current target; Routes and
+Accounts show completed punctuality. A daily timetable uses scheduled departure
+plus the budget; an unscheduled direction uses actual departure. Targets report
+performance without changing fares or safety rules. See
+[arrival targets](ARRIVAL_TARGETS.md).

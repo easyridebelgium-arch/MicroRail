@@ -76,6 +76,7 @@ func open_train(id: int) -> void:
 				destinations.append("%s: %d%s" % [game.ServiceRoutes.STATIONS[station].name, int(manifest[station]), " (change trains)" if not game.services[data.service].stops.has(station) else ""])
 		summary.text += "\nOnboard destinations: " + (", ".join(destinations) if not destinations.is_empty() else "none")
 		summary.text += "\n" + game.journey_ledger.describe_train(str(data.service), manifest, game.sim_clock.tick)
+		summary.text += "\n" + game.arrival_targets.describe(str(data.service), game.sim_clock.tick)
 		var vehicle: Dictionary = game.Fleet.find(game.fleet, id)
 		if not vehicle.is_empty():
 			summary.text += "\nSeats occupied: %d / %d\n" % [game.PassengerDemand.total(manifest), game.Fleet.capacity(vehicle)] + game.passenger_occupancy.describe(id)

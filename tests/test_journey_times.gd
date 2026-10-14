@@ -132,7 +132,7 @@ func run() -> void:
 	payload.version = 32
 	payload.erase("journeys")
 	var migrated := Migrations.migrate(payload)
-	check(migrated.ok and migrated.data.version == 33 and migrated.data.journeys.completed.is_empty() and migrated.data.journeys.unknown_completed == 5 and game._is_valid_save(migrated.data), "v32 keeps counts and marks old completions unmeasured")
+	check(migrated.ok and migrated.data.version == Migrations.CURRENT_VERSION and migrated.data.journeys.completed.is_empty() and migrated.data.journeys.unknown_completed == 5 and game._is_valid_save(migrated.data), "v32 keeps counts and marks old completions unmeasured")
 	check(migrated.data.demand.batches.a[0].tick == 60 and not migrated.data.demand.batches.a[0].known and migrated.data.demand.queues == payload.demand.queues, "legacy queue ages survive without inventing original journey provenance")
 	game.queue_free()
 	await process_frame

@@ -27,6 +27,13 @@ These recent observations reset on load and do not alter fares or satisfaction.
 Use **Accounts** for station and company totals; see
 [occupancy feedback](PASSENGER_OCCUPANCY.md) for the sampling rules.
 
+## Arrival target
+
+Passenger trains show the captured target for their current leg, its scheduled or
+actual-departure baseline and current lateness. No active trip means no fabricated
+target. Timing edits affect later departures, and physical recovery cancels the
+unfinished measurement. See [arrival targets](ARRIVAL_TARGETS.md).
+
 ## Read the evidence
 
 - **State and reason:** traffic wait, approaching restriction, confirmed deadlock,

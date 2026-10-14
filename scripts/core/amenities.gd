@@ -3,6 +3,7 @@ extends RefCounted
 ## set of amenities. Each raises the waiting-area limit and adds a small arrival
 ## bonus (whole percent). Train capacity never creates demand; amenities do.
 const STATIONS: Array[String] = ["a", "b", "c"]
+var station_ids: Array[String] = []
 const BASE_QUEUE: int = 100
 const ORDER: Array[String] = ["shelter", "waiting_room", "kiosk"]
 const DEFS: Dictionary = {
@@ -14,11 +15,15 @@ const DEFS: Dictionary = {
 var owned: Dictionary = {}   # station -> Array[String] in purchase order
 var carry: Dictionary = {}   # station -> hundredths of a passenger carried over
 
-func _init() -> void:
+func _init(ids: Array = STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
 	reset()
 
 func reset() -> void:
-	for station in STATIONS:
+	owned.clear()
+	carry.clear()
+	for station in station_ids:
 		owned[station] = []
 		carry[station] = 0
 
@@ -37,7 +42,7 @@ func demand_bonus(station: String) -> int:
 
 ## Returns "" when the amenity can be bought, otherwise the reason it cannot.
 func refusal(station: String, id: String, money: int) -> String:
-	if not STATIONS.has(station) or not DEFS.has(id): return "Unknown amenity."
+	if not station_ids.has(station) or not DEFS.has(id): return "Unknown amenity."
 	if has(station, id): return "%s is already built here." % DEFS[id].name
 	var need: String = DEFS[id].requires
 	if need != "" and not has(station, need): return "%s needs a %s first." % [DEFS[id].name, DEFS[need].name.to_lower()]
@@ -61,17 +66,18 @@ func arrivals(station: String, batch: int) -> int:
 func to_save() -> Dictionary:
 	return {"owned": owned.duplicate(true), "carry": carry.duplicate(true)}
 
-static func default_save() -> Dictionary:
+static func default_save(ids: Array = STATIONS) -> Dictionary:
 	var result := {"owned": {}, "carry": {}}
-	for station in STATIONS:
+	for station in ids:
 		result.owned[station] = []
 		result.carry[station] = 0
 	return result
 
-static func valid_save(value: Variant) -> bool:
+static func valid_save(value: Variant, ids: Array = STATIONS) -> bool:
+	if not preload("res://scripts/core/passenger_demand.gd").valid_ids(ids): return false
 	if not value is Dictionary or not value.get("owned") is Dictionary or not value.get("carry") is Dictionary: return false
-	if value.owned.size() != STATIONS.size() or value.carry.size() != STATIONS.size(): return false
-	for station in STATIONS:
+	if value.owned.size() != ids.size() or value.carry.size() != ids.size(): return false
+	for station in ids:
 		var list: Variant = value.owned.get(station)
 		if not list is Array: return false
 		var seen: Dictionary = {}
@@ -84,8 +90,10 @@ static func valid_save(value: Variant) -> bool:
 		if typeof(rest) not in [TYPE_INT, TYPE_FLOAT] or float(rest) != floor(float(rest)) or float(rest) < 0 or float(rest) > 99: return false
 	return true
 
-func load_save(value: Dictionary) -> void:
+func load_save(value: Dictionary, ids: Array = STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
 	reset()
-	for station in STATIONS:
+	for station in station_ids:
 		for id in value.owned[station]: owned[station].append(str(id))
 		carry[station] = int(value.carry[station])

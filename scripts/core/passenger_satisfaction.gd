@@ -1,13 +1,20 @@
 extends RefCounted
 ## Waiting experience, not a claim about journey time or timetable punctuality.
 const STATIONS: Array[String] = ["a", "b", "c"]
+var station_ids: Array[String] = []
 const MAX_GROUPS := 128
 const GRACE_TICKS := 15 * 60
 const PENALTY_TICKS := 3 * 60
 const COMFORT := {"shelter": 3, "waiting_room": 5, "kiosk": 2}
-var history: Dictionary = defaults()
-static func defaults() -> Dictionary:
-	return {"a": [], "b": [], "c": []}
+var history: Dictionary = {}
+func _init(ids: Array = STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
+	history = defaults(station_ids)
+static func defaults(ids: Array = STATIONS) -> Dictionary:
+	var result: Dictionary = {}
+	for key in ids: result[key] = []
+	return result
 static func comfort(owned: Array) -> int:
 	var result := 0
 	for id in COMFORT:
@@ -40,7 +47,7 @@ func station(station_key: String, queues: Array, tick: int, owned: Array) -> Dic
 func company(demand: RefCounted, tick: int, amenities: RefCounted) -> Dictionary:
 	var count := 0
 	var points := 0
-	for key in STATIONS:
+	for key in station_ids:
 		var row := station(key, demand.waiting_groups(key, tick), tick, amenities.owned[key])
 		count += int(row.count)
 		points += int(row.points)
@@ -50,15 +57,18 @@ func describe(station_key: String, demand: RefCounted, tick: int, amenities: Ref
 	var title := "Waiting satisfaction: no data yet" if row.rating < 0 else "Waiting satisfaction: %d / 100" % row.rating
 	return "%s\nAverage measured station wait: %.1fs; %d recent boarding experiences plus %d currently waiting.\nComfort bonus: +%d (Shelter +3, Waiting room +5, Kiosk +2). First 15s incur no penalty; each extra 3s subtracts 1 point, capped at 90.\nOlder waits lower the rating. Add usable service capacity/frequency or repair blocked routes; comfort helps but cannot replace service.\nIncludes current queues and the last 128 boarding groups here, weighted by passengers. Recorded comfort is the bonus at boarding. Transfers count as separate station experiences. Journey time, punctuality and fares are not rated yet." % [title, row.seconds, row.boarded, demand.waiting(station_key), comfort(amenities.owned[station_key])]
 func save_state() -> Dictionary: return history.duplicate(true)
-func restore_state(value: Dictionary) -> void:
-	history = defaults()
-	for key in STATIONS:
+func restore_state(value: Dictionary, ids: Array = STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
+	history = defaults(station_ids)
+	for key in station_ids:
 		for row in value[key]: history[key].append({"count": int(row.count), "tick": int(row.tick), "wait": int(row.wait), "comfort": int(row.comfort)})
 static func integer(value: Variant, low: int, high: int) -> bool:
 	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and float(value) >= low and float(value) <= high
-static func valid_state(value: Variant, tick: int) -> bool:
-	if not value is Dictionary or value.size() != STATIONS.size(): return false
-	for key in STATIONS:
+static func valid_state(value: Variant, tick: int, ids: Array = STATIONS) -> bool:
+	if not preload("res://scripts/core/passenger_demand.gd").valid_ids(ids): return false
+	if not value is Dictionary or value.size() != ids.size(): return false
+	for key in ids:
 		var rows: Variant = value.get(key)
 		if not rows is Array or rows.size() > MAX_GROUPS: return false
 		var previous := 0

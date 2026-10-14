@@ -143,10 +143,16 @@ per-instance station IDs. Tutorial defaults and schema 39 remain compatible.
 Validation: 94 regression suites pass; the final focused suite passes 28 checks.
 See [catalog routing and demand](CATALOG_ROUTING_AND_DEMAND.md).
 
-**Next implementation:** adapt journey/interchange validation and station-owned
-amenities, satisfaction, demand-response and aggregate state, then facility
-geometry and passenger-class policy. These gates precede seeded settlement/industry
-layouts, player-built stations/catchments and gradual city growth/decline. See [seeded cities plan](SEEDED_CITIES_PLAN.md). Player fare controls, richer passenger
+**Latest station-state batch:** Local journey/interchange graphs, original journey
+clocks/history, amenities, waiting satisfaction and demand response use catalog
+identities. Arrival-target validation and Accounts/occupancy reporting enumerate
+those stations too. Existing prices, demand bounds, timing and schema 39 are retained.
+Validation: 95 regression suites pass; the final station-state suite passes 27 checks.
+See [catalog station state](CATALOG_STATION_STATE.md).
+
+**Next implementation:** catalog-owned facility geometry and passenger-class policy,
+then feasible seeded settlement/industry layouts, player-built stations/catchments
+and gradual city growth/decline. See [seeded cities plan](SEEDED_CITIES_PLAN.md). Player fare controls, richer passenger
 choices, timed connections and punctuality scoring remain planned refinements. Completed elapsed time is now measured; journey scoring
 still needs explicit benchmarks rather than treating duration alone as lateness. Basic
 waiting-based demand balancing is complete; population, player fare controls and richer
@@ -477,7 +483,7 @@ history may land earlier once their foundations are reliable.
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Seeded starting layouts | Start new sandbox games with reproducible cities and industries instead of three fixed stations. | Saved catalog foundation is implemented in version 39 with stable facility IDs and validated settlement references. Route/platform and Local demand adapters are implemented. Finish station-owned journey/amenity/response state and facility geometry before seeded placement and a seed/map-settings chooser. Validate spacing, buildable station approaches, reachable industries and objective feasibility. Save generated geometry plus seed, generator/content versions and rules. Keep A/B/C as the tutorial/legacy scenario; full terrain generation is later. |
+| Seeded starting layouts | Start new sandbox games with reproducible cities and industries instead of three fixed stations. | Saved catalog foundation is implemented in version 39 with stable facility IDs and validated settlement references. Route/platform and Local demand adapters are implemented. Station-owned journey/amenity/response state is now adapted; finish facility geometry and class policy before seeded placement and a seed/map-settings chooser. Validate spacing, buildable station approaches, reachable industries and objective feasibility. Save generated geometry plus seed, generator/content versions and rules. Keep A/B/C as the tutorial/legacy scenario; full terrain generation is later. |
 | Player-built stations and city catchments | Build stations beside cities and make location matter for passenger supply. | Before city growth: replace hard-coded A/B/C lookup with saved station IDs, placement/orientation/platform footprints and city catchment links. Preview construction cost, building clearance and population served; reject overlaps and preserve existing train positions during edits/load. Passenger origins/destinations belong to settlements; no station or no useful service leaves demand unmet. Clarify overlapping catchments so passengers are not generated twice. Support multiple stations per city after the initial one-station slice. |
 | City growth and decline | Cities expand with useful service and contract when sustained passenger demand is unmet. | After seeded settlements, stations and catchments work: use bounded population and measured served/unserved demand over a rolling window, including delivered passengers, capacity, frequency and usable destinations. Grow/shrink gradually with grace periods and visible explanations; unserved new cities must not collapse immediately. Preserve existing buildings/station access during visual expansion; never demolish rail or teleport trains. Add slower/no-growth options and later integrate industry supply/jobs and land rights. |
 | Industry growth | Useful cargo service creates production and expansion opportunities. | Retain the existing Phase 2C plan: measured delivered supply and usable demand support bounded industry growth. Extend the saved world catalog and production definitions; keep storage/recipe accounting valid and explain changes. Integrate land rights later. |

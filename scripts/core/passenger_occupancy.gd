@@ -63,9 +63,9 @@ func describe(id: int = -1) -> String:
 	lines.append("Recent boarding opportunities: %d; boarded %d; eligible passengers left behind for lack of seats: %d." % [stats.boardings, stats.boarded, stats.left])
 	return "\n".join(lines)
 
-func summary() -> String:
+func summary(ids: Array = ["a", "b", "c"]) -> String:
 	var lines: PackedStringArray = ["Passenger occupancy and capacity", describe()]
-	for station in ["a", "b", "c"]:
+	for station in ids:
 		var left := 0
 		for row in boardings:
 			if row.station == station: left += int(row.left)

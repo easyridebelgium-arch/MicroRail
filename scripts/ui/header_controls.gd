@@ -110,9 +110,12 @@ func refresh() -> void:
 	loans_button.text = "Bank loans — overdue £%d" % game.loans.overdue() if game.loans.overdue() > 0 else "Bank loans"
 	if not accounts_dialog.visible: return
 	var amenity_value := 0
-	for station in game.Amenities.STATIONS:
+	for station in game.amenities.station_ids:
 		for id in game.amenities.owned[station]: amenity_value += int(game.Amenities.DEFS[id].price)
-	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: A %d / B %d / C %d\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes financing interest, capital purchases, construction refunds, starting cash and objective rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), game.waiting_at_a, game.waiting_at_b, game.waiting_at_c, game.passengers_delivered, game.logs_delivered]
+	var waiting_lines: PackedStringArray = []
+	for station in game.passenger_demand.station_ids:
+		waiting_lines.append("%s %d" % [game.station_definitions()[station].name, game.passenger_demand.waiting(station)])
+	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: %s\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes financing interest, capital purchases, construction refunds, starting cash and objective rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), " / ".join(waiting_lines), game.passengers_delivered, game.logs_delivered]
 
 	accounts_text.text += "\n\n" + game.passenger_revenue.summary()
 	if game.sawmill.state.installed: accounts_text.text += "\n\n" + game.sawmill.summary(game.factory.state.installed)
@@ -122,7 +125,7 @@ func refresh() -> void:
 
 	accounts_text.text += "\n\n" + waiting_summary()
 	accounts_text.text += "\n\n" + game.journey_ledger.summary()
-	accounts_text.text += "\n\n" + game.passenger_occupancy.summary()
+	accounts_text.text += "\n\n" + game.passenger_occupancy.summary(game.passenger_demand.station_ids)
 	accounts_text.text += "\n\n" + game.arrival_targets.report()
 	var directions: String = game.arrival_targets.direction_report()
 	if not directions.is_empty(): accounts_text.text += "\nPer direction (game minutes):\n" + directions
@@ -143,7 +146,7 @@ func waiting_summary() -> String:
 	var company: Dictionary = game.satisfaction.company(game.passenger_demand, game.sim_clock.tick, game.amenities)
 	var lines: PackedStringArray = ["Passenger waiting satisfaction: no data yet" if company.rating < 0 else "Passenger waiting satisfaction: %d / 100" % company.rating]
 	var network: Dictionary = game._passenger_network()
-	for station in game.PassengerDemand.STATIONS:
+	for station in game.passenger_demand.station_ids:
 		var experience: Dictionary = game.satisfaction.station(station, game.passenger_demand.waiting_groups(station, game.sim_clock.tick), game.sim_clock.tick, game.amenities.owned[station])
 		lines.append("\n" + game.station_definitions()[station].name + "\n" + game.satisfaction.describe(station, game.passenger_demand, game.sim_clock.tick, game.amenities))
 		lines.append(game.demand_response.describe(station, int(experience.rating), int(experience.boarded), not network[station].is_empty()))

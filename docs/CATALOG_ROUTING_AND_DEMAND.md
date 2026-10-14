@@ -33,8 +33,9 @@ Old tutorial passengers, manifests, timing and paid receipts retain their IDs.
 ## Remaining gate before seeded sandbox starts
 
 Journey/interchange graph validation, amenities, satisfaction, demand response,
-station aggregate adapters and broader passenger-class policy still have tutorial
-assumptions. The current Express A↔C policy is retained; unfamiliar station IDs
+station aggregate adapters, arrival validation and reports are now adapted
+([station state](CATALOG_STATION_STATE.md)). Broader passenger-class policy still
+has tutorial assumptions. The current Express A↔C policy is retained; unfamiliar station IDs
 exercise Local demand in this increment. Freight facilities still use the fixed
 first-chain profile. Adapt these remaining consumers and facility geometry before
 offering generated layouts or player-built stations as a playable option.

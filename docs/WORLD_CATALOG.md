@@ -50,9 +50,9 @@ routing and demand code uses A/B/C elsewhere.
 
 Route building, platform geometry and Local passenger queues now accept explicit
 per-game catalogs ([backend adapters](CATALOG_ROUTING_AND_DEMAND.md)). Retained
-paths and additional-train saves use those identities too. Next adapt journey/
-interchange validation, station-owned amenities/satisfaction/response, aggregate
-state and broader class policy, preserving existing accepted journeys. Then add seeded settlement/industry placement, city-linked station
+paths and additional-train saves use those identities too. Journey/interchange validation, station-owned amenities/satisfaction/response and
+aggregate reporting are now adapted ([station state](CATALOG_STATION_STATE.md)).
+Next adapt facility geometry and broader class policy, preserving accepted journeys. Then add seeded settlement/industry placement, city-linked station
 construction and a usable sandbox chooser. Growth/decline follows measured useful
 service and unmet demand. These gameplay systems are planned, not enabled by this
 catalog update. See [seeded cities plan](SEEDED_CITIES_PLAN.md).

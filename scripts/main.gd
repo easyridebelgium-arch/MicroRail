@@ -31,13 +31,13 @@ const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
 const PassengerClasses = preload("res://scripts/core/passenger_classes.gd")
 const PassengerJourneys = preload("res://scripts/core/passenger_journeys.gd")
 const JourneyLedger = preload("res://scripts/core/journey_ledger.gd")
-var journey_ledger = JourneyLedger.new()
+var journey_ledger = JourneyLedger.new(world.stations().keys())
 const PassengerOccupancy = preload("res://scripts/core/passenger_occupancy.gd")
 var passenger_occupancy = PassengerOccupancy.new()
 const DemandResponse = preload("res://scripts/core/demand_response.gd")
-var demand_response = DemandResponse.new()
+var demand_response = DemandResponse.new(world.stations().keys())
 const Satisfaction = preload("res://scripts/core/passenger_satisfaction.gd")
-var satisfaction = Satisfaction.new()
+var satisfaction = Satisfaction.new(world.stations().keys())
 const PassengerDemand = preload("res://scripts/core/passenger_demand.gd")
 const Amenities = preload("res://scripts/core/amenities.gd")
 const Presentation = preload("res://scripts/core/presentation.gd")
@@ -268,7 +268,7 @@ var right_start_point: Vector2 = Vector2.ZERO
 var right_start_cell: Vector2i = Vector2i.ZERO
 
 var passenger_demand = PassengerDemand.new(world.stations().keys())
-var amenities = Amenities.new()
+var amenities = Amenities.new(world.stations().keys())
 var amenity_buttons: Dictionary = {}
 var passenger_destinations: Dictionary = {}
 var waiting_at_a: int:
@@ -1337,7 +1337,7 @@ func _passenger_network() -> Dictionary:
 		var config: Dictionary = services[key]
 		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), config.get("platforms", {}), station_definitions())
 		if not built.cells.is_empty(): available[key] = config
-	return PassengerJourneys.graph(available)
+	return PassengerJourneys.graph(available, passenger_demand.station_ids)
 
 func _transfer_passengers(key: String, station: String, manifest: Dictionary) -> int:
 	journey_ledger.ensure(key, manifest, sim_clock.tick)
@@ -1678,15 +1678,15 @@ func _is_valid_save(data: Dictionary) -> bool:
 		if train_x > _cell_center(STATION_B).x:
 			return false
 
-	if not DemandResponse.valid_state(data.get("demand_response")): return false
-	if not Satisfaction.valid_state(data.get("satisfaction"), int(sim.clock.tick)): return false
-	if not Amenities.valid_save(data.get("amenities")): return false
+	if not DemandResponse.valid_state(data.get("demand_response"), saved_catalog.stations().keys()): return false
+	if not Satisfaction.valid_state(data.get("satisfaction"), int(sim.clock.tick), saved_catalog.stations().keys()): return false
+	if not Amenities.valid_save(data.get("amenities"), saved_catalog.stations().keys()): return false
 	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
 	if not Presentation.valid(data.get("presentation"), data.services): return false
 	var state: Dictionary = data["state"]
 	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger, int(sim.clock.tick), saved_catalog.stations().keys()): return false
 	if not PassengerClasses.valid_progress(data.demand.get("class_progress")): return false
-	if not JourneyLedger.valid_save(data.get("journeys"), data, int(sim.clock.tick)): return false
+	if not JourneyLedger.valid_save(data.get("journeys"), data, int(sim.clock.tick), saved_catalog.stations().keys()): return false
 
 	for field in SAVE_FIELDS:
 		if not state.has(field):
@@ -1813,7 +1813,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 	if saved_stage < 0.0 or saved_stage > ScenarioGoals.OBJECTIVES.size():
 		return false
-	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick)) and PassengerRevenue.valid_save(data.get("passenger_revenue"), state.passengers_delivered) and Sawmill.valid_game(data) and Factory.valid_game(data)
+	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick), saved_catalog.stations().keys()) and PassengerRevenue.valid_save(data.get("passenger_revenue"), state.passengers_delivered) and Sawmill.valid_game(data) and Factory.valid_game(data)
 	
 func _load_game(save_path: String = "") -> bool:
 	if save_path.is_empty(): save_path = SaveSlots.path(active_save_slot)
@@ -1941,11 +1941,11 @@ func _load_game(save_path: String = "") -> bool:
 	network_map.facilities = _facility_markers()
 	passenger_demand.restore_state(data.demand, saved_catalog.stations().keys())
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
-	amenities.load_save(data.amenities)
+	amenities.load_save(data.amenities, saved_catalog.stations().keys())
 	loans.restore_state(data.loans)
-	satisfaction.restore_state(data.satisfaction)
-	demand_response.restore_state(data.demand_response)
-	journey_ledger.restore_state(data.journeys)
+	satisfaction.restore_state(data.satisfaction, saved_catalog.stations().keys())
+	demand_response.restore_state(data.demand_response, saved_catalog.stations().keys())
+	journey_ledger.restore_state(data.journeys, saved_catalog.stations().keys())
 	passenger_revenue.restore_state(data.passenger_revenue)
 	sawmill.restore_state(data.sawmill)
 	factory.restore_state(data.factory)
@@ -3925,10 +3925,10 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 			build_plan.error = "Remove the signal before adding a switch on its tile."
 
 func _waiting(key: String) -> int:
-	return int(get("waiting_at_" + key))
+	return passenger_demand.waiting(key)
 
 func _set_waiting(key: String, count: int) -> void:
-	set("waiting_at_" + key, count)
+	passenger_demand.reset_total(key, count, sim_clock.tick)
 
 # Platform length is measured from the live track, so laying straight track
 # behind a stop lengthens it immediately.

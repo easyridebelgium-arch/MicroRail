@@ -71,7 +71,7 @@ func open_train(id: int) -> void:
 	if game.ServiceRoutes.is_passenger_key(str(data.service)):
 		var manifest: Dictionary = game.passenger_destinations if data.service == "passenger" else game.passenger_services[data.service].passenger_destinations
 		var destinations: PackedStringArray = []
-		for station in game.PassengerDemand.STATIONS:
+		for station in game.passenger_demand.station_ids:
 			if int(manifest.get(station, 0)) > 0:
 				destinations.append("%s: %d%s" % [game.station_definitions()[station].name, int(manifest[station]), " (change trains)" if not game.services[data.service].stops.has(station) else ""])
 		summary.text += "\nOnboard destinations: " + (", ".join(destinations) if not destinations.is_empty() else "none")

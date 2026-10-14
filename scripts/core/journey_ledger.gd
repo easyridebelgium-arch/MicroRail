@@ -3,6 +3,10 @@ extends RefCounted
 const Demand = preload("res://scripts/core/passenger_demand.gd")
 const Classes = preload("res://scripts/core/passenger_classes.gd")
 const LIMIT := 128
+var station_ids: Array[String] = []
+func _init(ids: Array = Demand.STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
 var aboard: Dictionary = {}
 var completed: Array = []
 var unknown_completed := 0
@@ -15,7 +19,7 @@ func ensure(key: String, manifest: Dictionary, tick: int) -> void:
 		if not aboard.has(key): aboard[key] = []
 		return
 	aboard[key] = []
-	for destination in Demand.STATIONS:
+	for destination in station_ids:
 		if int(manifest.get(destination, 0)) > 0: aboard[key].append({"destination": destination, "origin": "unknown", "start": tick, "known": false, "count": int(manifest[destination]), "class": Classes.LOCAL})
 func board(key: String, groups: Array) -> void:
 	for group in groups:
@@ -58,8 +62,8 @@ func summary() -> String:
 		longest = maxi(longest, duration)
 	var result := "Completed journey time: no measured completions yet" if count == 0 else "Completed journey time: %.1fs average, %.1fs longest — %d passengers" % [elapsed / count / 60.0, float(longest) / 60.0, count]
 	result += "\nUnmeasured completed deliveries (including legacy): %d\nLast 128 completed groups, passenger-weighted. Includes original queue wait, onboard travel/dwell/delays, transfers and recovery; simulation seconds. This is elapsed time, not lateness or a satisfaction penalty." % unknown_completed
-	for origin in Demand.STATIONS:
-		for destination in Demand.STATIONS:
+	for origin in station_ids:
+		for destination in station_ids:
 			var passengers := 0
 			var duration_sum := 0.0
 			for row in completed:
@@ -84,7 +88,9 @@ func save_state(manifests: Dictionary, tick: int) -> Dictionary:
 	for key in aboard.keys():
 		if not manifests.has(key): aboard.erase(key)
 	return {"aboard": aboard.duplicate(true), "completed": completed.duplicate(true), "unknown_completed": unknown_completed}
-func restore_state(data: Dictionary) -> void:
+func restore_state(data: Dictionary, ids: Array = Demand.STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
 	aboard = data.aboard.duplicate(true)
 	completed = data.completed.duplicate(true)
 	unknown_completed = int(data.unknown_completed)
@@ -96,13 +102,13 @@ func restore_state(data: Dictionary) -> void:
 		for field in ["count", "start", "end"]: row[field] = int(row[field])
 static func integer(value: Variant, low: int, high: int) -> bool:
 	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and float(value) >= low and float(value) <= high
-static func valid_row(row: Variant, tick: int, finished: bool = false) -> bool:
-	if not row is Dictionary or not Demand.STATIONS.has(row.get("destination")) or not Classes.valid(row): return false
+static func valid_row(row: Variant, tick: int, finished: bool = false, ids: Array = Demand.STATIONS) -> bool:
+	if not row is Dictionary or not ids.has(row.get("destination")) or not Classes.valid(row): return false
 	if not integer(row.get("count"), 1, 1000000000) or not integer(row.get("start"), 0, tick): return false
 	if finished:
-		return Demand.STATIONS.has(row.get("origin")) and row.origin != row.destination and integer(row.get("end"), int(row.start), tick)
+		return ids.has(row.get("origin")) and row.origin != row.destination and integer(row.get("end"), int(row.start), tick)
 	if not row.get("known") is bool: return false
-	return (Demand.STATIONS.has(row.get("origin")) and row.origin != row.destination) if row.known else (row.get("origin") == "unknown" or Demand.STATIONS.has(row.get("origin")))
+	return (ids.has(row.get("origin")) and row.origin != row.destination) if row.known else (row.get("origin") == "unknown" or ids.has(row.get("origin")))
 static func manifests(data: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
 	if not data.get("demand") is Dictionary or not data.demand.get("primary") is Dictionary: return result
@@ -115,23 +121,24 @@ static func manifests(data: Dictionary) -> Dictionary:
 			if not running is Dictionary or not running.get("passenger_destinations") is Dictionary: return {}
 			result[key] = running.passenger_destinations
 	return result
-static func valid_save(value: Variant, data: Dictionary, tick: int) -> bool:
+static func valid_save(value: Variant, data: Dictionary, tick: int, ids: Array = Demand.STATIONS) -> bool:
+	if not Demand.valid_ids(ids): return false
 	if not value is Dictionary or not value.get("aboard") is Dictionary or not value.get("completed") is Array: return false
 	if not integer(value.get("unknown_completed"), 0, 1000000000) or value.completed.size() > LIMIT: return false
 	var loads := manifests(data)
 	if loads.is_empty() or loads.size() != value.aboard.size(): return false
 	for key in loads:
-		if not Demand.valid_counts(loads[key], Demand.STATIONS): return false
+		if not Demand.valid_counts(loads[key], ids): return false
 		var rows: Variant = value.aboard.get(key)
 		if not rows is Array or rows.size() > Demand.total(loads[key]): return false
 		for row in rows:
-			if not valid_row(row, tick): return false
+			if not valid_row(row, tick, false, ids): return false
 			if row.get("class", Classes.LOCAL) == Classes.EXPRESS and not Classes.service_can_carry(data.services[key], row.origin, row.destination): return false
 		if Demand.normalize(counts(rows)) != Demand.normalize(loads[key]): return false
 	var delivered := int(value.unknown_completed)
 	var previous := 0
 	for row in value.completed:
-		if not valid_row(row, tick, true) or int(row.end) < previous: return false
+		if not valid_row(row, tick, true, ids) or int(row.end) < previous: return false
 		previous = int(row.end)
 		delivered += int(row.count)
 	return integer(data.get("state", {}).get("passengers_delivered"), delivered, 1000000000)

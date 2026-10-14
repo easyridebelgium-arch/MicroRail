@@ -125,11 +125,11 @@ func restore_state(state: Dictionary) -> void:
 static func whole(value: Variant, minimum: int, maximum: int) -> bool:
 	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and value >= minimum and value <= maximum
 
-static func valid_row(row: Variant, tick: int, finished: bool) -> bool:
+static func valid_row(row: Variant, tick: int, finished: bool, ids: Array = ["a", "b", "c"]) -> bool:
 	if not row is Dictionary: return false
 	if not row.get("service") is String or not row.get("leg") is String or not row.get("scheduled") is bool: return false
 	var leg: PackedStringArray = row.leg.split(">")
-	if leg.size() != 2 or leg[0] not in ["a", "b", "c"] or leg[1] not in ["a", "b", "c"] or leg[0] == leg[1]: return false
+	if leg.size() != 2 or not ids.has(leg[0]) or not ids.has(leg[1]) or leg[0] == leg[1]: return false
 	if row.service != "passenger":
 		var suffix: String = str(row.service).trim_prefix("passenger_")
 		if not str(row.service).begins_with("passenger_") or not suffix.is_valid_int() or int(suffix) < 1 or int(suffix) >= 1000000000 or str(int(suffix)) != suffix: return false
@@ -141,11 +141,11 @@ static func valid_row(row: Variant, tick: int, finished: bool) -> bool:
 	if finished: return whole(row.get("arrive"), int(row.depart), tick)
 	return not row.has("arrive")
 
-static func valid_save(value: Variant, data: Dictionary, tick: int) -> bool:
+static func valid_save(value: Variant, data: Dictionary, tick: int, ids: Array = ["a", "b", "c"]) -> bool:
 	if not value is Dictionary or not value.get("active") is Dictionary or not value.get("completed") is Array or value.completed.size() > KEEP: return false
 	for service in value.active:
 		var row: Variant = value.active[service]
-		if not valid_row(row, tick, false) or row.service != service or not data.services.has(service): return false
+		if not valid_row(row, tick, false, ids) or row.service != service or not data.services.has(service): return false
 		var config: Dictionary = data.services[service]
 		if not Timetable.departure_legs(config.stops, config.get("mode", "shuttle")).has(row.leg): return false
 		var found := false
@@ -160,6 +160,6 @@ static func valid_save(value: Variant, data: Dictionary, tick: int) -> bool:
 		if following < 0 or following >= config.stops.size() or row.leg != "%s>%s" % [config.stops[index], config.stops[following]]: return false
 	var previous := -1
 	for row in value.completed:
-		if not valid_row(row, tick, true) or row.arrive < previous: return false
+		if not valid_row(row, tick, true, ids) or row.arrive < previous: return false
 		previous = int(row.arrive)
 	return true

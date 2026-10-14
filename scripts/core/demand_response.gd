@@ -1,13 +1,18 @@
 extends RefCounted
 ## Saved gradual demand response; existing arrival clock owns update timing.
 const STATIONS: Array[String] = ["a", "b", "c"]
+var station_ids: Array[String] = []
 const MIN_FACTOR := 50
 const MAX_FACTOR := 125
 const REQUIRED_BOARDINGS := 10
-var state: Dictionary = defaults()
-static func defaults() -> Dictionary:
+var state: Dictionary = {}
+func _init(ids: Array = STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
+	state = defaults(station_ids)
+static func defaults(ids: Array = STATIONS) -> Dictionary:
 	var result: Dictionary = {}
-	for key in STATIONS: result[key] = {"factor": 100, "carry": 0}
+	for key in ids: result[key] = {"factor": 100, "carry": 0}
 	return result
 static func target(rating: int, boarded: int, connected: bool) -> int:
 	if rating < 0: return 100
@@ -25,14 +30,17 @@ func describe(station: String, rating: int, boarded: int, connected: bool) -> St
 	var goal := target(rating, boarded, connected)
 	return "Demand response: %d%% of amenity-adjusted arrivals; current target %d%%.\nTarget = waiting rating +25, limited to 50–125%%. Above 100%% needs at least 10 recent boarding experiences and an enabled connection. No data targets 100%%.\nChanges by at most 1 percentage point each normal arrival interval. Existing queue limits still apply; waiting/transfer/recovery passengers are retained." % [state[station].factor, goal]
 func save_state() -> Dictionary: return state.duplicate(true)
-func restore_state(value: Dictionary) -> void:
-	state = defaults()
-	for key in STATIONS:
+func restore_state(value: Dictionary, ids: Array = STATIONS) -> void:
+	station_ids.assign(ids)
+	station_ids.sort()
+	state = defaults(station_ids)
+	for key in station_ids:
 		state[key].factor = int(value[key].factor)
 		state[key].carry = int(value[key].carry)
-static func valid_state(value: Variant) -> bool:
-	if not value is Dictionary or value.size() != STATIONS.size(): return false
-	for key in STATIONS:
+static func valid_state(value: Variant, ids: Array = STATIONS) -> bool:
+	if not preload("res://scripts/core/passenger_demand.gd").valid_ids(ids): return false
+	if not value is Dictionary or value.size() != ids.size(): return false
+	for key in ids:
 		var row: Variant = value.get(key)
 		if not row is Dictionary: return false
 		for field in ["factor", "carry"]:

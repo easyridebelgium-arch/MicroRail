@@ -152,11 +152,11 @@ func status(game: Node) -> String:
 	var title: String = configuration.name
 	if held: return title + ": held here — enable in Fleet or resume in Traffic"
 	if not connected: return title + ": Route incomplete ahead — stopped here. Repair the path to the next destination."
-	if returning: return title + ": reversing to " + Services.STATIONS[configuration.stops[return_stop]].name
+	if returning: return title + ": reversing to " + game.station_definitions()[configuration.stops[return_stop]].name
 	if not enabled and at_home(): return title + ": withdrawn at first stop"
 	if game.reservation_waits.has(key): return title + ": " + str(game.reservation_waits[key])
-	if dwell > 0: return "%s: departing %s in %.1f seconds" % [title, Services.STATIONS[configuration.stops[stop_index]].name, dwell]
-	return title + (": withdrawing; travelling to " if not enabled else ": travelling to ") + Services.STATIONS[configuration.stops[next_stop()]].name
+	if dwell > 0: return "%s: departing %s in %.1f seconds" % [title, game.station_definitions()[configuration.stops[stop_index]].name, dwell]
+	return title + (": withdrawing; travelling to " if not enabled else ": travelling to ") + game.station_definitions()[configuration.stops[next_stop()]].name
 
 func save_state() -> Dictionary:
 	return {"cells": Runtime.encode(cells), "distance": distance, "stop_index": stop_index, "forward": forward, "dwell": dwell, "boarding": boarding, "passengers": passengers, "passenger_destinations": passenger_destinations.duplicate(true), "enabled": enabled, "held": held, "returning": returning, "return_stop": return_stop, "operating_timer": operating_timer}

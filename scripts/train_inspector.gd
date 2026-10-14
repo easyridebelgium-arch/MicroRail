@@ -73,7 +73,7 @@ func open_train(id: int) -> void:
 		var destinations: PackedStringArray = []
 		for station in game.PassengerDemand.STATIONS:
 			if int(manifest.get(station, 0)) > 0:
-				destinations.append("%s: %d%s" % [game.ServiceRoutes.STATIONS[station].name, int(manifest[station]), " (change trains)" if not game.services[data.service].stops.has(station) else ""])
+				destinations.append("%s: %d%s" % [game.station_definitions()[station].name, int(manifest[station]), " (change trains)" if not game.services[data.service].stops.has(station) else ""])
 		summary.text += "\nOnboard destinations: " + (", ".join(destinations) if not destinations.is_empty() else "none")
 		summary.text += "\n" + game.journey_ledger.describe_train(str(data.service), manifest, game.sim_clock.tick)
 		summary.text += "\n" + game.arrival_targets.describe(str(data.service), game.sim_clock.tick)

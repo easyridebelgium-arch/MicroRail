@@ -1,5 +1,8 @@
 extends Node2D
 
+const WorldCatalog = preload("res://scripts/core/world_catalog.gd")
+var world = WorldCatalog.new()
+
 const TILE_SIZE: int = 32
 
 const GRID_COLOR: Color = Color(0.18, 0.23, 0.25)
@@ -783,10 +786,24 @@ func _is_inside_map(cell: Vector2i) -> bool:
 	)
 
 
+func station_definitions() -> Dictionary:
+	return world.stations()
+
+func refresh_station_choices(choice: OptionButton, prefix: String = "") -> void:
+	var selected: String = str(choice.get_selected_metadata()) if choice.selected >= 0 else ""
+	choice.clear()
+	for key in station_definitions():
+		choice.add_item(prefix + str(station_definitions()[key].name))
+		choice.set_item_metadata(choice.item_count - 1, key)
+		if key == selected: choice.select(choice.item_count - 1)
+
 func facility_cells(installed_override: int = -1, factory_override: int = -1) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = [STATION_A, STATION_B, STATION_C, FOREST_SITE, CARGO_TERMINAL]
-	if (sawmill.state.installed if installed_override < 0 else installed_override == 1): cells.append(Sawmill.CELL)
-	if (factory.state.installed if factory_override < 0 else factory_override == 1): cells.append(Factory.CELL)
+	var cells: Array[Vector2i] = []
+	for row in world.state.facilities:
+		var enabled: bool = row.enabled
+		if row.kind == "sawmill" and installed_override >= 0: enabled = installed_override == 1
+		if row.kind == "factory" and factory_override >= 0: enabled = factory_override == 1
+		if enabled: cells.append(Vector2i(int(row.cell[0]), int(row.cell[1])))
 	return cells
 
 func _is_station_space(cell: Vector2i, installed_override: int = -1, factory_override: int = -1) -> bool:
@@ -942,13 +959,8 @@ func _draw() -> void:
 		_draw_track(cell, tracks[cell], false)
 	_draw_construction_draft()
 	_draw_inspection_paths()
-	_draw_station(STATION_A, "Station A")
-	_draw_station(STATION_B, "Station B")
-	_draw_station(STATION_C, "Station C")
-	_draw_station(FOREST_SITE, "Forest")
-	_draw_station(CARGO_TERMINAL, "Terminal")
-	if sawmill.state.installed: _draw_station(Sawmill.CELL, "Sawmill")
-	if factory.state.installed: _draw_station(Factory.CELL, "Factory")
+	for row in world.facilities():
+		_draw_station(row.cell, row.name)
 	if inspect_mode:
 		if selected_station != Vector2i(-1, -1):
 			draw_rect(Rect2(Vector2(selected_station) * TILE_SIZE, Vector2.ONE * TILE_SIZE).grow(3.0), Color(1.0, 0.85, 0.25), false, 2.0)
@@ -1475,6 +1487,7 @@ func _save_game(slot: int = 0) -> bool:
 
 	var data: Dictionary = {
 		"version": SAVE_VERSION,
+		"world": world.save_state(),
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
@@ -1662,6 +1675,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 			return false
 
 	if not Sawmill.valid(data.get("sawmill")) or not Factory.valid(data.get("factory")): return false
+	if not WorldCatalog.valid_tutorial(data.get("world"), data.sawmill.installed, data.factory.installed): return false
 	if not DemandResponse.valid_state(data.get("demand_response")): return false
 	if not Satisfaction.valid_state(data.get("satisfaction"), int(sim.clock.tick)): return false
 	if not Amenities.valid_save(data.get("amenities")): return false
@@ -1919,6 +1933,8 @@ func _load_game(save_path: String = "") -> bool:
 			TYPE_INT: set(field, int(state[field]))
 			TYPE_FLOAT: set(field, float(state[field]))
 			TYPE_BOOL: set(field, state[field])
+	world.restore_state(data.world)
+	network_map.facilities = _facility_markers()
 	passenger_demand.restore_state(data.demand)
 	passenger_destinations = PassengerDemand.normalize(data.demand.primary)
 	amenities.load_save(data.amenities)
@@ -2558,7 +2574,7 @@ func _update_station_details() -> void:
 				incoming += _incoming_passengers(service, key)
 			else:
 				incoming += _incoming_passengers(service, key)
-		station_title.text = ServiceRoutes.STATIONS[key].name
+		station_title.text = station_definitions()[key].name
 		station_details.text = "Services: %s\n\nWaiting passengers: %d\nPassengers aboard for this station: %d\n\n%s\n\nManage individual trains and upgrades in Fleet." % [", ".join(serving) if not serving.is_empty() else "None", _waiting(key), incoming, "\n".join(states)]
 		station_details.text += "\n\n" + _destination_queue_text(key)
 		station_details.text += "\n" + PassengerClasses.describe(passenger_demand.waiting_groups(key, sim_clock.tick))
@@ -2570,7 +2586,7 @@ func _update_station_details() -> void:
 	freight_rule_option.hide()
 
 	var station_key: String = _station_key(selected_station)
-	var station_name: String = ServiceRoutes.STATIONS[station_key]["name"]
+	var station_name: String = station_definitions()[station_key]["name"]
 	var destination_name: String = services["passenger"]["name"]
 	if not services["passenger"]["stops"].has(station_key):
 		destination_name += " (not served)"
@@ -3291,13 +3307,13 @@ func _passenger_service_status() -> String:
 	if reservation_waits.has("passenger"):
 		return title + ": " + reservation_waits["passenger"]
 	if passenger_returning:
-		return title + ": reversing to " + ServiceRoutes.STATIONS[services["passenger"]["stops"][passenger_return_stop]]["name"]
-	var home: String = ServiceRoutes.STATIONS[services["passenger"]["stops"][0]]["name"]
+		return title + ": reversing to " + station_definitions()[services["passenger"]["stops"][passenger_return_stop]]["name"]
+	var home: String = station_definitions()[services["passenger"]["stops"][0]]["name"]
 	if not passenger_service_enabled:
 		return title + (": withdrawing to " if _passenger_service_is_active() else ": stopped at ") + home
 	if wait_remaining > 0.0:
-		return "%s: departing %s in %.1f seconds" % [title, ServiceRoutes.STATIONS[services["passenger"]["stops"][passenger_stop_index]]["name"], wait_remaining]
-	return title + ": travelling to " + ServiceRoutes.STATIONS[services["passenger"]["stops"][_next_passenger_stop()]]["name"]
+		return "%s: departing %s in %.1f seconds" % [title, station_definitions()[services["passenger"]["stops"][passenger_stop_index]]["name"], wait_remaining]
+	return title + ": travelling to " + station_definitions()[services["passenger"]["stops"][_next_passenger_stop()]]["name"]
 
 
 func _selected_service_is_freight() -> bool:
@@ -3604,21 +3620,11 @@ func _apply_settings() -> void:
 
 func _facility_markers() -> Array[Dictionary]:
 	var markers: Array[Dictionary] = []
-
-	for station in [STATION_A, STATION_B, STATION_C]:
-		markers.append({
-			"cell": station,
-			"color": Palette.get_color(Palette.Role.FACILITY_STATION)
-		})
-
-	markers.append({
-		"cell": FOREST_SITE,
-		"color": Palette.get_color(Palette.Role.FACILITY_FOREST)
-	})
-	markers.append({
-		"cell": CARGO_TERMINAL,
-		"color": Palette.get_color(Palette.Role.FACILITY_TERMINAL)
-	})
+	for row in world.facilities():
+		var role := Palette.Role.FACILITY_STATION
+		if row.kind == "forest": role = Palette.Role.FACILITY_FOREST
+		elif row.kind != "station": role = Palette.Role.FACILITY_TERMINAL
+		markers.append({"id": row.id, "cell": row.cell, "color": Palette.get_color(role)})
 	return markers
 
 
@@ -3631,28 +3637,7 @@ func _setup_network_map() -> void:
 	network_map.map_cells = Vector2i(MAP_WIDTH, MAP_HEIGHT)
 	network_map.world_tile_size = float(TILE_SIZE)
 
-	network_map.facilities = [
-		{
-			"cell": STATION_A,
-			"color": Color("#F4D56A")
-		},
-		{
-			"cell": STATION_B,
-			"color": Color("#F4D56A")
-		},
-		{
-			"cell": STATION_C,
-			"color": Color("#F4D56A")
-		},
-		{
-			"cell": FOREST_SITE,
-			"color": Color("#6ED68C")
-		},
-		{
-			"cell": CARGO_TERMINAL,
-			"color": Color("#F0A75A")
-		}
-	]
+	network_map.facilities = _facility_markers()
 
 	$Interface.add_child(network_map)
 
@@ -3945,8 +3930,8 @@ func _set_waiting(key: String, count: int) -> void:
 # behind a stop lengthens it immediately.
 func _platform_text(cell: Vector2i) -> String:
 	var key := ""
-	for station in ServiceRoutes.STATIONS:
-		if ServiceRoutes.STATIONS[station].cell == cell: key = station
+	for station in station_definitions():
+		if station_definitions()[station].cell == cell: key = station
 	if key.is_empty():
 		return Platforms.describe(Platforms.measure(tracks, track_signals, cell, float(TILE_SIZE)), float(TILE_SIZE))
 	var lines: PackedStringArray = []
@@ -3962,10 +3947,8 @@ func _platform_text(cell: Vector2i) -> String:
 	return "\n".join(lines)
 
 func _station_key(cell: Vector2i) -> String:
-	for key in ServiceRoutes.STATIONS:
-		if ServiceRoutes.STATIONS[key]["cell"] == cell:
-			return key
-	return "a"
+	return world.station_key(cell)
+
 
 func _next_passenger_stop() -> int:
 	if passenger_returning: return passenger_return_stop
@@ -4015,7 +3998,7 @@ func _buy_amenity(id: String) -> void:
 	var price: int = amenities.buy(station, id, money)
 	money -= price
 	_record_event(EventLog.UPGRADE_BOUGHT, "passenger", {"kind": "amenity " + id, "station": station, "price": price})
-	_show_notice("%s built at %s: waiting limit %d, arrivals +%d%%." % [Amenities.DEFS[id].name, ServiceRoutes.STATIONS[station].name, amenities.queue_limit(station), amenities.demand_bonus(station)])
+	_show_notice("%s built at %s: waiting limit %d, arrivals +%d%%." % [Amenities.DEFS[id].name, station_definitions()[station].name, amenities.queue_limit(station), amenities.demand_bonus(station)])
 	_update_station_inspector()
 
 func _destination_queue_text(station: String) -> String:
@@ -4026,8 +4009,8 @@ func _destination_queue_text(station: String) -> String:
 		var journey := PassengerJourneys.plan(network, station, destination)
 		var connection := " — no enabled connection"
 		if journey.size() == 2: connection = " — direct service"
-		elif journey.size() > 2: connection = " — change at " + ServiceRoutes.STATIONS[journey[1]].name
-		lines.append("To %s: %d%s | Oldest wait %.1fs" % [ServiceRoutes.STATIONS[destination].name, int(passenger_demand.queues[station].get(destination, 0)), connection, passenger_demand.oldest_seconds(station, sim_clock.tick, destination)])
+		elif journey.size() > 2: connection = " — change at " + station_definitions()[journey[1]].name
+		lines.append("To %s: %d%s | Oldest wait %.1fs" % [station_definitions()[destination].name, int(passenger_demand.queues[station].get(destination, 0)), connection, passenger_demand.oldest_seconds(station, sim_clock.tick, destination)])
 	lines.append(satisfaction.describe(station, passenger_demand, sim_clock.tick, amenities))
 	var experience: Dictionary = satisfaction.station(station, passenger_demand.waiting_groups(station, sim_clock.tick), sim_clock.tick, amenities.owned[station])
 	lines.append(demand_response.describe(station, int(experience.rating), int(experience.boarded), not network[station].is_empty()))
@@ -4104,7 +4087,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 				if in_use == 1: platforms.erase(stop)
 				else: platforms[stop] = in_use
 				continue
-			if not ServiceRoutes.STATIONS.has(stop) or not service.get("stops", []).has(stop):
+			if not station_definitions().has(stop) or not service.get("stops", []).has(stop):
 				platforms.erase(stop)
 				continue
 			var current: int = int(services.get(key, {}).get("platforms", {}).get(stop, 1))
@@ -4113,7 +4096,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 				else: platforms[stop] = current
 				continue
 			var body := Fleet.length(Fleet.assigned(fleet, key)) if Fleet.assigned(fleet, key).has("id") else Reservations.VEHICLE_LENGTH
-			var options := Platforms.for_station(tracks, track_signals, stop, ServiceRoutes.STATIONS[stop]["cell"], float(TILE_SIZE))
+			var options := Platforms.for_station(tracks, track_signals, stop, station_definitions()[stop]["cell"], float(TILE_SIZE))
 			var probe := func(number: int) -> bool:
 				var trial: Dictionary = platforms.duplicate()
 				trial[stop] = number
@@ -4123,7 +4106,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 			var number := Platforms.choose(options, body, float(TILE_SIZE), busy, probe)
 			if number == 0:
 				number = 1
-				notes.append("%s: no free platform fits at %s; using platform 1." % [service.get("name", key), ServiceRoutes.STATIONS[stop]["name"]])
+				notes.append("%s: no free platform fits at %s; using platform 1." % [service.get("name", key), station_definitions()[stop]["name"]])
 			busy["%s/%d" % [stop, number]] = true
 			if number == 1: platforms.erase(stop)
 			else: platforms[stop] = number
@@ -4493,7 +4476,7 @@ func _maybe_reroute_platform(service: String) -> void:
 	var id := int(Fleet.assigned(fleet, service)["id"])
 	var planned := int(config.get("platforms", {}).get(stop, 1))
 	var body := Fleet.length(Fleet.assigned(fleet, service))
-	var options := Platforms.for_station(tracks, track_signals, stop, ServiceRoutes.STATIONS[stop]["cell"], float(TILE_SIZE))
+	var options := Platforms.for_station(tracks, track_signals, stop, station_definitions()[stop]["cell"], float(TILE_SIZE))
 	var ordered: Array = []
 	for platform in options:
 		if int(platform.number) == planned: ordered.push_front(platform)
@@ -4779,7 +4762,7 @@ func _section_check(id: int, service: String, path: Curve2D, current: float, pro
 		section_held[id] = true
 		result["distance"] = current
 		var cell := Vector2i(floori(path.sample_baked(current).x / TILE_SIZE), floori(path.sample_baked(current).y / TILE_SIZE))
-		var place := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE))
+		var place := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE), station_definitions())
 		var name := str(Fleet.find(fleet, blocker).get("name", "another train"))
 		result["conflict"] = {"owner": blocker, "cell": cell, "reason": "Waiting for %s to clear the single-track section%s" % [name, " (%s)" % place if not place.is_empty() else ""]}
 	else:
@@ -4807,7 +4790,7 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 		var other := Fleet.find(fleet, owner)
 		var name: String = str(other.get("name", "another train"))
 		var place := "switch" if TrackGeometry.is_switch(tracks.get(cell)) else "track"
-		var platform_label := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE))
+		var platform_label := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE), station_definitions())
 		var reason := str(conflict.get("reason", "Waiting for %s at %s (%s %d,%d)" % [name, platform_label, place, cell.x, cell.y] if not platform_label.is_empty() else "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]))
 		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001:
 			traffic_wait_samples[id] = {"reason": reason, "cell": cell}
@@ -5187,7 +5170,7 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	if not paused: return "Pause before starting a service."
 	var train := Fleet.find(fleet, id)
 	if train.is_empty() or train.service != "" or Fleet.MODELS[train.model].kind != "passenger": return "Choose a stored passenger train."
-	if not ServiceRoutes.STATIONS.has(home): return "Choose a passenger starting station."
+	if not station_definitions().has(home): return "Choose a passenger starting station."
 	if services.size() >= ServiceRoutes.MAX_PASSENGER_SERVICES + 1: return "This prototype supports up to eight active passenger services."
 	var service_id := id
 	# Replacement can leave the original service attached to a different train.
@@ -5195,7 +5178,7 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	var key := "passenger_%d" % service_id
 	var configuration := {"name": "Passenger Service %d" % id, "stops": [home, "b" if home == "a" else "a"], "mode": "shuttle", "waypoints": {}}
 	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE))
-	if built.cells.is_empty(): return "Complete track from the starting station to %s first." % ServiceRoutes.STATIONS[configuration.stops[1]].name
+	if built.cells.is_empty(): return "Complete track from the starting station to %s first." % station_definitions()[configuration.stops[1]].name
 	var fit := _consist_service_fit(train, configuration)
 	if not fit.is_empty(): return fit
 	_rebuild_reservations()
@@ -5211,7 +5194,7 @@ func start_passenger_service(id: int, home: String = "a") -> String:
 	_rebuild_reservations()
 	_record_event(EventLog.ROUTE_CHANGED, str(id), {"service": key, "action": "created"})
 	queue_redraw()
-	return "%s started at %s. Choose it in Routes to edit stops, mode and waypoints." % [configuration.name, ServiceRoutes.STATIONS[home].name]
+	return "%s started at %s. Choose it in Routes to edit stops, mode and waypoints." % [configuration.name, station_definitions()[home].name]
 
 ## Starts a stored train as a copy of an existing passenger service: same stops,
 ## mode, waypoints and platforms, its own name. It starts at the source's first
@@ -5848,11 +5831,11 @@ func object_rows() -> Array:
 		var id := int(train.get("id", -1))
 		var stops: PackedStringArray = []
 		for stop in services[service].stops:
-			stops.append(str(ServiceRoutes.STATIONS[stop].name) if ServiceRoutes.STATIONS.has(stop) else "Forest" if stop == "forest" else "Cargo Terminal")
+			stops.append(str(station_definitions()[stop].name) if station_definitions().has(stop) else "Forest" if stop == "forest" else "Cargo Terminal")
 		var title: String = str(services[service].name)
 		result.append({"key": "service:" + service, "kind": "Service", "id": id, "service": service, "title": title, "details": "%s\n%s: %s\nAssigned train #%d\n%s" % [title, str(services[service].get("mode", "shuttle")).capitalize(), " → ".join(stops), id, fleet_train_status(id)], "cell": Vector2i(-1, -1)})
-	for key in ServiceRoutes.STATIONS:
-		var station: Dictionary = ServiceRoutes.STATIONS[key]
+	for key in station_definitions():
+		var station: Dictionary = station_definitions()[key]
 		result.append({"key": "station:" + key, "kind": "Station", "id": -1, "service": "", "title": station.name, "details": "%s\n%d passengers waiting\nMap cell %d,%d" % [station.name, _waiting(key), station.cell.x, station.cell.y], "cell": station.cell})
 	result.append({"key": "industry:forest", "kind": "Industry", "id": -1, "service": "", "title": "Forest", "details": "Forest — produces logs\n%d logs in stock\nMap cell %d,%d" % [forest_stock, FOREST_SITE.x, FOREST_SITE.y], "cell": FOREST_SITE})
 	if sawmill.state.installed: result.append({"key": "industry:sawmill", "kind": "Industry", "id": -1, "service": "", "title": "Sawmill", "details": sawmill.summary(factory.state.installed), "cell": Sawmill.CELL})
@@ -6088,6 +6071,8 @@ func build_sawmill() -> String:
 	var candidate := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, points)
 	if candidate != cells: return "Review the route: the sawmill directive would change its geometry. Install with a simple connected route first."
 	sawmill.state.installed = true
+	world.set_enabled("industry:sawmill", true)
+	network_map.facilities = _facility_markers()
 	services.freight["waypoints"] = {"forest>terminal": points}
 	money -= Sawmill.DEFINITION.build_price
 	total_construction_cost += Sawmill.DEFINITION.build_price
@@ -6133,6 +6118,8 @@ func build_factory() -> String:
 	var candidate := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, points)
 	if candidate != cells: return "Review the route: the factory directive would change its geometry. Install with a simple connected route first."
 	factory.state.installed = true
+	world.set_enabled("industry:factory", true)
+	network_map.facilities = _facility_markers()
 	services.freight["waypoints"] = {"forest>terminal": points}
 	money -= Factory.DEFINITION.build_price
 	total_construction_cost += Factory.DEFINITION.build_price

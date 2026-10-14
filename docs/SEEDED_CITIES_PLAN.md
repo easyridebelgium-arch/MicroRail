@@ -1,16 +1,19 @@
 # Seeded cities and player-built stations — Phase 2C plan
 
-This is planned gameplay, not a feature already enabled in the current game.
+The saved catalog foundation is implemented ([world catalog](WORLD_CATALOG.md));
+seeded cities, station construction and growth remain planned gameplay.
 The fixed three-station map remains the tutorial and supports existing saves.
 New sandbox layouts will instead contain cities and industries, with the player
 building stations beside cities and connecting useful services.
 
 ## Dependency order
 
-1. **Saved world catalog:** introduce stable settlement, station and industry IDs,
+1. **Saved world catalog (foundation implemented):** persist stable settlement, station and industry IDs,
    positions, names and content versions. Routes, passenger destinations, station
    inspectors, demand and save validation must use this catalog instead of fixed
-   A/B/C entries. Migrate old games without moving platforms, trains or passengers.
+   A/B/C entries. Rendering, markers and station labels now use it; route/platform
+   builders and passenger-demand/journey validators are the next integration.
+   Old tutorial saves migrate without moving platforms, trains or passengers.
 2. **Seeded layouts:** deterministically place a bounded number of cities and
    industries on buildable land. Validate spacing, station approaches and feasible
    connections. Save the actual generated layout as well as seed, generator/content

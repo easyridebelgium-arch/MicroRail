@@ -85,8 +85,8 @@ func configure(owner_game: Node) -> void:
 	var start_row := HFlowContainer.new()
 	box.add_child(start_row)
 	start_station = OptionButton.new()
-	for key in game.ServiceRoutes.STATIONS:
-		start_station.add_item("Start at " + game.ServiceRoutes.STATIONS[key].name)
+	for key in game.station_definitions():
+		start_station.add_item("Start at " + game.station_definitions()[key].name)
 		start_station.set_item_metadata(start_station.item_count - 1, key)
 	start_row.add_child(start_station)
 	start_copy = OptionButton.new()
@@ -129,6 +129,7 @@ func _button(parent: Node, title_text: String, callback: Callable) -> Button:
 	return button
 
 func open_editor() -> void:
+	game.refresh_station_choices(start_station, "Start at ")
 	status.text = "Choose a model to buy or select an owned train to manage it."
 	refresh()
 	popup_centered_clamped(Vector2i(700, 620), 0.95)

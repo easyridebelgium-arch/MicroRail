@@ -170,8 +170,8 @@ func configure(owner_game: Node) -> void:
 	editing_controls = HBoxContainer.new()
 	box.add_child(editing_controls)
 	station_choice = OptionButton.new()
-	for key in Services.STATIONS:
-		station_choice.add_item(Services.STATIONS[key]["name"])
+	for key in game.station_definitions():
+		station_choice.add_item(game.station_definitions()[key]["name"])
 		station_choice.set_item_metadata(station_choice.item_count - 1, key)
 	editing_controls.add_child(station_choice)
 	add_button = _button("Add", _add_stop)
@@ -238,6 +238,7 @@ func _button(title_text: String, callback: Callable) -> Button:
 	return button
 
 func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
+	game.refresh_station_choices(station_choice)
 	draft = game.services.duplicate(true)
 	for key in draft:
 		var chosen: Dictionary = draft[key].get("platforms", {})
@@ -428,7 +429,7 @@ func _refresh_stops(selected: int = -1) -> void:
 	draft[_key()]["platforms"] = platforms
 	for index in range(stops.size()):
 		var key: String = stops[index]
-		var stop_name: String = Services.STATIONS[key]["name"] if Services.STATIONS.has(key) else ("Forest — load logs" if key == "forest" else "Terminal — unload logs")
+		var stop_name: String = game.station_definitions()[key]["name"] if game.station_definitions().has(key) else ("Forest — load logs" if key == "forest" else "Terminal — unload logs")
 		var chosen: int = int(draft[_key()].get("platforms", {}).get(key, 1))
 		stop_list.add_item("%d. %s%s" % [index + 1, stop_name, "" if chosen == 1 else (" — auto platform" if chosen == 0 else " — platform %d" % chosen)])
 	if selected >= 0 and selected < stops.size():

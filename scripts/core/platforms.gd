@@ -1,4 +1,5 @@
 extends RefCounted
+const STATIONS_DEFAULT = preload("res://scripts/service_routes.gd").STATIONS
 ## Formal platform measurement. A stop's platform is the continuous run of
 ## straight horizontal, signal-free track through its stop tile; trains stop
 ## centred on that tile. Laying more straight track lengthens the platform, so
@@ -101,13 +102,13 @@ static func choose(platforms: Array, body: float, tile_size: float, busy: Dictio
 
 ## "Station B platform 2" when `cell` lies on a station platform (within
 ## PLATFORM_REACH tiles of its stop tile), otherwise "".
-static func label_for_cell(tracks: Dictionary, signs: Dictionary, cell: Vector2i, tile_size: float) -> String:
-	for key in Services.STATIONS:
-		var stop: Vector2i = Services.STATIONS[key]["cell"]
+static func label_for_cell(tracks: Dictionary, signs: Dictionary, cell: Vector2i, tile_size: float, station_catalog: Dictionary = STATIONS_DEFAULT) -> String:
+	for key in station_catalog:
+		var stop: Vector2i = station_catalog[key]["cell"]
 		if absi(cell.x - stop.x) > PLATFORM_REACH or absi(cell.y - stop.y) > 1: continue
 		for platform in for_station(tracks, signs, key, stop, tile_size):
 			if cell.y == platform.cell.y and cell.x >= platform.cell.x - mini(int(platform.left), PLATFORM_REACH) and cell.x <= platform.cell.x + mini(int(platform.right), PLATFORM_REACH):
-				return "%s platform %d" % [Services.STATIONS[key]["name"], int(platform.number)]
+				return "%s platform %d" % [station_catalog[key]["name"], int(platform.number)]
 	return ""
 
 static func _usable(tracks: Dictionary, signs: Dictionary, cell: Vector2i) -> bool:

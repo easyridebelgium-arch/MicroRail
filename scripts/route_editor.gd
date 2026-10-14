@@ -395,7 +395,7 @@ func _show_service() -> void:
 	else:
 		route_mode.disabled = false
 		waypoint_add.disabled = false
-	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if Services.is_passenger_key(_key()) else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse."
+	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if Services.is_passenger_key(_key()) else ("Forest: logs → Sawmill: unload/process/load timber → Terminal: sell → Forest. Keep the 18,24 directive." if game.sawmill.state.installed else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse.")
 
 func _refresh_copy_sources() -> void:
 	copy_controls.visible = Services.is_passenger_key(_key())

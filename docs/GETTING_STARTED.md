@@ -132,3 +132,14 @@ See [passenger classes](PASSENGER_CLASSES.md).
 Open **Accounts** for actual passenger receipts split into Local, Express and
 legacy flat-fare income. The operating profit shown above the map now uses these
 recorded receipts. See [passenger revenue](PASSENGER_REVENUE.md).
+
+## Process logs into timber
+
+Pause with empty freight at the Forest. Connect its loading track (8,24) to the
+Terminal (28,24) through a straight horizontal loading tile at 18,24, leaving
+columns 17–19, rows 22–23 clear for the building. Click Forest or Terminal and
+choose **Build sawmill (£500)**. Enable freight and resume: it unloads logs, loads
+processed timber, sells at the Terminal and returns empty. The sawmill makes one
+timber from two logs every five simulation seconds; each timber sells for £24.
+Click the new industry for stocks and progress. The old direct-log service remains
+available until you install it. See [sawmill chain](SAWMILL_CHAIN.md).

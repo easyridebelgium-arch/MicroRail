@@ -13,7 +13,7 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings and richer measured planning. Alert acknowledgement/persistence and optional incident slowdown are implemented. Unified waiting inspection is implemented. |
-| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phases 2B/2C planned. Direct log delivery already exists. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
+| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phase 2B first processing slice implemented; Phase 2C planned. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
 **Current-stage UI work is complete:** all twelve items in the table below are
@@ -112,8 +112,16 @@ flat-fare deliveries retain their £5 historical income without changing cash or
 awarding retrospective premiums. Recovery/transfers remain unpaid until arrival.
 See [recorded passenger revenue](PASSENGER_REVENUE.md).
 
-**Next implementation:** Phase 2B versioned cargo/industry definitions and the
-first logs → sawmill → timber delivery slice. Player fare controls, richer passenger
+**Latest freight batch:** Phase 2B versioned cargo/industry `.tres` definitions and
+the optional £500 sawmill are implemented. It consumes 2 logs per timber every five
+simulation seconds, keeps bounded inventories and pays £24 per timber only at the
+terminal. Whole-train reservations and physical recovery remain authoritative.
+Save version 37 retains production progress and freight stages; version 36 migrates
+to the unchanged log-only service. Validation: 91 regression suites pass, including
+39 focused sawmill checks. See [sawmill chain](SAWMILL_CHAIN.md).
+
+**Next implementation:** Phase 2B factory processing and finished-goods delivery
+to complete the first vertical slice before generalising cargo types. Player fare controls, richer passenger
 choices, timed connections and punctuality scoring remain planned refinements. Completed elapsed time is now measured; journey scoring
 still needs explicit benchmarks rather than treating duration alone as lateness. Basic
 waiting-based demand balancing is complete; population, player fare controls and richer
@@ -173,7 +181,7 @@ advance or reorder the gameplay milestones above.
 
 **Amenities checkpoint:** stations can buy a Shelter, Waiting room and Kiosk. Each raises that
 station's waiting limit and passenger arrivals by a small, saved percentage (save version 26); see
-[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction, gradual demand response, complete journey timing and occupancy/capacity-denial measurement are implemented; directional arrival targets and basic punctuality are implemented; advisory feasibility guidance and per-direction reports are implemented; Express/Local classes and direct-leg eligibility are implemented; differentiated fares and recorded revenue are implemented; the next core batch begins Phase 2B.
+[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction, gradual demand response, complete journey timing and occupancy/capacity-denial measurement are implemented; directional arrival targets and basic punctuality are implemented; advisory feasibility guidance and per-direction reports are implemented; Express/Local classes and direct-leg eligibility are implemented; differentiated fares and recorded revenue are implemented; Phase 2B now has its first playable processing slice.
 
 **Rename checkpoint:** the project is now **MicroRail** (formerly "Trainz", a name already in use by another
 game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
@@ -420,14 +428,14 @@ must be labelled estimates.
 
 ### Phase 2B — Freight and supply chains
 
-Complete logs → sawmill → timber delivery first, then add factory processing and a
+Logs → sawmill → timber delivery is implemented; next add factory processing and a
 finished-goods destination. Only generalise recipes/cargo behaviour after that full
 chain is playable and its storage, stock compatibility and finances are verified.
-Versioned cargo/industry definitions start before the first processing industry.
+Versioned cargo/industry definitions are implemented with the first processing industry.
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Phase 2B first delivers a playable logs → sawmill → timber delivery chain, then adds a factory and finished-goods destination to complete the logs → sawmill → timber → factory chain. Verify input consumption, production recipes, bounded storage, compatible wagons and delivery accounting before generalising cargo types. |
+| Industry supply chains | Move logs to sawmills, timber to factories, and finished goods to terminals. | Implemented first slice: optional sawmill, 2:1 log processing, bounded storage, timber loading/payment and physical recovery. Next add a factory and finished-goods destination to complete the logs → sawmill → timber → factory chain. Verify input consumption, production recipes, bounded storage, compatible wagons and delivery accounting before generalising cargo types. |
 | Cargo with distinct behaviours | Perishable cargo spoils over time, hazardous materials need lower speeds or special handling, and high-value express cargo rewards fast delivery. | Track shipment age and delivery terms; connect cargo requirements to rolling stock, facilities and routing. Make spoilage, restrictions and bonuses visible before loading. |
 | Mail and parcels | Add small, fast, high-value consignments, including carriage on compatible passenger trains. | Requires cargo definitions, compatible vehicles and explicit capacity sharing; introduce before complex intermodal logistics. |
 | Station facilities and amenities | Add platforms, waiting rooms, cargo warehouses and fuel depots to increase capacity, shorten loading times or lower running costs. | Physical platforms and usable lengths belong to Phase 1B. Phase 2A implements separate waiting-area capacity and demand/amenity purchases; train capacity does not create passengers. Passenger loading facilities follow measured dwell/loading rules; Phase 2B adds cargo warehouses and handling. Fuel depots wait for locomotive technology and energy costs. Each facility needs a clear priced benefit. |
@@ -578,7 +586,7 @@ instead of adding a separate campaign simulation.
    occupancy/capacity-denial measurement is implemented; directional arrival targets and basic punctuality are implemented; advisory target-feasibility guidance and per-direction reports are implemented; Express/Local eligibility is implemented; differentiated fares and recorded revenue are implemented; player fare controls, richer choices and scoring remain refinements before full reputation/contract systems. Departure timetables are implemented;
    Arrival targets now measure actual trips; punitive contracts still follow demand/contract rules.
 6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
-   by factory/finished goods; verify stock, recipes, storage and payments first.
+   by factory/finished goods (next); the initial sawmill recipe, storage and payments are implemented.
 7. **Growth, sandbox rules and persistence (2C):** service-driven growth,
    eligibility-aware scenario rules, bounded metrics and reliable rotating saves.
 8. **Later mechanics (3–5):** opt-in maintenance, terrain/economy, research/eras,

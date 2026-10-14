@@ -59,6 +59,8 @@ state is changed.
 
 Optional [directional arrival targets and basic punctuality](ARRIVAL_TARGETS.md)
 are implemented in version 34, using each served departure slot as their baseline.
+Routes now includes advisory free-running target guidance; Routes/Accounts separate
+per-direction running time, arrival lateness and scheduled departure delay.
 Passenger satisfaction effects, freight contract bonuses/penalties
 and timed transfers remain future work. They require actual passenger destinations,
 contracts and reliable demand/arrival measurements. Weather/art preparation does

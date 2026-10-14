@@ -32,6 +32,7 @@ var headway_label: Label
 var timetable_field: LineEdit
 var timetable_leg: OptionButton
 var arrival_minutes: SpinBox
+var arrival_hint: Label
 var link_controls: HFlowContainer
 var link_label: Label
 var unlink_button: Button
@@ -157,6 +158,9 @@ func configure(owner_game: Node) -> void:
 	headway_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	headway_label.custom_minimum_size.x = 540
 	box.add_child(headway_label)
+	arrival_hint = Label.new()
+	arrival_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(arrival_hint)
 	heading = Label.new()
 	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(heading)
@@ -305,6 +309,12 @@ func _set_arrival_target(value: float) -> void:
 	if targets.is_empty(): draft[_key()].erase("arrival_targets")
 	else: draft[_key()]["arrival_targets"] = targets
 	status.text = "Arrival target updated in draft. Apply to use on future departures."
+	_refresh_arrival_hint()
+
+func _refresh_arrival_hint() -> void:
+	if not headway_controls.visible or timetable_leg.item_count == 0: return
+	var result: Dictionary = game.arrival_target_guidance(_key(), draft, str(timetable_leg.get_selected_metadata()))
+	arrival_hint.text = str(result.text)
 
 func _select_timetable_leg(_index: int) -> void:
 	# The text field's focus-exit captures the previous leg before this click.
@@ -315,6 +325,7 @@ func _show_timetable_times() -> void:
 	var times: Array = draft[_key()].get("timetable", []) if timetable_leg.selected == 0 else draft[_key()].get("stop_timetables", {}).get(timetable_leg.get_selected_metadata(), [])
 	timetable_field.text = Timetable.to_text(times)
 	arrival_minutes.set_value_no_signal(float(draft[_key()].get("arrival_targets", {}).get(timetable_leg.get_selected_metadata(), 0)))
+	_refresh_arrival_hint()
 
 func _refresh_timetable_legs() -> void:
 	if not Services.is_passenger_key(_key()): return
@@ -358,6 +369,7 @@ func _show_service() -> void:
 	var has_headway: bool = Services.is_passenger_key(_key()) and not linked
 	headway_controls.visible = has_headway
 	headway_label.visible = has_headway
+	arrival_hint.visible = has_headway
 	if has_headway:
 		headway_spin.set_value_no_signal(float(draft[_key()].get("headway", 0)))
 		timetable_field.text = Timetable.to_text(draft[_key()].get("timetable", []))
@@ -557,6 +569,7 @@ func _refresh_waypoints(selected: int = -1) -> void:
 	for index in range(points.size()):
 		waypoint_list.add_item("%d. Track %d,%d" % [index + 1, int(points[index][0]), int(points[index][1])])
 	if selected >= 0 and selected < points.size(): waypoint_list.select(selected)
+	_refresh_arrival_hint()
 
 func _add_waypoint() -> void:
 	var point: Array = [int(waypoint_x.value), int(waypoint_y.value)]

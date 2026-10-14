@@ -40,19 +40,79 @@ func describe(service: String, tick: int) -> String:
 	var due_minute := Timetable.START_MINUTE + int(floor(float(row.due) / Timetable.TICKS_PER_MINUTE))
 	return "Arrival target %s: %s (%d game min from %s); %s. Safety restrictions still apply." % [str(row.leg).replace(">", " → ").to_upper(), Timetable.clock_text(due_minute), row.minutes, "scheduled departure" if row.scheduled else "actual departure", "late by %.1f game min" % (float(tick - row.due) / Timetable.TICKS_PER_MINUTE) if tick > row.due + TOLERANCE_TICKS else "within the target window"]
 
-func report(service: String = "", members: Array = []) -> String:
-	var count := 0
-	var on_time := 0
-	var late_minutes := 0.0
-	var travel_minutes := 0.0
+func statistics(service: String = "", members: Array = [], leg: String = "") -> Dictionary:
+	var result := {"count": 0, "on_time": 0, "late_minutes": 0.0, "travel_minutes": 0.0, "scheduled": 0, "departure_delay": 0.0}
 	for row in completed:
 		if service != "" and row.service != service and not members.has(row.service): continue
-		count += 1
-		if int(row.arrive) <= int(row.due) + TOLERANCE_TICKS: on_time += 1
-		late_minutes += maxf(0.0, float(row.arrive - row.due) / Timetable.TICKS_PER_MINUTE)
-		travel_minutes += float(row.arrive - row.depart) / Timetable.TICKS_PER_MINUTE
-	if count == 0: return "Arrival punctuality: no completed targeted trips yet."
-	return "Arrival punctuality: %d / %d on time (%.1f%%); average positive lateness %.1f game min; average running time %.1f game min. On time includes early arrivals and up to 1 game min late. Latest %d measured trips; no fare/satisfaction penalties." % [on_time, count, 100.0 * on_time / count, late_minutes / count, travel_minutes / count, count]
+		if leg != "" and row.leg != leg: continue
+		result.count += 1
+		if int(row.arrive) <= int(row.due) + TOLERANCE_TICKS: result.on_time += 1
+		result.late_minutes += maxf(0.0, float(row.arrive - row.due) / Timetable.TICKS_PER_MINUTE)
+		result.travel_minutes += float(row.arrive - row.depart) / Timetable.TICKS_PER_MINUTE
+		if row.scheduled:
+			result.scheduled += 1
+			result.departure_delay += float(row.depart - row.planned_depart) / Timetable.TICKS_PER_MINUTE
+	if result.count > 0:
+		result.late_minutes /= result.count
+		result.travel_minutes /= result.count
+	if result.scheduled > 0: result.departure_delay /= result.scheduled
+	return result
+
+func report(service: String = "", members: Array = []) -> String:
+	var stats := statistics(service, members)
+	if stats.count == 0: return "Arrival punctuality: no completed targeted trips yet."
+	return "Arrival punctuality: %d / %d on time (%.1f%%); average positive lateness %.1f game min; average running time %.1f game min. On time includes early arrivals and up to 1 game min late. Latest %d measured trips; no fare/satisfaction penalties." % [stats.on_time, stats.count, 100.0 * stats.on_time / stats.count, stats.late_minutes, stats.travel_minutes, stats.count]
+
+func direction_report(service: String = "", members: Array = [], legs: Array = []) -> String:
+	var selected: Array = legs.duplicate()
+	if selected.is_empty():
+		for row in completed:
+			if service != "" and row.service != service and not members.has(row.service): continue
+			if not selected.has(row.leg): selected.append(row.leg)
+		selected.sort()
+	var lines: PackedStringArray = []
+	for leg in selected:
+		var stats := statistics(service, members, str(leg))
+		if stats.count == 0:
+			lines.append("%s: no measured arrivals yet." % str(leg).replace(">", " → ").to_upper())
+			continue
+		var departure := "no scheduled departures measured" if stats.scheduled == 0 else "scheduled departure delay %.1f min (%d trips)" % [stats.departure_delay, stats.scheduled]
+		lines.append("%s: %d / %d on time; running %.1f min; positive arrival lateness %.1f min; %s." % [str(leg).replace(">", " → ").to_upper(), stats.on_time, stats.count, stats.travel_minutes, stats.late_minutes, departure])
+	return "\n".join(lines)
+
+## Approximate free-running travel time. Origin dwell/dispatch wait are excluded.
+static func guidance(length: float, speeds: Array, target: int) -> Dictionary:
+	if length <= 0 or not is_finite(length) or speeds.is_empty(): return {"known": false, "text": "Journey guidance unavailable: complete the route and assign a train."}
+	var times: Array = []
+	for speed in speeds:
+		if float(speed) <= 0 or not is_finite(float(speed)): return {"known": false, "text": "Journey guidance unavailable: assigned train speed is unknown."}
+		times.append(length / float(speed))
+	return travel_guidance(times, target)
+
+static func travel_guidance(times: Array, target: int) -> Dictionary:
+	if times.is_empty(): return {"known": false, "text": "Journey guidance unavailable: assign a train."}
+	var fastest := INF
+	var slowest := 0.0
+	for minutes in times:
+		if float(minutes) <= 0 or not is_finite(float(minutes)): return {"known": false, "text": "Journey guidance unavailable: travel time is unknown."}
+		fastest = minf(fastest, float(minutes))
+		slowest = maxf(slowest, float(minutes))
+	var status := "off"
+	var advice := "Target is off."
+	if target > 0:
+		if target + 1 < fastest - 1.0 / 60.0:
+			status = "short_for_all"
+			advice = "Target plus the 1-minute grace is shorter than every assigned train's approximate travel time. Increase it."
+		elif target + 1 < slowest - 1.0 / 60.0:
+			status = "short_for_slowest"
+			advice = "Target plus the 1-minute grace is too short for the slower assigned train. Review the linked fleet or increase it."
+		elif target < slowest - 1.0 / 60.0:
+			status = "uses_grace"
+			advice = "A slower assigned train needs some of the grace window even without traffic. Add margin."
+		else:
+			status = "unproven"
+			advice = "Target covers free-running travel; add margin for traffic and late departures. This does not guarantee on-time arrival."
+	return {"known": true, "fastest": fastest, "slowest": slowest, "status": status, "text": "Approximate free-running time: %.1f–%.1f game min across assigned trains. %s" % [fastest, slowest, advice]}
 
 func save_state() -> Dictionary: return {"active": active.duplicate(true), "completed": completed.duplicate(true)}
 func restore_state(state: Dictionary) -> void:

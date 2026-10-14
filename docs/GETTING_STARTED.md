@@ -112,3 +112,9 @@ Accounts show completed punctuality. A daily timetable uses scheduled departure
 plus the budget; an unscheduled direction uses actual departure. Targets report
 performance without changing fares or safety rules. See
 [arrival targets](ARRIVAL_TARGETS.md).
+
+Routes now shows approximate free-running travel time below the timing controls.
+Check this against your target, especially for linked trains with different speeds.
+Add margin for traffic and departure delays. Routes and Accounts also break down
+punctuality by direction, separating running time from scheduled departure delay.
+No measured arrivals means there is no result yet.

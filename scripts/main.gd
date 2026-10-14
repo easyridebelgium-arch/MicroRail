@@ -4552,6 +4552,37 @@ func headway_group_members(group: String) -> Array:
 		if key != group and services[key].get("link", "") == group: members.append(key)
 	return members
 
+## Read-only guidance from draft graph geometry, never movement authority.
+func arrival_target_guidance(group: String, configuration: Dictionary, leg: String) -> Dictionary:
+	if not configuration.has(group) or not ServiceRoutes.is_passenger_key(group): return {"known": false, "text": "Select a passenger route."}
+	var config: Dictionary = configuration[group]
+	var legs := Timetable.departure_legs(config.stops, config.get("mode", "shuttle"))
+	if not legs.has(leg): return {"known": false, "text": "Select a valid departure direction."}
+	var resolved := ServiceRoutes.propagate(configuration)
+	var times: Array = []
+	var has_auto := false
+	for key in resolved:
+		if key != group and resolved[key].get("link", "") != group: continue
+		var train: Dictionary = Fleet.assigned(fleet, key)
+		if train.is_empty(): return {"known": false, "text": "Journey guidance unavailable: assign a train to each linked service."}
+		var route: Dictionary = resolved[key]
+		for number in route.get("platforms", {}).values():
+			if int(number) == 0: return {"known": false, "text": "Journey guidance unavailable until Auto platforms resolve on Apply; select fixed platforms for a draft estimate."}
+		var built := ServiceRoutes.build(tracks, route.stops, float(TILE_SIZE), route.get("waypoints", {}), route.get("mode", "shuttle"), route.get("platforms", {}))
+		if built.cells.is_empty(): return {"known": false, "text": "Journey guidance unavailable: complete the draft track and waypoint route for " + str(route.name) + "."}
+		var from_index: int = route.stops.find(leg.get_slice(">", 0))
+		var to_index: int = route.stops.find(leg.get_slice(">", 1))
+		var length: float = absf(float(built.distances[to_index]) - float(built.distances[from_index]))
+		if route.get("mode", "shuttle") == "loop" and to_index == 0: length = float(built.distances.back()) - float(built.distances[from_index])
+		var speed := Fleet.speed(train)
+		if speed <= 0: return {"known": false, "text": "Journey guidance unavailable: assigned train speed is unknown."}
+		times.append(length / speed)
+		has_auto = has_auto or not route.get("auto", {}).is_empty()
+	var result := ArrivalTargets.travel_guidance(times, int(config.get("arrival_targets", {}).get(leg, 0)))
+	result["text"] = str(result.text) + " Origin dwell is excluded; signals, holds and departure delays are not predicted."
+	if has_auto: result["text"] += " Auto platform choice may change the path on Apply."
+	return result
+
 ## Plain-text headway report for a source service.
 func headway_report(group: String) -> String:
 	var target := int(services.get(group, {}).get("headway", 0))
@@ -4579,6 +4610,8 @@ func headway_report(group: String) -> String:
 			if not gap_reason.is_empty(): lines.append("Timetable: closest departures are %d min apart. %s" % [gap, gap_reason])
 	if not timetable_text.is_empty(): lines.append(timetable_text)
 	lines.append(arrival_targets.report(group, members))
+	var directions := arrival_targets.direction_report(group, members, Timetable.departure_legs(services[group].stops, services[group].get("mode", "shuttle")))
+	if not directions.is_empty(): lines.append("Per direction (game minutes):\n" + directions)
 	return "\n".join(lines)
 
 ## Cell of the stop a service's train is heading for next (-1,-1 if unknown).

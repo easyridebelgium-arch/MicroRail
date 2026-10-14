@@ -120,6 +120,8 @@ func refresh() -> void:
 	accounts_text.text += "\n\n" + game.journey_ledger.summary()
 	accounts_text.text += "\n\n" + game.passenger_occupancy.summary()
 	accounts_text.text += "\n\n" + game.arrival_targets.report()
+	var directions: String = game.arrival_targets.direction_report()
+	if not directions.is_empty(): accounts_text.text += "\nPer direction (game minutes):\n" + directions
 
 func open_accounts() -> void:
 	game._cancel_right_gesture()

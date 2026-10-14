@@ -15,6 +15,28 @@ Route copying copies targets independently. Removing a direction removes its
 stale target from the draft with a warning. Editing timing instructions leaves
 train positions and route geometry unchanged.
 
+## Check the journey guidance
+
+The selected direction now shows an approximate free-running travel-time range
+for the source train and trains linked to it in the draft. It builds each assigned
+train's own draft path, including a linked train's separate first platform,
+from the track graph, platforms and waypoints, and uses its speed
+upgrades and attached rolling stock speed limit. Return directions use the same
+Shuttle leg in reverse; a Loop closing direction uses only its closing segment.
+
+The hint updates when you edit targets, platforms, stops or waypoints. It flags
+target-plus-grace windows shorter than even the fastest train's travel time,
+budgets too short for slower linked trains, and budgets that rely on grace.
+A fixed tick of rounding tolerance avoids warnings at near-equal boundaries.
+Targets remain editable and Apply is not blocked by this advisory hint.
+
+These are travel estimates, not traffic forecasts. Origin dwell is excluded,
+while signal waits, dispatcher holds and late departures are not predicted.
+Unresolved Auto platforms or an incomplete draft route show guidance unavailable;
+resolved Auto choices may change on Apply. Platform fit and safe topology remain
+subject to the existing Apply checks. A budget covering free-running travel still
+needs operating margin and does not promise on-time arrival.
+
 ## How the planned arrival is chosen
 
 A measurement starts only when the train physically leaves its departure stop.
@@ -43,8 +65,10 @@ hold a train in a block, bypass reservations, throw locked switches or move it.
 
 - Click a passenger train: the operating inspector shows its active direction,
   target day/time, baseline and current lateness.
-- **Routes** reports completed punctuality for the source and its linked trains.
-- **Accounts** reports company punctuality and average measured running time.
+- **Routes** reports completed punctuality for the source and its linked trains,
+  split by the current route directions.
+- **Accounts** reports company punctuality and average measured running time,
+  split by every direction observed in the retained history.
 
 **On time** means arrival no more than **one game minute late**, including early
 arrivals. Calculations use exact fixed ticks, rather than rounded display minutes.
@@ -55,10 +79,15 @@ trips; a service report filters that same bounded window. Services without a
 target contribute no fabricated result. All clocks follow simulation speed and
 pause, with identical outcomes at 30/60/120 FPS.
 
-This first increment applies **no fare, satisfaction, demand or contract penalty**.
-Player-chosen targets are not yet checked for feasibility. Direction-level reports,
-minimum achievable journey-time guidance, timed connections and scoring require
-further rules. End-to-end passenger journeys remain a separate measure, because
+Per-direction results separate mean running time, mean positive arrival lateness
+and scheduled departure delay. Departure delay averages only timetabled trips and
+shows their count; unscheduled trips explicitly have no scheduled-departure data.
+Directions without measured arrivals say so. Reports derive from the original
+snapshots, so editing a target does not rewrite past results.
+
+There is **no fare, satisfaction, demand or contract penalty**. Free-running
+feasibility guidance and per-direction diagnostics are implemented; congestion
+forecasts, timed connections and scoring need further rules. End-to-end passenger journeys remain a separate measure, because
 one passenger may change services or stay aboard for several legs.
 
 ## Saves and validation
@@ -79,3 +108,9 @@ journey clocks, finances and timetable progress remain intact.
 precise grace boundaries, bounded results, real departure/arrival hooks, mid-trip
 edits and persistence, blocked tracks/repair, cancellation, atomic invalid loads,
 old saves, midnight, UI scale 100–200%, FPS equality and 2×/5×/10× simulation.
+
+`tests/test_arrival_guidance.gd`: 34 checks for advisory thresholds, linked models and distinct first-platform paths,
+speed upgrades/coach limits, Shuttle return/Loop closure distances, waypoint
+refresh, incomplete/Auto drafts, read-only behaviour, group/direction weighting,
+JSON history and 100–200% UI layout. This reporting increment requires no new
+save version; existing version-34 snapshots retain all inputs.

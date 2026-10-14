@@ -48,12 +48,14 @@ starting a new station wait as before. No passengers teleport or disappear.
 
 ## Economy and persistence
 
-Both classes currently pay the existing **£5**, only at their final destination.
-There is no Express bonus or new class-specific satisfaction penalty yet. Existing
+Local pays **£5** and Express pays **£10**, only at the final destination; see
+[recorded revenue](PASSENGER_REVENUE.md). There is no new class-specific
+satisfaction penalty or punctuality multiplier. Existing
 waiting satisfaction includes all waiting groups, so unmet Express demand can
 lower the existing station waiting rating just like other passengers' long waits.
-The next increment will add differentiated fares with recorded income so the
-financial UI stops relying on `delivered × flat fare`.
+Accounts records actual class receipts; historical flat-fare deliveries stay
+separate in the legacy income bucket. Player fare controls and price response
+remain future refinements.
 
 Save version **35** stores class metadata in station groups and journey records,
 plus the two generation counters. Class totals remain views of the original
@@ -71,6 +73,6 @@ queue resets create Local groups and cannot invent Express journey provenance.
 
 `tests/test_passenger_classes.gd`: 41 checks covering generation mix/no extra RNG,
 capacity, fairness-compatible groups, Local transfers, direct/Loop eligibility,
-partial Express boarding, physical recovery, income unchanged, atomic invalid
+partial Express boarding, physical recovery, class fare paid once, atomic invalid
 loads, migration, actual game generation, UI explanations and FPS determinism.
 All network, journey, occupancy, timetable and save suites remain requirements.

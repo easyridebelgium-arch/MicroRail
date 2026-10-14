@@ -30,12 +30,14 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 35, including amenities, loan state, route appearance,
+schema is version 36, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
 history, gradual demand factor/carry, and original journey clocks with recent
 completed timing, plus active arrival targets and bounded punctuality history.
-Version 34 migration preserves all existing passengers as Local and adds saved
+Version 35 migration records old flat-fare deliveries as legacy income at £5
+each; there is no cash change or retroactive Express premium. New class receipts
+and paid counts persist independently of recent journey history. Version 34 migration preserves all existing passengers as Local and adds saved
 Express generation counters/class metadata, without moving trains or changing
 journey clocks, revenue or arrival targets. Version 33 migration starts unknown arrival history empty without changing train
 positions, queues or departure progress. Version 32 migration keeps queue ages and marks unknown

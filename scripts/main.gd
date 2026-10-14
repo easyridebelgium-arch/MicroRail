@@ -10,7 +10,9 @@ const TRAIN_CAPACITY: int = 20
 const PASSENGER_INTERVAL: float = 5.0
 const PASSENGERS_PER_BATCH: int = 3
 const MAX_STATION_QUEUE: int = 100
-const TICKET_PRICE: int = 5
+const PassengerRevenue = preload("res://scripts/core/passenger_revenue.gd")
+const TICKET_PRICE: int = PassengerRevenue.LOCAL_FARE
+var passenger_revenue = PassengerRevenue.new()
 
 const STARTING_BALANCE: int = 1000
 const TRACK_BUILD_COST: int = 10
@@ -1365,10 +1367,10 @@ func _unload_passengers(station: String) -> int:
 	return _finish_passengers("passenger", station, passenger_destinations)
 
 func _finish_passengers(key: String, station: String, manifest: Dictionary) -> int:
-	journey_ledger.finish(key, station, manifest, sim_clock.tick)
+	var finished: Array = journey_ledger.finish(key, station, manifest, sim_clock.tick)
 	var arrived := PassengerDemand.alight(manifest, station)
 	passengers_delivered += arrived
-	money += arrived * TICKET_PRICE
+	money += passenger_revenue.record(PassengerClasses.counts(finished))
 	return arrived
 
 func _charge_operating_cost(delta: float) -> void:
@@ -1463,6 +1465,7 @@ func _save_game(slot: int = 0) -> bool:
 		"satisfaction": satisfaction.save_state(),
 		"demand_response": demand_response.save_state(),
 		"journeys": _saved_journeys(),
+		"passenger_revenue": passenger_revenue.save_state(),
 		"arrivals": arrival_targets.save_state(),
 		"presentation": _saved_presentation(),
 		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
@@ -1775,7 +1778,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 	if saved_stage < 0.0 or saved_stage > ScenarioGoals.OBJECTIVES.size():
 		return false
-	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick))
+	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick)) and PassengerRevenue.valid_save(data.get("passenger_revenue"), state.passengers_delivered)
 	
 func _load_game(save_path: String = "") -> bool:
 	if save_path.is_empty(): save_path = SaveSlots.path(active_save_slot)
@@ -1901,6 +1904,7 @@ func _load_game(save_path: String = "") -> bool:
 	satisfaction.restore_state(data.satisfaction)
 	demand_response.restore_state(data.demand_response)
 	journey_ledger.restore_state(data.journeys)
+	passenger_revenue.restore_state(data.passenger_revenue)
 	arrival_targets.restore_state(data.arrivals)
 	presentation = Presentation.normalize(data.presentation)
 	route_distance = loaded_distance

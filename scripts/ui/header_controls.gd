@@ -100,7 +100,7 @@ func apply_layout(compact: bool) -> void:
 	refresh()
 
 func refresh() -> void:
-	var fares: int = game.passengers_delivered * game.TICKET_PRICE
+	var fares: int = game.passenger_revenue.total()
 	var running: int = game.total_operating_cost + game.freight_operating_cost
 	var operating: int = fares + game.freight_income - running
 	game.clock_label.text = game.game_clock_text()
@@ -113,6 +113,8 @@ func refresh() -> void:
 	for station in game.Amenities.STATIONS:
 		for id in game.amenities.owned[station]: amenity_value += int(game.Amenities.DEFS[id].price)
 	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: A %d / B %d / C %d\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes financing interest, capital purchases, construction refunds, starting cash and objective rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), game.waiting_at_a, game.waiting_at_b, game.waiting_at_c, game.passengers_delivered, game.logs_delivered]
+
+	accounts_text.text += "\n\n" + game.passenger_revenue.summary()
 
 	accounts_text.text += "\n\nBank principal outstanding: £%d\nAccrued interest: £%d (early payoff £%d)\nLoan payments overdue: £%d\nLoan interest paid: £%d\nLoan principal repaid: £%d" % [game.loans.state.principal, game.loans.state.interest, game.loans.payoff(), game.loans.overdue(), game.loans.state.interest_paid, game.loans.state.principal_paid]
 

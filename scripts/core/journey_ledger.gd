@@ -34,9 +34,10 @@ func release(key: String, destinations: Array) -> Array:
 		else: kept.append(row)
 	aboard[key] = kept
 	return result
-func finish(key: String, station: String, manifest: Dictionary, tick: int) -> void:
+func finish(key: String, station: String, manifest: Dictionary, tick: int) -> Array:
 	ensure(key, manifest, tick)
-	for row in release(key, [station]):
+	var finished := release(key, [station])
+	for row in finished:
 		if not row.known:
 			unknown_completed += int(row.count)
 			continue
@@ -45,6 +46,7 @@ func finish(key: String, station: String, manifest: Dictionary, tick: int) -> vo
 		sample["end"] = tick
 		completed.append(sample)
 		if completed.size() > LIMIT: completed.pop_front()
+	return finished
 func summary() -> String:
 	var count := 0
 	var elapsed := 0.0

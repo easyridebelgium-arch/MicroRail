@@ -1,7 +1,7 @@
 # MicroRail: your first 15 minutes
 
 **Goal:** connect the stations, run passenger trains and earn enough to grow. Stations A, B and C are
-already on the map in a row, and each ticket pays £5. You start with £1,000 and track costs £10 per tile.
+already on the map in a row, with Local fares of £5 and Express fares of £10. You start with £1,000 and track costs £10 per tile.
 
 ## Minute 0–2: start and look around
 - On the title screen choose a slot and **New game in selected slot**. The map starts paused.
@@ -126,5 +126,9 @@ appears gradually between A and C. Set a service to **A–C** to carry both clas
 **A–B–C** carries Local passengers while Express keeps waiting. A waypoint or
 passing loop is allowed; a station call at B prevents Express eligibility.
 Routes shows eligibility for the selected direction, and clicking a train shows
-its onboard class counts. Both classes currently pay £5 at their final destination.
+its onboard class counts. Local pays £5 and Express pays £10 at the final destination.
 See [passenger classes](PASSENGER_CLASSES.md).
+
+Open **Accounts** for actual passenger receipts split into Local, Express and
+legacy flat-fare income. The operating profit shown above the map now uses these
+recorded receipts. See [passenger revenue](PASSENGER_REVENUE.md).

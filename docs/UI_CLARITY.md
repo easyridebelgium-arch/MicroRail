@@ -138,3 +138,8 @@ Validation: `tests/test_stage_ui.gd` covers saved identities and schema migratio
 linked routes, signal cues, persistent cycle acknowledgement, incident slowdown,
 metadata fallbacks, layout scaling, failed title loads and successful Continue.
 The full gameplay suites continue to check movement, reservations and save safety.
+
+Passenger income now uses cumulative recorded receipts: Local £5 and Express £10
+per final delivery. Accounts separately shows class receipts and legacy flat-fare
+income. Financing and capital expenses keep their existing treatment. See
+[passenger revenue](PASSENGER_REVENUE.md).

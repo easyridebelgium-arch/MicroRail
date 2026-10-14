@@ -116,7 +116,7 @@ func run() -> void:
 	check(game.train_inspector.summary.text.contains("Local 0 / Express 1"), "train inspector shows actual onboard class")
 	game.train_inspector.hide()
 	game.route_editor.open_editor()
-	check(game.route_editor.arrival_hint.text.contains("Local and Express"), "Routes describes direct leg eligibility")
+	check(game.route_editor.arrival_hint.text.contains("Express (£10)"), "Routes describes direct leg eligibility")
 	game.route_editor.hide()
 	check(game._save_game(4), "class metadata saves mid-journey")
 	var position: Vector2 = game.train_position
@@ -151,7 +151,7 @@ func run() -> void:
 	for i in range(1500):
 		advance(game)
 		if game.passenger_stop_index == 1: break
-	check(game.passengers_delivered == 1 and game.money == cash + 5 and game.journey_ledger.completed[0].get("class") == "express", "completed Express journey keeps existing fare and records class")
+	check(game.passengers_delivered == 1 and game.money == cash + 10 and game.journey_ledger.completed[0].get("class") == "express", "completed Express journey pays class fare once and records class")
 	game.header_controls.open_accounts()
 	check(game.header_controls.accounts_text.text.contains("Passenger classes"), "Accounts exposes class rule and counts")
 	game.header_controls.accounts_dialog.hide()

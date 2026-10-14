@@ -101,13 +101,22 @@ passengers retain stopping-service and transfer eligibility. Saved original
 journey groups preserve preference through partial boarding and physical recovery;
 Routes/station Details/train inspectors/Accounts explain the rule. Generation
 adds no RNG draws or demand. Save version 35 keeps counters and metadata; older
-passengers remain Local. Both classes still pay £5.
+passengers remain Local. This eligibility batch originally used flat £5 fares; version 36 adds the Express premium.
 See [passenger classes](PASSENGER_CLASSES.md).
 
-**Next implementation:** Phase 2A differentiated passenger fares with recorded
-revenue and matching financial reports, before punctuality/contract scoring. Completed elapsed time is now measured; journey scoring
+**Latest fare batch:** Local pays £5 and Express pays £10 once at the final
+destination. Cumulative paid-delivery receipts are independent of bounded journey
+history. Header profit and Accounts use actual income with class/legacy breakdowns.
+Save version 36 persists receipts and reconciles them with delivered counts; old
+flat-fare deliveries retain their £5 historical income without changing cash or
+awarding retrospective premiums. Recovery/transfers remain unpaid until arrival.
+See [recorded passenger revenue](PASSENGER_REVENUE.md).
+
+**Next implementation:** Phase 2B versioned cargo/industry definitions and the
+first logs → sawmill → timber delivery slice. Player fare controls, richer passenger
+choices, timed connections and punctuality scoring remain planned refinements. Completed elapsed time is now measured; journey scoring
 still needs explicit benchmarks rather than treating duration alone as lateness. Basic
-waiting-based demand balancing is complete; population, differentiated fares and richer
+waiting-based demand balancing is complete; population, player fare controls and richer
 demand factors remain later refinements. Waiting-area amenities and the current UI work are complete.
 Historical dashboards, expanded camera modes and optional gameplay branding remain
 later enhancements. This closes the UI workstream, not every Phase 1B/1C extension.
@@ -126,8 +135,8 @@ Services can already be assigned a fixed platform per stop in Routes (trains dri
 see [platform lengths](PLATFORMS.md). The unified why-waiting inspector (Phase 1C) is now implemented; see
 [train operating inspection](TRAIN_INSPECTOR.md). Completed Phase 1C
 tools remain available while Phase 1B gaps are closed; Phase 1 overall is not yet
-complete. The latest cloud validation covers all 89 passing headless suites in Godot 4.6.3
-(full passenger-class regression, including 41 passenger-class checks, 34 guidance checks, 54 arrival-target checks, 22 capacity-feedback checks and 29 journey-timing checks), including 50 loan checks and
+complete. The latest cloud validation covers all 90 passing headless suites in Godot 4.6.3
+(full fare/revenue regression, including 25 revenue checks, 41 passenger-class checks, 34 guidance checks, 54 arrival-target checks, 22 capacity-feedback checks and 29 journey-timing checks), including 50 loan checks and
 26 panel-preference/layout checks,
 including the uploaded PNG ribbon, action bindings, selected/disabled states,
 keyboard focus, live counters and wrapping at 100–200% UI scale, plus directional
@@ -164,7 +173,7 @@ advance or reorder the gameplay milestones above.
 
 **Amenities checkpoint:** stations can buy a Shelter, Waiting room and Kiosk. Each raises that
 station's waiting limit and passenger arrivals by a small, saved percentage (save version 26); see
-[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction, gradual demand response, complete journey timing and occupancy/capacity-denial measurement are implemented; directional arrival targets and basic punctuality are implemented; advisory feasibility guidance and per-direction reports are implemented; Express/Local classes and direct-leg eligibility are implemented; differentiated fares and recorded revenue are next.
+[station amenities](STATION_AMENITIES.md). Basic transfers, waiting-age fairness, waiting-experience satisfaction, gradual demand response, complete journey timing and occupancy/capacity-denial measurement are implemented; directional arrival targets and basic punctuality are implemented; advisory feasibility guidance and per-direction reports are implemented; Express/Local classes and direct-leg eligibility are implemented; differentiated fares and recorded revenue are implemented; the next core batch begins Phase 2B.
 
 **Rename checkpoint:** the project is now **MicroRail** (formerly "Trainz", a name already in use by another
 game). Project name, window title, docs and save filenames (`microrail_save*`) are renamed. On first launch
@@ -400,7 +409,7 @@ must be labelled estimates.
 | Passenger destinations and transfers | Reward networks that connect useful places, including journeys requiring a change of train. | Direct destination journeys implemented: per-destination station queues, forward-itinerary boarding, through riders, destination-only delivery/fare and saved manifests. Basic transfers and deterministic fewest-change planning are implemented on the three-station map, with direct-service preference, physical interchange queues, final-only fares and saved off-route manifests. Oldest-eligible-first station boarding is also implemented, with saved arrival groups and oldest-wait diagnostics. Waiting-experience satisfaction is implemented with explicit comfort effects and saved history. End-to-end journey clocks and recent completed origin/destination timing are implemented, including transfers/recovery and honest legacy unknowns. Directional arrival targets and basic punctuality are implemented. Express/Local direct-leg eligibility is implemented on the three-station map. Timed connections, richer choices and punctuality/crowding scoring remain. See [passenger destinations](PASSENGER_DESTINATIONS.md). |
 | Platform preferences | Prefer a platform by service, direction, train length, electrification, cargo access or transfer convenience, with safe fallback. | Basic platform infrastructure and assignment belong to Phase 1B. Phase 2A adds service/direction preferences, passenger transfer convenience and safe compatible fallback. Electrification and cargo-access preferences wait for those systems. Platform selection never overrides reservations. |
 | Holding rules and timed transfers | Wait for a connection or a target load, avoid early departure and cap waiting time. Protect transfers within configurable windows and warn about missed connections. | Requires timetables, passenger destinations and platform metadata. Avoid indefinite holds and explain knock-on delays. |
-| Express versus local passenger demand | High-paying express passengers prefer direct travel between distant hubs; commuters accept frequent stops along a local line. | Define clear rules for directness, stops, journey time and fares. Depends on passenger destinations and service performance data. |
+| Express versus local passenger demand | High-paying express passengers prefer direct travel between distant hubs; commuters accept frequent stops along a local line. | Implemented initial slice: one in four new A↔C passengers is Express, boards only when the next stop is the final destination, and pays £10 at arrival; Local accepts stops/transfers and pays £5. Version 36 records actual cumulative class receipts. Broader hubs, journey choices and punctuality modifiers remain refinements. |
 | Catchment visualisation and feeders | Show population, workplaces, inputs/outputs, walking distance and competing stations; abstract park-and-ride, bus and tram feeder capacity. | Implement catchment/destination rules first. Feeders are demand abstractions, not a second vehicle-management game. |
 | Demand and bottleneck adviser | Forecast queues, platform demand and shortages; explain persistent congestion with clickable evidence and recommendations. | Stopped-traffic measurements and a bounded recent-wait overlay are implemented. Forecasts still require utilisation and demand history. Start with transparent heuristics; present forecasts as estimates, not guaranteed outcomes. |
 | Passenger classes and preferences | Add commuters seeking frequency, business travellers prioritising speed/punctuality, tourists valuing comfort/scenery and budget travellers sensitive to fares. | Extend express/local demand rather than adding a competing demand system. Add classes gradually with understandable journey-choice rules. |
@@ -566,7 +575,7 @@ instead of adding a separate campaign simulation.
 5. **Passenger demand (2A, destinations, amenities and basic transfers implemented):**
    waiting-age fairness and waiting-experience satisfaction are implemented;
    waiting-based demand response and complete journey timing are implemented;
-   occupancy/capacity-denial measurement is implemented; directional arrival targets and basic punctuality are implemented; advisory target-feasibility guidance and per-direction reports are implemented; Express/Local eligibility is implemented; next add differentiated fares, recorded revenue, richer choices and scoring. Departure timetables are implemented;
+   occupancy/capacity-denial measurement is implemented; directional arrival targets and basic punctuality are implemented; advisory target-feasibility guidance and per-direction reports are implemented; Express/Local eligibility is implemented; differentiated fares and recorded revenue are implemented; player fare controls, richer choices and scoring remain refinements before full reputation/contract systems. Departure timetables are implemented;
    Arrival targets now measure actual trips; punitive contracts still follow demand/contract rules.
 6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
    by factory/finished goods; verify stock, recipes, storage and payments first.

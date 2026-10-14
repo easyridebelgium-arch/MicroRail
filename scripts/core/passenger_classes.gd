@@ -2,6 +2,8 @@ extends RefCounted
 ## Passenger intent is independent of locomotive model and reservations.
 const LOCAL := "local"
 const EXPRESS := "express"
+const LOCAL_FARE := 5
+const EXPRESS_FARE := 10
 static func distant(origin: String, destination: String) -> bool:
 	return (origin == "a" and destination == "c") or (origin == "c" and destination == "a")
 static func valid(row: Dictionary) -> bool:
@@ -23,7 +25,7 @@ static func counts(rows: Array) -> Dictionary:
 	return result
 static func describe(rows: Array) -> String:
 	var totals := counts(rows)
-	return "Passenger classes: Local %d / Express %d. Express needs a direct A ↔ C leg; Local accepts stops and transfers." % [totals[LOCAL], totals[EXPRESS]]
+	return "Passenger classes: Local %d / Express %d. Local pays £%d; Express pays £%d and needs a direct A ↔ C leg. Local accepts stops and transfers." % [totals[LOCAL], totals[EXPRESS], LOCAL_FARE, EXPRESS_FARE]
 static func valid_progress(value: Variant) -> bool:
 	if not value is Dictionary or value.size() != 2: return false
 	for station in ["a", "c"]:

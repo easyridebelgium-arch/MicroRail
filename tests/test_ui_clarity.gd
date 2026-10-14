@@ -26,12 +26,13 @@ func _run() -> void:
 	var position_before: Vector2 = game.train_position
 	var authority_before: Dictionary = game.reservations.owners.duplicate()
 	game.passengers_delivered = 10
+	game.passenger_revenue.record({"local": 8, "express": 2})
 	game.freight_income = 20
 	game.total_operating_cost = 5
 	game.freight_operating_cost = 3
 	game.total_construction_cost = 1234
 	game._update_instructions()
-	check(header.profit.text == "Operating profit £62", "operating profit uses all service revenue/running costs and excludes construction")
+	check(header.profit.text == "Operating profit £72", "operating profit uses all service revenue/running costs and excludes construction")
 	check(header.deliveries.text.contains("10 passengers"), "deliveries are live")
 	check(not game.instructions.text.contains("Fares:") and not game.instructions.text.contains("Waiting: A"), "detailed accounts no longer consume map space")
 	game.paused = false

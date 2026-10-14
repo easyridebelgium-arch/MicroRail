@@ -19,7 +19,7 @@ New arrivals use the owned simulation RNG; its state is saved and restored.
   order. Transfer riders board only when a forward stop makes progress along a
   journey with the fewest changes. Unserved demand remains queued.
 - Fares and the delivered counter increase only when the destination is reached.
-  Flat £5 fares remain; distance pricing, classes and broader satisfaction are later work. Waiting-experience scores are now
+  Local pays £5 and Express pays £10 at final arrival; see [recorded revenue](PASSENGER_REVENUE.md). Distance pricing and broader satisfaction remain later work. Waiting-experience scores are now
   visible; see [satisfaction](PASSENGER_SATISFACTION.md).
 - Withdrawal stops taking new riders and completes accepted journeys. A Loop may
   need to continue past its first stop once more to deliver through passengers,
@@ -55,7 +55,7 @@ available seats or punctuality.
 
 On the current three-station map, A–B plus B–C enables A→C via B. Riders keep C as
 their final destination while aboard A–B. Physically arriving at B moves them into
-B's C-bound queue; they compete for seats on B–C in oldest-eligible-first order. No fare or delivered count is awarded at B. The £5 fare is paid
+B's C-bound queue; they compete for seats on B–C in oldest-eligible-first order. No fare or delivered count is awarded at B. The class fare is paid
 once at C. Transfer arrivals can overflow a full waiting area without losing riders;
 new random arrivals remain capped. There is no walking delay or timed-connection hold.
 

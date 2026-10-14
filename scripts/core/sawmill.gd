@@ -51,7 +51,7 @@ static func valid(value: Variant) -> bool:
 			if key not in ["installed", "definition_version"] and value[key] != 0: return false
 	return true
 
-static func valid_game(data: Dictionary) -> bool:
+static func valid_game(data: Dictionary, positions: Dictionary = {}) -> bool:
 	if not valid(data.get("sawmill")): return false
 	var stock: Dictionary = data.sawmill
 	var freight: Dictionary = data.freight
@@ -62,15 +62,16 @@ static func valid_game(data: Dictionary) -> bool:
 	if typeof(cargo) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(cargo)) or float(cargo) != floor(float(cargo)) or cargo < 0 or cargo > 1000000000: return false
 	if not stock.installed: return stage == 0
 	if stock.loaded != stock.sold + int(data.get("factory", {}).get("received", 0)) + (int(cargo) if int(stage) == 1 else 0): return false
+	var loading_cell: Vector2i = positions.get("sawmill", CELL)
 	var cells: Array = data.runtime.freight_cells
-	if count_points(cells) != 1 or count_points(data.services.freight.get("waypoints", {}).get("forest>terminal", [])) != 1: return false
+	if count_points(cells, loading_cell) != 1 or count_points(data.services.freight.get("waypoints", {}).get("forest>terminal", []), loading_cell) != 1: return false
 	var pad := false
 	for entry in data.tracks:
-		if entry[0] == CELL.x and entry[1] == CELL.y: pad = typeof(entry[2]) == TYPE_BOOL and entry[2] == false
+		if entry[0] == loading_cell.x and entry[1] == loading_cell.y: pad = typeof(entry[2]) == TYPE_BOOL and entry[2] == false
 	return pad
 
-static func count_points(points: Array) -> int:
+static func count_points(points: Array, loading_cell: Vector2i = CELL) -> int:
 	var count := 0
 	for point in points:
-		if point is Array and point.size() == 2 and point[0] == CELL.x and point[1] == CELL.y: count += 1
+		if point is Array and point.size() == 2 and point[0] == loading_cell.x and point[1] == loading_cell.y: count += 1
 	return count

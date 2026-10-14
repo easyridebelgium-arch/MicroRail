@@ -102,8 +102,8 @@ func restore_state(data: Dictionary, ids: Array = Demand.STATIONS) -> void:
 		for field in ["count", "start", "end"]: row[field] = int(row[field])
 static func integer(value: Variant, low: int, high: int) -> bool:
 	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and float(value) >= low and float(value) <= high
-static func valid_row(row: Variant, tick: int, finished: bool = false, ids: Array = Demand.STATIONS) -> bool:
-	if not row is Dictionary or not ids.has(row.get("destination")) or not Classes.valid(row): return false
+static func valid_row(row: Variant, tick: int, finished: bool = false, ids: Array = Demand.STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> bool:
+	if not row is Dictionary or not ids.has(row.get("destination")) or not Classes.valid(row, catalog): return false
 	if not integer(row.get("count"), 1, 1000000000) or not integer(row.get("start"), 0, tick): return false
 	if finished:
 		return ids.has(row.get("origin")) and row.origin != row.destination and integer(row.get("end"), int(row.start), tick)
@@ -121,7 +121,7 @@ static func manifests(data: Dictionary) -> Dictionary:
 			if not running is Dictionary or not running.get("passenger_destinations") is Dictionary: return {}
 			result[key] = running.passenger_destinations
 	return result
-static func valid_save(value: Variant, data: Dictionary, tick: int, ids: Array = Demand.STATIONS) -> bool:
+static func valid_save(value: Variant, data: Dictionary, tick: int, ids: Array = Demand.STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> bool:
 	if not Demand.valid_ids(ids): return false
 	if not value is Dictionary or not value.get("aboard") is Dictionary or not value.get("completed") is Array: return false
 	if not integer(value.get("unknown_completed"), 0, 1000000000) or value.completed.size() > LIMIT: return false
@@ -132,13 +132,13 @@ static func valid_save(value: Variant, data: Dictionary, tick: int, ids: Array =
 		var rows: Variant = value.aboard.get(key)
 		if not rows is Array or rows.size() > Demand.total(loads[key]): return false
 		for row in rows:
-			if not valid_row(row, tick, false, ids): return false
+			if not valid_row(row, tick, false, ids, catalog): return false
 			if row.get("class", Classes.LOCAL) == Classes.EXPRESS and not Classes.service_can_carry(data.services[key], row.origin, row.destination): return false
 		if Demand.normalize(counts(rows)) != Demand.normalize(loads[key]): return false
 	var delivered := int(value.unknown_completed)
 	var previous := 0
 	for row in value.completed:
-		if not valid_row(row, tick, true, ids) or int(row.end) < previous: return false
+		if not valid_row(row, tick, true, ids, catalog) or int(row.end) < previous: return false
 		previous = int(row.end)
 		delivered += int(row.count)
 	return integer(data.get("state", {}).get("passengers_delivered"), delivered, 1000000000)

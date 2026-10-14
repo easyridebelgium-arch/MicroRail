@@ -2,7 +2,8 @@ extends RefCounted
 ## Destination counts are authoritative. Aggregate counters remain views for UI
 ## and legacy fixtures. Final destinations persist across transfers.
 const Classes = preload("res://scripts/core/passenger_classes.gd")
-var class_progress: Dictionary = {"a": 0, "c": 0}
+var class_progress: Dictionary = {}
+var station_catalog: Dictionary = Classes.DEFAULT_CATALOG
 const STATIONS: Array[String] = ["a", "b", "c"]
 var station_ids: Array[String] = []
 var queues: Dictionary = {}
@@ -10,7 +11,9 @@ var batches: Dictionary = {}
 var last_boarding: Array = []
 var last_journeys: Array = []
 
-func _init(ids: Array = STATIONS) -> void:
+func _init(ids: Array = STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> void:
+	station_catalog = catalog.duplicate(true)
+	class_progress = Classes.progress_defaults(station_catalog)
 	station_ids.assign(ids)
 	station_ids.sort()
 	for station in station_ids:
@@ -49,7 +52,7 @@ func generate(station: String, batch: int, capacity: int, rng: RefCounted, tick:
 		var destination: String = choices[rng.randi_range(0, choices.size() - 1)]
 		queues[station][destination] = int(queues[station].get(destination, 0)) + 1
 		var kind := Classes.LOCAL
-		if classify and Classes.distant(station, destination):
+		if classify and Classes.distant(station, destination, station_catalog):
 			class_progress[station] = (int(class_progress[station]) + 1) % 4
 			if class_progress[station] == 0: kind = Classes.EXPRESS
 		_add_batch(station, destination, 1, tick, "", -1, true, kind)
@@ -74,7 +77,7 @@ func board(station: String, destinations: Array, capacity: int, manifest: Dictio
 	var room := maxi(0, capacity - total(manifest))
 	var candidates: Array = []
 	for batch in batches[station]:
-		if Classes.eligible(batch, destinations, express_destinations): candidates.append(batch)
+		if Classes.eligible(batch, destinations, express_destinations, station_catalog): candidates.append(batch)
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if a.tick != b.tick: return a.tick < b.tick
 		if a.destination != b.destination: return destinations.find(a.destination) < destinations.find(b.destination)
@@ -105,7 +108,7 @@ func board(station: String, destinations: Array, capacity: int, manifest: Dictio
 func eligible_waiting(station: String, destinations: Array, express_destinations: Array, tick: int) -> int:
 	var count := 0
 	for row in waiting_groups(station, tick):
-		if Classes.eligible(row, destinations, express_destinations): count += int(row.count)
+		if Classes.eligible(row, destinations, express_destinations, station_catalog): count += int(row.count)
 	return count
 
 static func alight(manifest: Dictionary, station: String) -> int:
@@ -148,7 +151,7 @@ static func normalize(counts: Dictionary) -> Dictionary:
 		if int(counts[destination]) > 0: result[destination] = int(counts[destination])
 	return result
 
-static func valid_state(value: Variant, state: Dictionary, _service: Dictionary, tick: int = 0, ids: Array = STATIONS) -> bool:
+static func valid_state(value: Variant, state: Dictionary, _service: Dictionary, tick: int = 0, ids: Array = STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> bool:
 	if not valid_ids(ids): return false
 	if not value is Dictionary or not value.get("queues") is Dictionary or value.queues.size() != ids.size(): return false
 	for station in ids:
@@ -157,7 +160,7 @@ static func valid_state(value: Variant, state: Dictionary, _service: Dictionary,
 		if not valid_counts(value.queues.get(station), allowed): return false
 		var legacy_key := "waiting_at_" + str(station)
 		if (STATIONS.has(station) or state.has(legacy_key)) and total(value.queues[station]) != state.get(legacy_key): return false
-	if not valid_batches(value.get("batches"), value.queues, tick, ids): return false
+	if not valid_batches(value.get("batches"), value.queues, tick, ids, catalog): return false
 	return valid_counts(value.get("primary"), ids) and total(value.primary) == state.get("passengers_on_train")
 static func legacy_manifest(count: int, config: Dictionary, index: int, forward: bool, returning: bool) -> Dictionary:
 	if count <= 0 or not config.get("stops") is Array or config.stops.size() < 2: return {}
@@ -220,19 +223,20 @@ func save_state(primary: Dictionary, tick: int) -> Dictionary:
 	for station in station_ids: _sync_batches(station, tick)
 	return {"queues": queues.duplicate(true), "primary": primary.duplicate(true), "batches": batches.duplicate(true), "class_progress": class_progress.duplicate()}
 
-func restore_state(data: Dictionary, ids: Array = STATIONS) -> void:
+func restore_state(data: Dictionary, ids: Array = STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> void:
+	station_catalog = catalog.duplicate(true)
 	station_ids.assign(ids)
 	station_ids.sort()
 	queues.clear()
 	batches.clear()
 	class_progress.clear()
-	var progress: Dictionary = data.get("class_progress", {"a": 0, "c": 0})
+	var progress: Dictionary = data.get("class_progress", Classes.progress_defaults(station_catalog))
 	for station in progress: class_progress[station] = int(progress[station])
 	for station in station_ids:
 		queues[station] = normalize(data.queues[station])
 		batches[station] = []
 		for batch in data.batches[station]: batches[station].append({"destination": batch.destination, "tick": int(batch.tick), "count": int(batch.count), "origin": batch.origin, "start": int(batch.start), "known": batch.known, "class": batch.get("class", Classes.LOCAL)})
-static func valid_batches(value: Variant, saved_queues: Dictionary, tick: int, ids: Array = STATIONS) -> bool:
+static func valid_batches(value: Variant, saved_queues: Dictionary, tick: int, ids: Array = STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> bool:
 	if not valid_ids(ids) or saved_queues.size() != ids.size(): return false
 	for station in ids:
 		if not valid_counts(saved_queues.get(station), ids): return false
@@ -243,7 +247,7 @@ static func valid_batches(value: Variant, saved_queues: Dictionary, tick: int, i
 		var counts: Dictionary = {}
 		var seen: Dictionary = {}
 		for batch in rows:
-			if not batch is Dictionary or not batch.get("destination") is String or not Classes.valid(batch): return false
+			if not batch is Dictionary or not batch.get("destination") is String or not Classes.valid(batch, catalog): return false
 			if batch.get("class", Classes.LOCAL) == Classes.EXPRESS and batch.get("origin") != station: return false
 			var destination: String = batch.destination
 			if destination == station or not ids.has(destination): return false

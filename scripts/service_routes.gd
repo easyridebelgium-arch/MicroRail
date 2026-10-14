@@ -134,7 +134,7 @@ static func defaults() -> Dictionary:
 		"freight": {"name": "Timber Service", "stops": ["forest", "terminal"], "waypoints": {}, "mode": "shuttle"},
 	}
 
-static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS) -> bool:
+static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS, positions: Dictionary = {}) -> bool:
 	if not valid_catalog(station_catalog): return false
 	if not value is Dictionary or not value.has("passenger") or not value.has("freight") or value.size() > MAX_PASSENGER_SERVICES + 1: return false
 	for key in value:
@@ -156,7 +156,7 @@ static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS) -> 
 			for stop in stops:
 				if not stop is String or not station_catalog.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service, station_catalog) or not valid_platforms(service, station_catalog) or not valid_auto(service, station_catalog) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
+		if not valid_waypoints(service, station_catalog, positions) or not valid_platforms(service, station_catalog) or not valid_auto(service, station_catalog) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
 	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}, station_catalog: Dictionary = STATIONS) -> Dictionary:
@@ -193,8 +193,8 @@ static func leg_key(stops: Array, index: int) -> String:
 static func leg_count(stops: Array, mode: String) -> int:
 	return stops.size() if mode == "loop" else stops.size() - 1
 
-static func valid_waypoints(service: Dictionary, station_catalog: Dictionary = STATIONS) -> bool:
-	var protected: Array = [Vector2i(8, 24), Vector2i(28, 24)]
+static func valid_waypoints(service: Dictionary, station_catalog: Dictionary = STATIONS, positions: Dictionary = {}) -> bool:
+	var protected: Array = [positions.get("forest", Vector2i(8, 24)), positions.get("terminal", Vector2i(28, 24))]
 	for station in station_catalog.values(): protected.append(station.cell)
 	var directives: Variant = service.get("waypoints", {})
 	if not directives is Dictionary: return false

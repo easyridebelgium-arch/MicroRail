@@ -76,3 +76,7 @@ capacity, fairness-compatible groups, Local transfers, direct/Loop eligibility,
 partial Express boarding, physical recovery, class fare paid once, atomic invalid
 loads, migration, actual game generation, UI explanations and FPS determinism.
 All network, journey, occupancy, timetable and save suites remain requirements.
+
+Express rules now accept a per-game station catalog: pairs at least 32 tiles apart
+qualify for the direct-leg rule. This preserves A↔C on the tutorial. See
+[catalog facilities and classes](CATALOG_FACILITIES_AND_CLASSES.md).

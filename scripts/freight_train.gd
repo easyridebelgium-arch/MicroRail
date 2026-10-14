@@ -5,6 +5,8 @@ signal logs_received(amount: int)
 const Factory = preload("res://scripts/core/factory.gd")
 var factory: RefCounted
 var factory_distance := -1.0
+var sawmill_cell: Vector2i = Sawmill.CELL
+var factory_cell: Vector2i = Factory.CELL
 signal timber_received(amount: int)
 const Sawmill = preload("res://scripts/core/sawmill.gd")
 var industry: RefCounted
@@ -443,14 +445,16 @@ func chain_enabled() -> bool:
 	return industry != null and industry.state.installed
 func factory_enabled() -> bool:
 	return chain_enabled() and factory != null and factory.state.installed
-func configure_industry(value: RefCounted, tile_size: float, processing_factory: RefCounted = null) -> void:
+func configure_industry(value: RefCounted, tile_size: float, processing_factory: RefCounted = null, positions: Dictionary = {}) -> void:
+	sawmill_cell = positions.get("sawmill", sawmill_cell)
+	factory_cell = positions.get("factory", factory_cell)
 	factory = processing_factory
 	factory_distance = -1.0
-	var factory_index := route_cells.find(Factory.CELL)
+	var factory_index := route_cells.find(factory_cell)
 	if factory_index >= 0: factory_distance = Router.make_path(route_cells.slice(0, factory_index + 1), tile_size).get_baked_length()
 	industry = value
 	sawmill_distance = -1.0
-	var index := route_cells.find(Sawmill.CELL)
+	var index := route_cells.find(sawmill_cell)
 	if index >= 0: sawmill_distance = Router.make_path(route_cells.slice(0, index + 1), tile_size).get_baked_length()
 func target_distance() -> float:
 	if chain_enabled():
@@ -490,17 +494,19 @@ func ready_to_move(available_logs: int) -> bool:
 		return cargo + int(industry.state.timber) >= processing_minimum_load()
 	return not to_terminal or distance_along_route > 0.001 or cargo + available_logs >= get_minimum_load()
 
-static func valid_chain(state: Dictionary, cells: Array[Vector2i], installed: bool, returning: bool, tile_size: float, has_factory: bool = false) -> bool:
+static func valid_chain(state: Dictionary, cells: Array[Vector2i], installed: bool, returning: bool, tile_size: float, has_factory: bool = false, positions: Dictionary = {}) -> bool:
+	var saved_sawmill_cell: Vector2i = positions.get("sawmill", Sawmill.CELL)
+	var saved_factory_cell: Vector2i = positions.get("factory", Factory.CELL)
 	if not installed: return int(state.chain_stage) == 0
 	if not has_factory and int(state.chain_stage) > 1: return false
-	var index := cells.find(Sawmill.CELL)
-	if index < 0 or cells.count(Sawmill.CELL) != 1: return false
+	var index := cells.find(saved_sawmill_cell)
+	if index < 0 or cells.count(saved_sawmill_cell) != 1: return false
 	var distance := Router.make_path(cells.slice(0, index + 1), tile_size).get_baked_length()
 	var current := float(state.distance)
 	var factory_stop := -1.0
 	if has_factory:
-		var factory_index := cells.find(Factory.CELL)
-		if factory_index <= index or cells.count(Factory.CELL) != 1: return false
+		var factory_index := cells.find(saved_factory_cell)
+		if factory_index <= index or cells.count(saved_factory_cell) != 1: return false
 		factory_stop = Router.make_path(cells.slice(0, factory_index + 1), tile_size).get_baked_length()
 	if returning:
 		if state.recovery_stop != state.leg_origin: return false

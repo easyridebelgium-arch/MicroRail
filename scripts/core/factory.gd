@@ -50,21 +50,22 @@ static func valid(value: Variant) -> bool:
 			if key not in ["installed", "definition_version"] and value[key] != 0: return false
 	return true
 
-static func valid_game(data: Dictionary) -> bool:
+static func valid_game(data: Dictionary, positions: Dictionary = {}) -> bool:
 	if not valid(data.get("factory")): return false
 	var stock: Dictionary = data.factory
 	if not stock.installed: return int(data.freight.chain_stage) < 2
 	if not data.sawmill.installed: return false
 	if stock.loaded != stock.sold + (int(data.freight.cargo) if int(data.freight.chain_stage) == 2 else 0): return false
+	var loading_cell: Vector2i = positions.get("factory", CELL)
 	# Factory loading track must remain on the saved physical route and directive.
 	var count := 0
 	for point in data.runtime.freight_cells:
-		if point[0] == CELL.x and point[1] == CELL.y: count += 1
+		if point[0] == loading_cell.x and point[1] == loading_cell.y: count += 1
 	if count != 1: return false
 	count = 0
 	for point in data.services.freight.get("waypoints", {}).get("forest>terminal", []):
-		if point[0] == CELL.x and point[1] == CELL.y: count += 1
+		if point[0] == loading_cell.x and point[1] == loading_cell.y: count += 1
 	if count != 1: return false
 	for entry in data.tracks:
-		if entry[0] == CELL.x and entry[1] == CELL.y: return typeof(entry[2]) == TYPE_BOOL and entry[2] == false
+		if entry[0] == loading_cell.x and entry[1] == loading_cell.y: return typeof(entry[2]) == TYPE_BOOL and entry[2] == false
 	return false

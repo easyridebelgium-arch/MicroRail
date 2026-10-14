@@ -34,11 +34,11 @@ Old tutorial passengers, manifests, timing and paid receipts retain their IDs.
 
 Journey/interchange graph validation, amenities, satisfaction, demand response,
 station aggregate adapters, arrival validation and reports are now adapted
-([station state](CATALOG_STATION_STATE.md)). Broader passenger-class policy still
-has tutorial assumptions. The current Express A↔C policy is retained; unfamiliar station IDs
-exercise Local demand in this increment. Freight facilities still use the fixed
-first-chain profile. Adapt these remaining consumers and facility geometry before
-offering generated layouts or player-built stations as a playable option.
+([station state](CATALOG_STATION_STATE.md)). Passenger-class policy
+now uses catalog distance ([facility/class adapters](CATALOG_FACILITIES_AND_CLASSES.md));
+A↔C eligibility is retained on the tutorial. Freight geometry adapters now use
+catalog positions too. Feasible generation, city-linked station placement and
+empty-network startup must work before a generated sandbox is offered.
 
 Tests use four unfamiliar stations, moved platforms, a planned reversal, catalog
 cache changes, unknown-stop diagnostics, passenger boarding and recovery, JSON

@@ -79,7 +79,7 @@ static func connected(cells: Array[Vector2i], tracks: Dictionary, station_catalo
 static func defaults() -> Dictionary:
 	return {"passenger_cells": [], "freight_cells": [], "passenger_returning": false, "passenger_return_stop": 0, "passenger_held": false, "freight_returning": false, "freight_held": false}
 
-static func valid_state(value: Variant, services: Dictionary, station_catalog: Dictionary = Services.STATIONS) -> bool:
+static func valid_state(value: Variant, services: Dictionary, station_catalog: Dictionary = Services.STATIONS, positions: Dictionary = {}) -> bool:
 	if not value is Dictionary: return false
 	for field in ["passenger_returning", "passenger_held", "freight_returning", "freight_held"]:
 		if typeof(value.get(field)) != TYPE_BOOL: return false
@@ -91,7 +91,7 @@ static func valid_state(value: Variant, services: Dictionary, station_catalog: D
 	if not passenger.is_empty() and passenger_path(passenger, services["passenger"]["stops"], 32, services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}), station_catalog).is_empty(): return false
 	var freight := decode(value["freight_cells"])
 	if not freight.is_empty():
-		if freight.size() < 2 or freight[0] != Vector2i(8, 24) or freight[-1] != Vector2i(28, 24): return false
+		if freight.size() < 2 or freight[0] != positions.get("forest", Vector2i(8, 24)) or freight[-1] != positions.get("terminal", Vector2i(28, 24)): return false
 		if not Services.waypoints_in_order(freight, services["freight"].get("waypoints", {}).get("forest>terminal", [])): return false
 		for i in range(1, freight.size() - 1):
 			if Geometry.from_ports(freight[i - 1] - freight[i], freight[i + 1] - freight[i]) == null: return false

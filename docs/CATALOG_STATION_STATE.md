@@ -3,8 +3,8 @@
 This Phase 2C increment removes A/B/C assumptions from the Local journey graph,
 journey timing/history, amenities, waiting satisfaction and demand response.
 Arrival-target validation and occupancy/Accounts reporting also accept current
-station identities. The playable map remains the tutorial until facility geometry,
-passenger-class policy and seeded generation are ready.
+station identities. The playable map remains the tutorial until seeded generation, city-linked
+station construction and empty-network startup are ready.
 
 ## Implemented behavior
 
@@ -37,6 +37,7 @@ JSON persistence, invalid identities, amenity benefits/prerequisites/isolation,
 company satisfaction, bounded demand growth/decline, custom arrival legs and
 occupancy reporting. Existing safety and frame-rate determinism remain required.
 
-Next: catalog-owned industry/facility positions and a catalog-based passenger-class
-policy, then feasible seeded city/industry layouts and city-linked station building.
+Catalog-owned industry positions and distance-based passenger classes are now
+adapted ([details](CATALOG_FACILITIES_AND_CLASSES.md)). Next: feasible seeded
+city/industry layouts, city-linked station building and empty-network startup.
 See [seeded cities plan](SEEDED_CITIES_PLAN.md).

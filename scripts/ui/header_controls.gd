@@ -150,5 +150,5 @@ func waiting_summary() -> String:
 		var experience: Dictionary = game.satisfaction.station(station, game.passenger_demand.waiting_groups(station, game.sim_clock.tick), game.sim_clock.tick, game.amenities.owned[station])
 		lines.append("\n" + game.station_definitions()[station].name + "\n" + game.satisfaction.describe(station, game.passenger_demand, game.sim_clock.tick, game.amenities))
 		lines.append(game.demand_response.describe(station, int(experience.rating), int(experience.boarded), not network[station].is_empty()))
-		lines.append(game.PassengerClasses.describe(game.passenger_demand.waiting_groups(station, game.sim_clock.tick)))
+		lines.append(game.PassengerClasses.describe(game.passenger_demand.waiting_groups(station, game.sim_clock.tick), game.station_definitions()))
 	return "\n".join(lines)

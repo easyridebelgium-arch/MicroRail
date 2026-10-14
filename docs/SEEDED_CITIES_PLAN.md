@@ -16,8 +16,10 @@ building stations beside cities and connecting useful services.
    Route/platform, retained-path and Local queue adapters are now implemented
    ([details](CATALOG_ROUTING_AND_DEMAND.md)); journey
    validation and station-owned metrics are now adapted
-   ([station state](CATALOG_STATION_STATE.md)); class policy and facility geometry
-   remain before generated starts.
+   ([station state](CATALOG_STATION_STATE.md)). Facility positions and distance-based
+   class policy are adapted too ([details](CATALOG_FACILITIES_AND_CLASSES.md)).
+   Generated starts still need feasible layouts, station construction and
+   empty-network/service startup.
    Old tutorial saves migrate without moving platforms, trains or passengers.
 2. **Seeded layouts:** deterministically place a bounded number of cities and
    industries on buildable land. Validate spacing, station approaches and feasible

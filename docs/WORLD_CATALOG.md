@@ -52,7 +52,10 @@ Route building, platform geometry and Local passenger queues now accept explicit
 per-game catalogs ([backend adapters](CATALOG_ROUTING_AND_DEMAND.md)). Retained
 paths and additional-train saves use those identities too. Journey/interchange validation, station-owned amenities/satisfaction/response and
 aggregate reporting are now adapted ([station state](CATALOG_STATION_STATE.md)).
-Next adapt facility geometry and broader class policy, preserving accepted journeys. Then add seeded settlement/industry placement, city-linked station
+Facility geometry and distance-based Express adapters are now implemented
+([details](CATALOG_FACILITIES_AND_CLASSES.md)). Next build feasible flat-grid seeded
+layouts plus city-linked station construction and empty-network startup, preserving
+accepted journeys. Then add seeded settlement/industry placement, city-linked station
 construction and a usable sandbox chooser. Growth/decline follows measured useful
 service and unmet demand. These gameplay systems are planned, not enabled by this
 catalog update. See [seeded cities plan](SEEDED_CITIES_PLAN.md).

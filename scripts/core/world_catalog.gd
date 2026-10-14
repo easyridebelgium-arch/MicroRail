@@ -5,6 +5,7 @@ const MAX_FACILITIES := 64
 const MAX_SETTLEMENTS := 64
 var state: Dictionary = tutorial()
 var _station_views: Dictionary = {}
+var _facility_cells: Dictionary = {}
 
 func _init() -> void: _refresh_station_views()
 
@@ -45,6 +46,10 @@ func facilities() -> Array[Dictionary]:
 	return result
 
 func _refresh_station_views() -> void:
+	var positions: Dictionary = {}
+	for row in state.facilities: positions[row.id] = Vector2i(int(row.cell[0]), int(row.cell[1]))
+	positions.make_read_only()
+	_facility_cells = positions
 	var views: Dictionary = {}
 	for row in facilities():
 		if row.kind == "station":
@@ -56,9 +61,18 @@ func _refresh_station_views() -> void:
 func stations() -> Dictionary:
 	return _station_views
 
-func station_key(cell: Vector2i) -> String:
+func cell(id: String) -> Vector2i:
+	return _facility_cells.get(id, Vector2i(-1, -1))
+
+func industry_positions() -> Dictionary:
+	var result: Dictionary = {}
+	for row in state.facilities:
+		if row.kind != "station": result[row.stop_id] = cell(row.id)
+	return result
+
+func station_key(coordinate: Vector2i) -> String:
 	for key in _station_views:
-		if _station_views[key].cell == cell: return key
+		if _station_views[key].cell == coordinate: return key
 	return ""
 
 static func whole(value: Variant, minimum: int, maximum: int) -> bool:
@@ -105,12 +119,12 @@ static func valid(value: Variant) -> bool:
 		if not row.settlement_id.is_empty() and (row.kind != "station" or not settlements.has(row.settlement_id)): return false
 		if value.layout_id != "tutorial_abc" and row.kind == "station" and row.settlement_id.is_empty(): return false
 		if row.enabled:
-			var cell := Vector2i(int(row.cell[0]), int(row.cell[1]))
-			if cell.x < 1 or cell.x >= int(size[0]) - 1 or cell.y < 2: return false
+			var coordinate := Vector2i(int(row.cell[0]), int(row.cell[1]))
+			if coordinate.x < 1 or coordinate.x >= int(size[0]) - 1 or coordinate.y < 2: return false
 			# Existing facilities have a 3x2 building plus the platform stop tile.
-			var footprint: Array[Vector2i] = [cell]
-			for x in range(cell.x - 1, cell.x + 2):
-				for y in range(cell.y - 2, cell.y): footprint.append(Vector2i(x, y))
+			var footprint: Array[Vector2i] = [coordinate]
+			for x in range(coordinate.x - 1, coordinate.x + 2):
+				for y in range(coordinate.y - 2, coordinate.y): footprint.append(Vector2i(x, y))
 			for tile in footprint:
 				if occupied.has(tile): return false
 				occupied[tile] = row.id

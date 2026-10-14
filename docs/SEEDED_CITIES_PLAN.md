@@ -1,7 +1,8 @@
 # Seeded cities and player-built stations — Phase 2C plan
 
-The saved catalog foundation is implemented ([world catalog](WORLD_CATALOG.md));
-seeded cities, station construction and growth remain planned gameplay.
+The saved catalog foundation and flat-grid candidate generator are implemented
+([world catalog](WORLD_CATALOG.md), [generator](SEEDED_LAYOUT_GENERATOR.md));
+playable seeded starts, station construction and growth remain planned gameplay.
 The fixed three-station map remains the tutorial and supports existing saves.
 New sandbox layouts will instead contain cities and industries, with the player
 building stations beside cities and connecting useful services.
@@ -21,10 +22,13 @@ building stations beside cities and connecting useful services.
    Generated starts still need feasible layouts, station construction and
    empty-network/service startup.
    Old tutorial saves migrate without moving platforms, trains or passengers.
-2. **Seeded layouts:** deterministically place a bounded number of cities and
-   industries on buildable land. Validate spacing, station approaches and feasible
-   connections. Save the actual generated layout as well as seed, generator/content
-   versions and rules; regenerate neither geometry nor passengers during load.
+2. **Seeded layouts (flat-grid generator implemented):** 3–8 spaced cities and
+   four freight-chain sites are generated deterministically on the 80×50 grid.
+   Initial geometry checks station clearances, freight-strip separation and flat-land
+   access ([generator details](SEEDED_LAYOUT_GENERATOR.md)). The candidate is not yet
+   a playable new-game option. Save the actual generated layout as well as seed,
+   generator/content versions and rules; regenerate neither geometry nor passengers
+   during load. Startup finances/objectives and operating routes still need validation.
 3. **Station construction and catchments:** preview price, orientation, platform
    footprint, building clearance and population served. A passenger station must
    connect to a nearby city's catchment. Cities own trip origins/destinations;

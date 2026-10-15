@@ -22,7 +22,8 @@ arrivals and starter passengers.
   city report records the unmet Express request instead of creating an unboardable
   Express queue. Near trips remain Local.
 
-Population is fixed in this increment. It starts at 800–1500 people, increasing by
+The original supply increment used fixed population. [Bounded city response](CITY_GROWTH.md)
+now updates it in the live game; the starting values remain unchanged. It starts at 800–1500 people, increasing by
 100 in stable sorted city-ID order. This needs no extra RNG draw and therefore can
 also initialize older generated saves without changing their random stream.
 No buildings expand/shrink and no trains or accepted passengers are relocated.
@@ -89,5 +90,5 @@ freight-only/mixed companies and processing/consist persistence.
 
 Implemented next slice: [useful-service cohorts](USEFUL_SERVICE.md) connect actual
 completed journeys and unmet requests, preserving unfinished/transfer identities.
-Next add fair scoring and bounded population growth/decline with grace periods, clear reasons and
-slower/no-growth settings. Merely filling queues must never earn growth.
+The next slice is now implemented: [bounded population response](CITY_GROWTH.md)
+with grace, limits, pending-journey protection, reasons and saved growth rules. Merely filling queues must never earn growth.

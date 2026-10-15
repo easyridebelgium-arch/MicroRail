@@ -93,7 +93,7 @@ func summary(id: String) -> Dictionary:
 func describe(id: String) -> String:
 	if not state.cities.has(id): return ""
 	var totals := summary(id)
-	return "Population: %d (fixed for now)\nRecent city trip requests: %d | Joined station queues: %d\nNot queued: missing origin/destination station %d; no usable service %d; Express needs a direct service %d; origin queue full %d.\nLast %d arrival intervals (at most 60 simulation seconds of arrivals). Queued does not mean delivered. Requests not queued are counted here, not added to another station. Growth/decline is not active yet." % [state.cities[id].population, totals.requested, totals.queued, totals.no_station, totals.no_service, totals.no_express, totals.full, state.cities[id].history.size()]
+	return "Population: %d\nRecent city trip requests: %d | Joined station queues: %d\nNot queued: missing origin/destination station %d; no usable service %d; Express needs a direct service %d; origin queue full %d.\nLast %d arrival intervals (at most 60 simulation seconds of arrivals). Queued does not mean delivered. Requests not queued are counted here, not added to another station. City response and its reasons are shown below." % [state.cities[id].population, totals.requested, totals.queued, totals.no_station, totals.no_service, totals.no_express, totals.full, state.cities[id].history.size()]
 
 static func valid(value: Variant, world: Dictionary, tick: int) -> bool:
 	var expected := defaults(world)

@@ -8,7 +8,7 @@ func step(count: int) -> void:
 	game.paused = true
 func normalized(value: Variant) -> Variant: return JSON.parse_string(JSON.stringify(value))
 func snapshot() -> Dictionary:
-	return normalized({"cities": game.city_demand.save_state(), "city_service": game.city_service.save_state(), "queues": game.passenger_demand.save_state({}, game.sim_clock.tick), "journeys": game._saved_journeys(), "trains": game._saved_passenger_services(), "money": game.money, "rng": game.sim_rng.save_state(), "tick": game.sim_clock.tick})
+	return normalized({"cities": game.city_demand.save_state(), "city_service": game.city_service.save_state(), "city_growth": game.city_growth.save_state(), "queues": game.passenger_demand.save_state({}, game.sim_clock.tick), "journeys": game._saved_journeys(), "trains": game._saved_passenger_services(), "money": game.money, "rng": game.sim_rng.save_state(), "tick": game.sim_clock.tick})
 func run() -> void:
 	root.size = Vector2i(1280, 720)
 	game = load("res://scenes/main/main.tscn").instantiate()
@@ -58,7 +58,7 @@ func run() -> void:
 	var physical: Vector2 = game.passenger_services[key].position
 	check(game._save_game(1), "save populated city-demand state")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-	check(saved.version == 42 and game._is_valid_save(saved), "version 42 validates city state alongside actual actors")
+	check(saved.version == 43 and game._is_valid_save(saved), "version 43 validates city state alongside actual actors")
 	step(601)
 	var uninterrupted := snapshot()
 	check(game._load_slot(1) and game.passenger_services[key].position.distance_to(physical) < 0.001 and game.world.save_state() == geometry, "load demand without moving trains or regenerating geometry")

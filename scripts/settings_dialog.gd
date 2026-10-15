@@ -8,6 +8,9 @@ signal settings_applied
 const Settings = preload("res://scripts/core/game_settings.gd")
 const Actions = preload("res://scripts/core/input_actions.gd")
 
+var owner_game: Node
+var growth_box: VBoxContainer
+var growth_choice: OptionButton
 var slow_check: CheckBox
 var notification_choices: Dictionary = {}
 
@@ -28,7 +31,8 @@ var key_buttons: Dictionary = {}
 var capturing_action: StringName = &""
 
 
-func configure(in_game: bool = false) -> void:
+func configure(in_game: bool = false, game: Node = null) -> void:
+	owner_game = game
 	title = "Settings"
 	size = Vector2i(560, 520)
 	ok_button_text = "Apply"
@@ -78,6 +82,18 @@ func configure(in_game: bool = false) -> void:
 	compact_header_check = CheckBox.new()
 	compact_header_check.text = "Compact header (always on at 175% and above)"
 	box.add_child(compact_header_check)
+
+	growth_box = VBoxContainer.new()
+	box.add_child(growth_box)
+	growth_box.add_child(_heading("This game's city population"))
+	growth_choice = OptionButton.new()
+	for rate_name in preload("res://scripts/core/city_growth.gd").RATE_NAMES: growth_choice.add_item(rate_name)
+	growth_box.add_child(growth_choice)
+	var growth_hint := Label.new()
+	growth_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	growth_hint.text = "This rule belongs to the current company, not other saves. Normal: small six-hour changes; Slower: quarter rates; Frozen: population fixed. Apply starts a fresh assessment interval without catching up frozen time. Find → City explains each city's current result."
+	growth_box.add_child(growth_hint)
+	growth_box.visible = false
 
 	box.add_child(_heading("Save protection"))
 	autosave_choice = OptionButton.new()
@@ -174,6 +190,8 @@ func configure(in_game: bool = false) -> void:
 
 
 func open_dialog() -> void:
+	growth_box.visible = owner_game != null and owner_game.city_builder.is_city_game()
+	if growth_box.visible: growth_choice.select(owner_game.CityGrowth.RATES.find(owner_game.city_growth.state.rate))
 	scale_choice.select(Settings.UI_SCALES.find(Settings.ui_scale))
 	palette_choice.select(Settings.palette_mode)
 	autosave_choice.select(maxi(0, Settings.AUTOSAVE_HOURS.find(Settings.autosave_hours)))
@@ -193,7 +211,7 @@ func open_dialog() -> void:
 	status.text = ""
 	_refresh_key_buttons()
 	_refresh_mouse_buttons()
-	popup_centered_clamped(Vector2i(560, 600), 0.95)
+	popup_centered_clamped(Vector2i(560, 600), 0.85)
 
 
 func _heading(text_value: String) -> Label:
@@ -406,6 +424,8 @@ func _apply() -> void:
 	Settings.key_bindings = Actions.export_bindings()
 	Settings.mouse_bindings = Actions.export_mouse_bindings()
 
+	if growth_box.visible and owner_game != null:
+		owner_game.request_city_growth_rate(owner_game.CityGrowth.RATES[maxi(0, growth_choice.selected)])
 	var saved: bool = Settings.save_settings()
 	settings_applied.emit()
 

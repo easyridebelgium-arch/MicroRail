@@ -9,6 +9,9 @@ save slots, then **New game in selected slot**. The chooser offers:
   no prebuilt stations, rails, locomotives or routes. The same seed and city count
   reproduce the initial layout. The seed remains a decimal string to preserve
   large values exactly. Maximum: `9223372036854775807`.
+- **City growth:** Normal, Slower (quarter rates), or Frozen. This rule is saved
+  with the company and can be changed in in-game Settings. Growth has limits and
+  a day of protection against decline; [rules and feedback](CITY_GROWTH.md).
 - **Tutorial — three stations:** the original A/B/C map, £1000, original trains
   and introductory objectives remain available as an explicit choice.
 

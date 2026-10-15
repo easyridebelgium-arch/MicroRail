@@ -6,7 +6,7 @@ City-linked station preview/purchase rules are also implemented
 ([construction backend](CITY_STATION_CONSTRUCTION.md)); the
 [main-scene preview](CITY_SCENE_PREVIEW.md) now connects startup, editors and station
 placement. [Generated saves](CITY_SAVES.md) are now implemented; the ordinary
-[seed chooser](NEW_GAME.md) is implemented; [city population/trip supply](CITY_DEMAND.md) is implemented; growth remains planned gameplay.
+[seed chooser](NEW_GAME.md) is implemented; [city population/trip supply](CITY_DEMAND.md) is implemented; [bounded growth/decline](CITY_GROWTH.md) is now implemented. Geographic expansion and deeper economic influences remain planned.
 The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes the
 generated world without default stations/trains and safely extends station-owned
 state as stations are purchased. Main-scene startup/editor integration is available

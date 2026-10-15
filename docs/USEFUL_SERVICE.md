@@ -14,8 +14,10 @@ Below the existing population/queue report, **Useful service** shows:
 - Separate unmet reasons: missing station, no usable service, Express requiring
   a direct leg, and a full origin queue.
 
-Population, fares, service eligibility, financial rules and train movement are
-unchanged. **This is measurement, not an active growth or satisfaction score.**
+This measurement increment left population, fares, eligibility, finances and
+movement unchanged. [City response](CITY_GROWTH.md) now uses newly resolved
+outcomes for bounded population changes; the measurement report itself remains
+factual rather than a completion percentage or satisfaction score.
 No accepted passenger becomes a failure just because time passes or a route is
 withdrawn. Transfers cannot multiply final deliveries.
 
@@ -41,7 +43,7 @@ For tracked requests, accepted = final deliveries + still unfinished. All reques
 also reconcile across accepted and the four unmet reasons. Reports show counts,
 not a misleading completion percentage that treats long journeys as failures.
 These are actual generated requests, not a claim to measure every potential trip
-in the population. Future growth still needs fair scoring, grace periods and caps.
+in the population. The initial city response adds grace and caps without introducing journey deadlines.
 
 ## History bounds
 

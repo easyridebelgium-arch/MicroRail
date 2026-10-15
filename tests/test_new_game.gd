@@ -9,6 +9,8 @@ func run() -> void:
 		check(not Config.validate({"mode": "cities", "seed": seed_text, "city_count": 4}).ok, "invalid seed rejected: " + seed_text)
 	for count in [2, 9, 4.5, "4"]:
 		check(not Config.validate({"mode": "cities", "seed": "42", "city_count": count}).ok, "invalid city count rejected")
+	check(Config.validate({"mode": "cities", "seed": "42", "city_count": 4}).configuration.city_growth == "normal", "new city games default to normal bounded growth")
+	check(not Config.validate({"mode": "cities", "seed": "42", "city_count": 4, "city_growth": "bad"}).ok, "invalid population rule rejected")
 	check(not Config.validate({"mode": "unknown"}).ok and Config.validate({"mode": "tutorial"}).ok, "explicit supported profiles")
 	for seed_text in ["0", "42", "99999", "9223372036854775807"]:
 		for count in [3, 4, 8]: check(Config.validate({"mode": "cities", "seed": seed_text, "city_count": count}).ok, "bounded preview validates seed/density")
@@ -51,6 +53,7 @@ func run() -> void:
 	title.new_game_dialog._seed_picker.seed = 42
 	title.new_game_dialog.random_seed_button.pressed.emit()
 	var chosen_seed: String = title.new_game_dialog.seed_field.text
+	title.new_game_dialog.growth_choice.select(1)
 	title.new_game_dialog.city_count.value = 8
 	title.new_game_dialog.refresh()
 	title.new_game_dialog.confirmed.emit()
@@ -64,6 +67,7 @@ func run() -> void:
 		return
 	fresh.set_process(false)
 	check(fresh.city_builder.is_city_game() and fresh.world.state.layout_seed == chosen_seed and fresh.world.state.settlements.size() == 8 and fresh.active_save_slot == 4, "randomly chosen seed, density, profile and slot reach startup")
+	check(fresh.city_growth.state.rate == "slow", "selected per-game growth rule reaches threaded title startup")
 	check(fresh.money == 5000 and fresh.tracks.is_empty() and fresh.fleet.trains.is_empty() and fresh.paused, "sandbox starts paused with stated budget and no prebuilt company")
 	check(FileAccess.get_file_as_string(fresh.SaveSlots.path(4)) == original_save, "starting a generated game never overwrites the chosen slot")
 	# Show that the quoted budget supports a complete first passenger service.

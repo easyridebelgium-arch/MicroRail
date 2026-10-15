@@ -150,6 +150,7 @@ func _finish(scene: PackedScene) -> void:
 	if not pending_load and pending_configuration.get("mode") == "cities":
 		game.startup_city_seed = pending_configuration.seed
 		game.startup_city_count = pending_configuration.city_count
+		game.startup_city_growth = pending_configuration.city_growth
 	game.paused = true
 	game.set_process(false)
 	get_tree().root.add_child(game)

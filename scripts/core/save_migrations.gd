@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 42
+const CURRENT_VERSION: int = 43
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -65,6 +65,14 @@ static func migrate(data: Dictionary) -> Dictionary:
 
 static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 	match from_version:
+		42:
+			var growth_sim: Variant = data.get("sim")
+			var growth_tick := 0
+			if growth_sim is Dictionary and growth_sim.get("clock") is Dictionary:
+				var raw_tick: Variant = growth_sim.clock.get("tick", 0)
+				if typeof(raw_tick) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(raw_tick)) and float(raw_tick) >= 0 and float(raw_tick) <= 1e12: growth_tick = int(raw_tick)
+			data["city_growth"] = preload("res://scripts/core/city_growth.gd").defaults(data.world if data.get("world") is Dictionary else {}, data.city_demand if data.get("city_demand") is Dictionary else {}, data.city_service if data.get("city_service") is Dictionary else {}, growth_tick)
+			return data
 		41:
 			var metric_world: Variant = data.get("world")
 			var metric_sim: Variant = data.get("sim")

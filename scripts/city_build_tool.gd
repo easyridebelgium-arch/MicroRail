@@ -1,5 +1,6 @@
 extends RefCounted
 ## Main-scene adapter. Source artwork is deliberately not required.
+const CityArt = preload("res://scripts/art/city_art.gd")
 const Start = preload("res://scripts/core/sandbox_start.gd")
 const Construction = preload("res://scripts/core/station_construction.gd")
 const Generator = preload("res://scripts/core/world_generator.gd")
@@ -121,14 +122,15 @@ func draw_cities() -> void:
 		var center := Vector2i(int(town.cell[0]), int(town.cell[1]))
 		var bounds := Generator.town_bounds(center)
 		game.draw_rect(Rect2(Vector2(bounds.position) * game.TILE_SIZE, Vector2(bounds.size) * game.TILE_SIZE), Color("#394538"))
-		for offset in [-2, 0, 2]:
-			var roof := Rect2(Vector2(center + Vector2i(offset, 0)) * game.TILE_SIZE + Vector2(3, -8), Vector2(25, 38))
-			game.draw_rect(roof, Color("#92795d"))
-			game.draw_rect(roof, Color("#d9c5a4"), false, 1)
+		var population: int = game.city_demand.state.cities[town.id].population
+		var initial: int = game.city_growth.state.cities[town.id].initial
+		CityArt.draw_city(game, Rect2(Vector2(bounds.position) * game.TILE_SIZE, Vector2(bounds.size) * game.TILE_SIZE), population, initial)
 		var served := false
 		for station in game.world.stations().values():
 			if station.settlement_id == town.id: served = true
-		game.draw_string(ThemeDB.fallback_font, Vector2(bounds.position) * game.TILE_SIZE + Vector2(0, -5), "%s (%d)" % [town.name, game.city_demand.state.cities[town.id].population] + (" — station built" if served else " — needs a station"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+		var history: Array = game.city_growth.state.cities[town.id].history
+		var change_label := "" if history.is_empty() or int(history.back().delta) == 0 else " | last %+d" % int(history.back().delta)
+		game.draw_string(ThemeDB.fallback_font, Vector2(bounds.position) * game.TILE_SIZE + Vector2(0, -5), "%s (%d)" % [town.name, population] + change_label + (" — station built" if served else " — needs a station"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 
 func draw_preview() -> void:
 	if not active or game._modal_open() or game._mouse_is_over_interface(): return

@@ -16,7 +16,7 @@ and a feedback questionnaire, see [Game overview and player feedback](GAME_OVERV
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings and richer measured planning. Alert acknowledgement/persistence and optional incident slowdown are implemented. Unified waiting inspection is implemented. |
-| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phase 2B first complete freight chain implemented; Phase 2C catalog, generator, station-purchase and empty-start models implemented; main-scene/editor/station UI integrated in a development preview; generated saves and ordinary seed chooser implemented; city-owned population and trip supply implemented; growth/decline pending. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
+| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phase 2B first complete freight chain implemented; Phase 2C catalog, generator, station-purchase and empty-start models implemented; main-scene/editor/station UI integrated in a development preview; generated saves and ordinary seed chooser implemented; city-owned population, trip supply and bounded growth/decline implemented. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and deeper growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
 **Current-stage UI work is complete:** all twelve items in the table below are
@@ -281,11 +281,17 @@ retained, recent history is bounded, and v41 saves migrate to an empty measureme
 baseline in v42 without changing their passengers/RNG. City and station inspectors
 show the results.
 
-**Next implementation:** fair scoring and bounded city growth/decline.
-Keep new-city grace periods, population floors, visible causes and slower/no-growth
-rules. Match deliveries to their request cohorts; queued passengers do not earn
-growth, and unfinished long trips must not count as instant failures. Arrival
-budgets remain advisory until fair scoring rules exist.
+**Bounded city response implemented (2C):** [population growth/decline](CITY_GROWTH.md)
+now assesses newly completed final journeys and explicit unmet requests every six
+game hours. A day of grace, two unmet intervals, pending/unknown-origin protection,
+floors/caps and saved Normal/Slower/Frozen rules keep the first version conservative.
+Prepared city density art remains inside existing protected plots. Version 43
+persists the rule and assessment state; v42 migrations preserve the company and
+start a fresh grace/baseline. No arrival-budget penalty or geographic land expansion
+is introduced.
+
+**Next implementation:** service performance cards and per-game persistent
+watchlists, followed by an actionable network summary and optional reports.
 
 Next expose the results through service performance cards, saved watchlists and
 an actionable network summary (not an unexplained composite score). Add optional
@@ -305,10 +311,10 @@ high-contrast cues preserve the simulation. Empty wagons and processed cargo use
 matching deck/plank/crate drawings. Other sheets remain candidates; see
 [live world artwork and rendered preview](WORLD_ART.md).
 Seasonal, terrain and stock artwork does not advance those gameplay mechanics.
-Gradual city growth/decline follows measured service and unmet demand. See [seeded cities plan](SEEDED_CITIES_PLAN.md). Player fare controls, richer passenger
+Bounded city growth/decline now follows measured final deliveries and explicit unmet demand. See [seeded cities plan](SEEDED_CITIES_PLAN.md). Player fare controls, richer passenger
 choices, timed connections and punctuality scoring remain planned refinements. Completed elapsed time is now measured; journey scoring
 still needs explicit benchmarks rather than treating duration alone as lateness. Basic
-waiting-based demand balancing is complete; population, player fare controls and richer
+waiting-based demand balancing and initial population response are complete; player fare controls and richer
 demand factors remain later refinements. Waiting-area amenities and the current UI work are complete.
 Historical dashboards, expanded camera modes and optional gameplay branding remain
 later enhancements. This closes the UI workstream, not every Phase 1B/1C extension.
@@ -638,7 +644,7 @@ history may land earlier once their foundations are reliable.
 | --- | --- | --- |
 | Seeded starting layouts | Start new sandbox games with reproducible cities and industries instead of three fixed stations. | Saved catalog foundation is implemented in version 39 with stable facility IDs and validated settlement references. Route/platform and Local demand adapters are implemented. Station-owned journey/amenity/response state is now adapted; Facility geometry and distance-based class adapters are now implemented. The seeded flat-grid generator now validates initial spacing, station clearances, freight-strip separation and land access. City-linked station preview/purchase rules are now implemented as a backend. The empty-start model now preserves dynamic station-owned state. Main-scene startup/editors and placement UI now work in the development preview. Generated save/load is implemented in version 40. A seed/city-count chooser is implemented, with actual first-service affordability checks and tutorial rewards separated. City-owned population and trip supply are implemented; growth/decline is next; deeper finance/scenario balance remains. Validate spacing, buildable station approaches, reachable industries and objective feasibility. Save generated geometry plus seed, generator/content versions and rules. Keep A/B/C as the tutorial/legacy scenario; full terrain generation is later. |
 | Player-built stations and city catchments | Build stations beside cities and make location matter for passenger supply. | Horizontal five-tile station previews, exclusive city links, cost/reuse accounting and stale/safety checks are implemented as a backend. Dynamic station-owned state now extends safely in the empty-start model. Placement UI and main-scene adoption are available in the development preview. Generated save/load is implemented; ordinary new-game selection is implemented; city population/trip generation and population previews/reports are implemented; reject overlaps and preserve existing train positions during edits/load. Passenger origins/destinations belong to settlements; no station or no useful service leaves demand unmet. Clarify overlapping catchments so passengers are not generated twice. Support multiple stations per city after the initial one-station slice. |
-| City growth and decline | Cities expand with useful service and contract when sustained passenger demand is unmet. | Request cohorts, matched final deliveries, pending journeys and completed transfer legs are implemented in v42 ([measurement](USEFUL_SERVICE.md)); population changes are still planned. Next: use bounded population and measured served/unserved demand over a rolling window, including delivered passengers, capacity, frequency and usable destinations. Grow/shrink gradually with grace periods and visible explanations; unserved new cities must not collapse immediately. Preserve existing buildings/station access during visual expansion; never demolish rail or teleport trains. Add slower/no-growth options and later integrate industry supply/jobs and land rights. |
+| City growth and decline | Cities expand with useful service and contract when sustained passenger demand is unmet. | Request cohorts and measured completions are implemented in v42. Initial bounded population response, grace, pending/unknown-origin protection, floors/caps, per-game Normal/Slower/Frozen rules, reasons and density art are implemented in v43 ([city response](CITY_GROWTH.md)). Later extensions: use bounded population and measured served/unserved demand over a rolling window, including delivered passengers, capacity, frequency and usable destinations. Grow/shrink gradually with grace periods and visible explanations; unserved new cities must not collapse immediately. Preserve existing buildings/station access during visual expansion; never demolish rail or teleport trains. Add slower/no-growth options and later integrate industry supply/jobs and land rights. |
 | Industry growth | Useful cargo service creates production and expansion opportunities. | Retain the existing Phase 2C plan: measured delivered supply and usable demand support bounded industry growth. Extend the saved world catalog and production definitions; keep storage/recipe accounting valid and explain changes. Integrate land rights later. |
 | Sandbox and scenario modes | Offer relaxed construction alongside structured challenges. | Expose unlimited-money and growth-rate options with the supporting systems. Add no-breakdown and maintenance-pressure controls when maintenance exists. Save rule settings and define challenge/achievement eligibility. Reuse introductory objectives for a small early scenario framework; avoid requiring all later simulation features first. |
 | Operating budgets | Break costs down into maintenance, fuel/energy, workforce, vehicles, construction, interest, station upkeep and penalties. | Expand the company dashboard as each cost system arrives; avoid double-counting the same expense across categories. |
@@ -759,26 +765,26 @@ checklist, first-delivery feedback and rotating autosaves. Representative startu
 affordability checks remain in the regression suite; broader balance changes and
 rescue rules still need playtesting.
 
-1. **City response (2A / 2C):** request-to-delivery measurement, arrived transfer
-   legs and unmet reasons are implemented ([useful service](USEFUL_SERVICE.md)).
-   Define fair scoring and add bounded growth/decline, grace periods, population floors,
-   readable reasons and slower/no-growth settings. Advisory arrival budgets must
-   not become arbitrary growth penalties.
-2. **Visible operational progress (1C / 2A):** compact service cards, per-game
+The initial [city population response](CITY_GROWTH.md) is also complete: matched
+final-delivery evidence, explicit unmet demand, grace, pending-trip protection,
+bounds, readable reasons and saved growth-rate rules. More detailed reputation,
+service-frequency scoring, industry/jobs and geographic expansion remain extensions.
+
+1. **Visible operational progress (1C / 2A):** compact service cards, per-game
    persistent watchlists, actionable network summary, optional end-of-day reports
    and proportionate historical trends. Distinguish company final-journey totals
    from the legs carried by individual services. Complete relevant remaining
    safety/platform/body-routing extensions when this work requires them.
-3. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,
+2. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,
    difficulty modifiers and locally comparable seed results. Contracts follow clear
    scoring, failure/recovery and measured delivery accounting.
-4. **Map variety:** rivers and bridges first, then additional terrain/elevation,
+3. **Map variety:** rivers and bridges first, then additional terrain/elevation,
    tunnels and map settings. Art alone never adds crossing permissions or geometry.
-5. **Operational and business depth:** deterministic fair priorities, richer planning,
+4. **Operational and business depth:** deterministic fair priorities, richer planning,
    wider service/platform choices and full reputation, introduced using existing
    measured evidence. Raise fleet limits only after realistic performance/usability
    tests. Physical depots follow when their gameplay prerequisites justify them.
-6. **Later mechanics (3–5):** optional maintenance, research/eras, weather,
+5. **Later mechanics (3–5):** optional maintenance, research/eras, weather,
    richer content/editor/modding and community tools. Keep workforce, deeper finance,
    rivals and detailed replay behind a satisfying core loop.
 

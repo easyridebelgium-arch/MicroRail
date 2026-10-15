@@ -5,7 +5,7 @@
 **Current gameplay snapshot: 3bd2913 · Save format 41**  
 **Format: single-player desktop railway-management prototype**
 
-**Update after this snapshot:** configurable rotating autosaves and recovery are now implemented (F70); see [usage and safety](AUTOSAVES.md). The optional [first-service checklist](FIRST_SERVICE_GUIDE.md), nearest-city suggestion and first-final-delivery feedback are also implemented. This is an initial slice of F63; full tutorial campaigns remain planned. [Useful-service measurement](USEFUL_SERVICE.md) (N01) is also implemented in save version 42; city growth (N02/N03) remains planned. The remaining catalogue describes the snapshot above.
+**Update after this snapshot:** configurable rotating autosaves and recovery are now implemented (F70); see [usage and safety](AUTOSAVES.md). The optional [first-service checklist](FIRST_SERVICE_GUIDE.md), nearest-city suggestion and first-final-delivery feedback are also implemented. This is an initial slice of F63; full tutorial campaigns remain planned. [Useful-service measurement](USEFUL_SERVICE.md) (N01) is also implemented in save version 42; initial bounded city response (N02/N03) is now implemented in save version 43 ([rules](CITY_GROWTH.md)); broader reputation/jobs/urban expansion remain future work. The remaining catalogue describes the snapshot above.
 
 This document describes what can be played today and what may be added later. Future features are proposals for discussion, with no promised release dates. Please use the feature IDs when giving feedback.
 
@@ -17,7 +17,7 @@ You build track, connect cities and industries, buy trains, define services and 
 
 **Core play loop:** build a connection → assign trains → transport people or goods → understand delays and finances → improve the network → expand.
 
-Cities already create passenger requests. Cities growing or shrinking in response to the railway is the next major direction, rather than an available feature today.
+Cities already create passenger requests. The snapshot originally planned city growth next. Initial bounded population response is now available; see the update above.
 
 ## 2. How to read the catalogue
 
@@ -126,9 +126,9 @@ An existing feature may have a separate future extension. For example, automatic
 
 | ID | Planned next step | Intended outcome |
 | --- | --- | --- |
-| N01 | Useful-service measurement | Implemented after the snapshot: matched request cohorts, final deliveries, pending journeys, arrived transfer legs and unmet reasons. See [measurement](USEFUL_SERVICE.md). Growth scoring remains next. |
-| N02 | Bounded city growth and decline | Let sustained useful service support growth and unmet demand support gradual decline, with grace periods and population floors. Preserve existing track, stations and accepted trips. |
-| N03 | Clear growth reasons and settings | Show trends and causes, with slower/no-growth choices. Extend the measured economy and later industry growth without presenting invisible or arbitrary penalties. |
+| N01 | Useful-service measurement | Implemented after the snapshot: matched request cohorts, final deliveries, pending journeys, arrived transfer legs and unmet reasons. See [measurement](USEFUL_SERVICE.md). Initial bounded response is also implemented; see N02. |
+| N02 | Bounded city growth and decline | Implemented after the snapshot: six-hour assessments, small bounded changes, full-day grace and protection for unfinished/unknown journeys; existing track/stations remain intact. |
+| N03 | Clear growth reasons and settings | Implemented initial slice: inspector reasons, next assessment/grace end, bounded history and saved Normal/Slower/Frozen rules. Deeper quality/industry scoring remains future work. |
 
 ## 6. Future feature catalogue
 

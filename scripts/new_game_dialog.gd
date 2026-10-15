@@ -9,6 +9,7 @@ var seed_field: LineEdit
 var random_seed_button: Button
 var _seed_picker := RandomNumberGenerator.new()
 var city_count: SpinBox
+var growth_choice: OptionButton
 var city_controls: VBoxContainer
 var explanation: Label
 var validation: Dictionary = {}
@@ -21,7 +22,7 @@ func _ready() -> void:
 	exclusive = true
 	dialog_hide_on_ok = false
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(320, 260)
+	scroll.custom_minimum_size = Vector2(280, 120)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.follow_focus = true
 	add_child(scroll)
@@ -64,6 +65,11 @@ func _ready() -> void:
 	city_count.value = 4
 	city_count.value_changed.connect(func(_value: float) -> void: refresh())
 	city_controls.add_child(city_count)
+	growth_choice = OptionButton.new()
+	for rate_name in Config.Growth.RATE_NAMES: growth_choice.add_item("City growth: " + rate_name)
+	growth_choice.tooltip_text = "Saved with this game. Normal: small changes every six game hours. Slower: quarter rates. Frozen keeps population fixed. All modes protect unfinished journeys and existing infrastructure."
+	growth_choice.item_selected.connect(func(_index: int) -> void: refresh())
+	city_controls.add_child(growth_choice)
 	explanation = Label.new()
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(explanation)
@@ -76,12 +82,12 @@ func open_dialog(target_slot: int) -> void:
 	slot = target_slot
 	title = "New game — Slot %d" % slot
 	refresh()
-	popup_centered_clamped(Vector2i(620, 480), 0.95)
+	popup_centered_clamped(Vector2i(620, 480), 0.85)
 
 func refresh() -> void:
 	city_controls.visible = mode_choice.selected == 0
-	validation = Config.validate({"mode": "cities", "seed": seed_field.text, "city_count": city_count.value} if mode_choice.selected == 0 else {"mode": "tutorial"})
-	explanation.text = validation.message + "\n\nStarting replaces the current game in memory. Existing saved files change only when you Save. Cancel keeps the current game."
+	validation = Config.validate({"mode": "cities", "seed": seed_field.text, "city_count": city_count.value, "city_growth": Config.Growth.RATES[maxi(0, growth_choice.selected)]} if mode_choice.selected == 0 else {"mode": "tutorial"})
+	explanation.text = validation.message + "\n\nStarting replaces the current game in memory. Existing manual saves change only when you Save; autosaves keep separate recovery copies. Cancel keeps the current game."
 	get_ok_button().disabled = not validation.ok
 
 func _choose_random_seed() -> void:

@@ -1,5 +1,8 @@
 extends Node2D
 
+const WorldArt = preload("res://scripts/art/world_art.gd")
+const GameSettings = preload("res://scripts/core/game_settings.gd")
+
 signal delivered(amount: int)
 signal logs_received(amount: int)
 const Factory = preload("res://scripts/core/factory.gd")
@@ -212,25 +215,19 @@ func _draw() -> void:
 	if offsets.size() > 1 and route_path.point_count >= 2:
 		for index in range(offsets.size()):
 			var pose := Consists.pose(route_path, distance_along_route + offsets[index])
-			draw_set_transform(to_local(pose.position), pose.angle - global_rotation + (0.0 if to_terminal else PI))
-			if index == 0: _draw_locomotive()
+			draw_set_transform(to_local(pose.position), pose.angle - global_rotation + (0.0 if to_terminal else PI) + PI * 0.5)
+			if index == 0:
+				_draw_locomotive()
 			else:
-				draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Palette.get_color(Palette.Role.TRAIN_FREIGHT))
-				draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Color.WHITE, false, 1.0)
-				for y in [-4, 0, 4]: draw_line(Vector2(-9, y), Vector2(9, y), Color(0.55, 0.32, 0.15), 2.0)
+				WorldArt.draw_freight_wagon(self, cargo_kind(), cargo > 0, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
 			draw_set_transform(Vector2.ZERO, 0.0)
-	else: _draw_locomotive()
+	else:
+		draw_set_transform(Vector2.ZERO, PI * 0.5)
+		_draw_locomotive()
+		draw_set_transform(Vector2.ZERO, 0.0)
 
 func _draw_locomotive() -> void:
-	var body := Rect2(Vector2(-14, -8), Vector2(28, 16))
-
-	draw_rect(body, Palette.get_color(Palette.Role.TRAIN_FREIGHT))
-	draw_rect(body, Color(0.05, 0.12, 0.22), false, 1.0)
-
-	draw_rect(
-		Rect2(Vector2(6, -5), Vector2(6, 10)),
-		Color(0.75, 0.9, 1.0)
-	)
+	WorldArt.draw_vehicle(self, str(consist_entry.get("model", "freight_standard")), GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
 
 
 func status_text() -> String:

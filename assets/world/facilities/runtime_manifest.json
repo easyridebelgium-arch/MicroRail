@@ -1,0 +1,188 @@
+{
+  "source_pack": "microrail_pack_v1",
+  "integrated": "2026-10-15",
+  "entries": [
+    {
+      "id": "passenger_standard",
+      "category": "vehicles",
+      "source": "assets/vehicles/sheets/rolling_stock.png",
+      "source_sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "resource": "assets/vehicles/sprites/passenger_standard.tres",
+      "region": [
+        409,
+        363,
+        122,
+        297
+      ]
+    },
+    {
+      "id": "passenger_fast",
+      "category": "vehicles",
+      "source": "assets/vehicles/sheets/rolling_stock.png",
+      "source_sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "resource": "assets/vehicles/sprites/passenger_fast.tres",
+      "region": [
+        723,
+        363,
+        122,
+        304
+      ]
+    },
+    {
+      "id": "freight_standard",
+      "category": "vehicles",
+      "source": "assets/vehicles/sheets/rolling_stock.png",
+      "source_sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "resource": "assets/vehicles/sprites/freight_standard.tres",
+      "region": [
+        725,
+        35,
+        118,
+        320
+      ]
+    },
+    {
+      "id": "freight_heavy",
+      "category": "vehicles",
+      "source": "assets/vehicles/sheets/rolling_stock.png",
+      "source_sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "resource": "assets/vehicles/sprites/freight_heavy.tres",
+      "region": [
+        1039,
+        20,
+        117,
+        335
+      ]
+    },
+    {
+      "id": "coach_standard",
+      "category": "vehicles",
+      "source": "assets/vehicles/sheets/rolling_stock.png",
+      "source_sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "resource": "assets/vehicles/sprites/coach_standard.tres",
+      "region": [
+        113,
+        667,
+        114,
+        292
+      ]
+    },
+    {
+      "id": "coach_fast",
+      "category": "vehicles",
+      "source": "assets/vehicles/sheets/rolling_stock.png",
+      "source_sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "resource": "assets/vehicles/sprites/coach_fast.tres",
+      "region": [
+        726,
+        667,
+        116,
+        290
+      ]
+    },
+    {
+      "id": "log_wagon_loaded",
+      "category": "vehicles",
+      "source": "assets/vehicles/sheets/rolling_stock.png",
+      "source_sha256": "b599061747de362c0f10a8784b51d944e54a58a8fcbc42d7956ab2952279cbb8",
+      "resource": "assets/vehicles/sprites/log_wagon_loaded.tres",
+      "region": [
+        1038,
+        962,
+        119,
+        264
+      ]
+    },
+    {
+      "id": "station_small",
+      "category": "facilities",
+      "source": "assets/world/facilities/sheets/facilities.png",
+      "source_sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "resource": "assets/world/facilities/sprites/station_small.tres",
+      "region": [
+        41,
+        88,
+        236,
+        184
+      ]
+    },
+    {
+      "id": "station_large",
+      "category": "facilities",
+      "source": "assets/world/facilities/sheets/facilities.png",
+      "source_sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "resource": "assets/world/facilities/sprites/station_large.tres",
+      "region": [
+        327,
+        72,
+        287,
+        203
+      ]
+    },
+    {
+      "id": "platform",
+      "category": "facilities",
+      "source": "assets/world/facilities/sheets/facilities.png",
+      "source_sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "resource": "assets/world/facilities/sprites/platform.tres",
+      "region": [
+        646,
+        131,
+        277,
+        101
+      ]
+    },
+    {
+      "id": "terminal",
+      "category": "facilities",
+      "source": "assets/world/facilities/sheets/facilities.png",
+      "source_sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "resource": "assets/world/facilities/sprites/terminal.tres",
+      "region": [
+        37,
+        371,
+        243,
+        192
+      ]
+    },
+    {
+      "id": "sawmill",
+      "category": "facilities",
+      "source": "assets/world/facilities/sheets/facilities.png",
+      "source_sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "resource": "assets/world/facilities/sprites/sawmill.tres",
+      "region": [
+        323,
+        353,
+        291,
+        227
+      ]
+    },
+    {
+      "id": "factory",
+      "category": "facilities",
+      "source": "assets/world/facilities/sheets/facilities.png",
+      "source_sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "resource": "assets/world/facilities/sprites/factory.tres",
+      "region": [
+        640,
+        347,
+        289,
+        234
+      ]
+    },
+    {
+      "id": "forest",
+      "category": "facilities",
+      "source": "assets/world/facilities/sheets/facilities.png",
+      "source_sha256": "6cf4dd435cfba5adae3224300cc736fcd18d65d7f6daa3d7fe50564d35ed8e59",
+      "resource": "assets/world/facilities/sprites/forest.tres",
+      "region": [
+        954,
+        357,
+        270,
+        211
+      ]
+    }
+  ]
+}

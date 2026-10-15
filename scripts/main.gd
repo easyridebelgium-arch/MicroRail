@@ -1,5 +1,7 @@
 extends Node2D
 
+const WorldArt = preload("res://scripts/art/world_art.gd")
+
 const CityDemand = preload("res://scripts/core/city_demand.gd")
 var city_demand := CityDemand.new()
 const WorldCatalog = preload("res://scripts/core/world_catalog.gd")
@@ -1117,51 +1119,43 @@ func _draw_track(cell: Vector2i, track_type: Variant, preview: bool) -> void:
 
 func _draw_station(cell: Vector2i, station_name: String) -> void:
 	var origin: Vector2 = Vector2(cell) * TILE_SIZE
-
-	var footprint := Rect2(
-		origin + Vector2(-TILE_SIZE, -2 * TILE_SIZE),
-		Vector2(3 * TILE_SIZE, 2 * TILE_SIZE)
-	)
-
-	# Reserved station grounds.
-	draw_rect(
-		footprint,
-		Color(0.17, 0.20, 0.22)
-	)
-
-	draw_rect(
-		footprint,
-		Color(0.35, 0.40, 0.43),
-		false,
-		1.0
-	)
-
-	# Name centered inside the reserved area.
-	draw_string(
-		ThemeDB.fallback_font,
-		origin + Vector2(-24, -38),
-		station_name,
-		HORIZONTAL_ALIGNMENT_CENTER,
-		80.0,
-		16,
-		Color.WHITE
-	)
-
-	# Platform alongside the station track.
-	draw_rect(
-		Rect2(
-			origin + Vector2(-24, -16),
-			Vector2(80, 12)
-		),
-		Color(0.65, 0.68, 0.70)
-	)
-
-	draw_line(
-		origin + Vector2(-24, -4),
-		origin + Vector2(56, -4),
-		Color(0.95, 0.80, 0.25),
-		2.0
-	)
+	var footprint := Rect2(origin + Vector2(-TILE_SIZE, -2 * TILE_SIZE), Vector2(3 * TILE_SIZE, 2 * TILE_SIZE))
+	var kind := "station"
+	for facility in world.facilities():
+		if facility.cell == cell:
+			kind = facility.kind
+			break
+	var art_id := "station_small" if kind == "station" else kind
+	var station_key: String = world.station_key(cell)
+	if kind == "station" and amenities.owned.has(station_key) and amenities.has(station_key, "waiting_room"):
+		art_id = "station_large"
+	draw_rect(footprint, Color("#293634"))
+	draw_rect(footprint, Color("#52645D"), false, 1.0)
+	# Building, name chip and platform all remain inside reserved grounds.
+	WorldArt.draw_fitted(self, art_id, Rect2(footprint.position + Vector2(3, 17), Vector2(90, 31)))
+	var platform_start := origin + Vector2(-24, -16)
+	var platform_width := 80.0
+	var platform_height := 12.0
+	if kind == "station" and city_builder.is_city_game():
+		platform_start.x = origin.x - 2 * TILE_SIZE
+		# The outer platform columns have no reserved building ground above
+		# them. Keep their apron inside the purchased platform tiles so it
+		# cannot paint over a separate track in the row above.
+		platform_start.y = origin.y + 2
+		platform_width = 5 * TILE_SIZE
+		platform_height = 8.0
+	var cursor := 0.0
+	while cursor < platform_width:
+		var width := minf(32.0, platform_width - cursor)
+		draw_texture_rect(WorldArt.texture("platform"), Rect2(platform_start + Vector2(cursor, 0), Vector2(width, platform_height)), false)
+		cursor += width
+	draw_line(platform_start + Vector2(0, platform_height), platform_start + Vector2(platform_width, platform_height), Color("#F1D16A"), 1.0)
+	var badge := Rect2(footprint.position + Vector2(2, 1), Vector2(92, 15))
+	draw_rect(badge, Color("#101923"))
+	var font_size := 12
+	while font_size > 8 and ThemeDB.fallback_font.get_string_size(station_name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > 88:
+		font_size -= 1
+	draw_string(ThemeDB.fallback_font, badge.position + Vector2(2, 12), station_name, HORIZONTAL_ALIGNMENT_CENTER, 88, font_size, Color.WHITE)
 
 
 func _draw_train() -> void:
@@ -1169,31 +1163,12 @@ func _draw_train() -> void:
 	_draw_passenger_consist("passenger", route_path, route_distance, train_position, train_heading, travelling_to_b)
 
 func _draw_passenger_vehicle(at: Vector2, angle: float, id: int) -> void:
-	draw_set_transform(at, angle)
-
-	var body := Rect2(
-		Vector2(-13, -7),
-		Vector2(26, 14)
-	)
-
-	draw_rect(body, Palette.get_color(Palette.Role.TRAIN_PASSENGER))
-	draw_rect(body, Color(0.15, 0.08, 0.08), false, 1.0)
-
-	# The front of the train always points along its heading.
-	draw_rect(
-		Rect2(Vector2(5, -5), Vector2(6, 10)),
-		Color(0.65, 0.85, 0.95)
-	)
-
-	# Restore normal drawing coordinates.
+	var train := Fleet.find(fleet, id)
+	draw_set_transform(at, angle + PI * 0.5)
+	WorldArt.draw_vehicle(self, str(train.get("model", "passenger_standard")), GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
 	draw_set_transform(Vector2.ZERO, 0.0)
 	if not passenger_services.is_empty():
 		draw_string(ThemeDB.fallback_font, at + Vector2(-10, -12), "#%d" % id, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
-
-
-
-
-
 
 
 func _finish_track_drag(end_cell: Vector2i) -> void:
@@ -6198,10 +6173,8 @@ func _draw_passenger_consist(service: String, path: Curve2D, distance: float, po
 		if index == 0:
 			_draw_passenger_vehicle(pose.position, angle, int(train.id))
 		else:
-			draw_set_transform(pose.position, angle)
-			draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Palette.get_color(Palette.Role.TRAIN_PASSENGER))
-			draw_rect(Rect2(Vector2(-12, -7), Vector2(24, 14)), Color.WHITE, false, 1.0)
-			for x in [-8, -2, 4]: draw_rect(Rect2(Vector2(x, -4), Vector2(4, 8)), Color(0.65, 0.85, 0.95))
+			draw_set_transform(pose.position, angle + PI * 0.5)
+			WorldArt.draw_vehicle(self, "coach_fast" if train.model == "passenger_fast" else "coach_standard", GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
 			draw_set_transform(Vector2.ZERO, 0.0)
 
 func _setup_train_inspector() -> void:

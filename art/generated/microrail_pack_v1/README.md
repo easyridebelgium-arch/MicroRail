@@ -2,8 +2,10 @@
 
 Seven AI-generated PNG source sheets, with **112 proposed entries** for the game.
 Created on 2026-10-14 using the OpenAI image generation tool at the user's request.
-These are review/editing sources, not approved runtime sprites. Existing toolbar,
-logo, map rendering and simulation behavior are unchanged.
+These remain the original review/editing sources. A selected **14-texture subset**
+from the rolling-stock and facility sheets is now used by the live game through
+runtime copies and measured AtlasTexture regions. See [live artwork integration](../../../docs/WORLD_ART.md).
+Other entries remain candidates. Existing toolbar/logo and simulation rules are preserved.
 
 ## Files
 
@@ -30,10 +32,10 @@ PNG source bytes are unchanged from tool output. The manifest includes SHA-256
 hashes, actual dimensions, image modes and alpha extrema. Terrain is opaque;
 the other six sheets have real alpha transparency.
 
-`.gdignore` keeps this candidate pack out of Godot's importer. Source art belongs
-here; export reviewed individual sprites to the proposed `assets/` paths only
-during deliberate integration. Adding source sheets does not unlock the depicted
-stock, industries, terrain, seasons or weather mechanics.
+`.gdignore` keeps these original sheets out of Godot's importer. Reviewed live
+selections use unchanged copies under `assets/vehicles/` and
+`assets/world/facilities/`; the remainder stays here. Adding source sheets does
+not unlock the depicted stock, industries, terrain, seasons or weather mechanics.
 
 ## Cleanup and export targets
 
@@ -79,10 +81,11 @@ filtering for pixel-art previews/imports. Match pixel density across categories.
   sizes are separate shapes, not an ordered, seamless animation. Weather particles
   must remain cosmetic until the relevant mechanics are deliberately implemented.
 
-For first integration, prefer a cleaned small station/city/scenery subset. Keep
-the authoritative graph, collision/occupancy footprints, accessibility overlays and
-why-waiting information intact. The gameplay roadmap still proceeds through
-empty-network startup and city-linked station placement before exposing seeded starts.
+The first live integration covers the current locomotives/coaches, log wagons,
+station roofs, concrete platform and forest/terminal/sawmill/factory presentation.
+The authoritative graph, occupancy footprints, accessibility overlays and waiting
+information remain intact. City placement and seeded starts are already implemented;
+city roof art, terrain/scenery and the other stock/facility entries remain later work.
 
 Provenance is the generation record above; this pack is not third-party CC0 art.
 No external reference art was supplied for these generations. Review and record

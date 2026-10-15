@@ -42,13 +42,14 @@ scene; this fix does not silently replace the artist's toolbar graphics.
 3. Add measured station queue count/bar with class/capacity distinctions and
    colour-independent cues, before decorative passenger crowds.
 4. Continue dialog/ribbon styling consistency, including a proper Station icon.
-5. Consider an explicit sandbox first-service shortcut and a nearest-pair/cost
-   suggestion, without overriding chosen routes or building automatically.
+5. Implemented: the optional [first-service guide](FIRST_SERVICE_GUIDE.md) suggests
+   nearby cities and opens existing tools, without overriding routes or building automatically.
 6. Evaluate distance-sensitive fares and longer-route incentives alongside useful
    destination coverage/growth. Do not change fares from one short-line result.
 
-These fit the early usability work in the [roadmap](ROADMAP.md). Rotating autosaves
-and useful-service/city-growth work remain next substantive milestones.
+These fit the early usability work in the [roadmap](ROADMAP.md). The first-service
+guide, final-delivery feedback and rotating autosaves are implemented. Useful-service
+measurement and bounded city growth are the next substantive milestones.
 
 ## Validation
 

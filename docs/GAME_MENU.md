@@ -12,6 +12,7 @@ The menu pauses the fixed-step simulation and offers:
 - **Save game — Slot N:** save to the active slot using normal atomic writes and
   its previous-save backup. The menu shows success or the actual refusal/error.
   Use the toolbar Save chooser when you want a different one of the four slots.
+- **First service guide:** open the optional live checklist and tool shortcuts. It pauses while you read; Close restores the pause state you had before opening the menu.
 - **Settings:** change options; closing Settings returns to the game menu.
 - **Return to Main Menu:** choose **Save and Return**, **Return Without Saving**
   or **Cancel**. Cancel returns to the paused game menu.

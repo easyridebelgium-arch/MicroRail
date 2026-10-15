@@ -28,6 +28,10 @@ simulation RNG, finances or saves.
 
 ## Building the first city service
 
+For help, click **Guide** beside Map/Goals or use **Menu → First service guide**.
+The optional checklist suggests nearby cities and tracks a real first delivery;
+it does not make purchases or configure routes for you. [Guide details](FIRST_SERVICE_GUIDE.md).
+
 1. Select **Station** and place one near each of two cities. Four cells below a
    city centre is a useful starting location. The preview shows footprint,
    catchment, price and refusal reasons. A new station normally costs £300.

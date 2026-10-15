@@ -268,9 +268,14 @@ cost and £100 connection reward. Follow-ups are Advanced scheduling, plain-lang
 refusals, station queue indicators, consistent dialog art and sandbox first-service
 help. See [playtest evidence and acceptance checks](FIRST_SESSION_FEEDBACK.md).
 
-**Next implementation (revised after player feedback):** a small first-service
-checklist (still planned); bounded rotating autosaves are now implemented. Then
-useful-service measurement from completed journeys and city request outcomes, followed by bounded growth/decline.
+**First-session guidance/save protection complete:** the optional, repeatable
+[Guide checklist](FIRST_SERVICE_GUIDE.md), nearest-city suggestion, first-final-delivery
+feedback and [rotating autosaves](AUTOSAVES.md) are implemented. Tutorial automatic
+startup and existing rewards remain unchanged. City Goals shows the live next step;
+the full guide opens only on request.
+
+**Next implementation:** useful-service measurement from completed journeys and
+city request outcomes, followed by bounded growth/decline.
 Keep new-city grace periods, population floors, visible causes and slower/no-growth
 rules. Match deliveries to their request cohorts; queued passengers do not earn
 growth, and unfinished long trips must not count as instant failures. Arrival
@@ -743,31 +748,31 @@ Completed work stays in place. The detailed milestone tables above distinguish
 implemented slices from remaining extensions. This list describes **remaining work**,
 updated after the October 2026 catalogue feedback; it is not the order of feature IDs.
 
-1. **First-session guidance and save protection (1C / 2C):** optional, repeatable
-   first-service checklist; explicit first-delivery feedback. Rotating configurable
-   autosaves alongside the four manual slots/backups are complete
-   ([usage and checks](AUTOSAVES.md)). Validate beginner affordability before adding
-   rescue rules or changing the economy.
-2. **Useful-service measurement and city response (2A / 2C):** match completed
+First-session guidance/save protection (1C / 2C) is complete: optional repeatable
+checklist, first-delivery feedback and rotating autosaves. Representative startup
+affordability checks remain in the regression suite; broader balance changes and
+rescue rules still need playtesting.
+
+1. **Useful-service measurement and city response (2A / 2C):** match completed
    journeys to request cohorts; separate final deliveries, carried legs and unmet
    reasons. Then add bounded growth/decline, grace periods, population floors,
    readable reasons and slower/no-growth settings. Advisory arrival budgets must
    not become arbitrary growth penalties.
-3. **Visible operational progress (1C / 2A):** compact service cards, per-game
+2. **Visible operational progress (1C / 2A):** compact service cards, per-game
    persistent watchlists, actionable network summary, optional end-of-day reports
    and proportionate historical trends. Distinguish company final-journey totals
    from the legs carried by individual services. Complete relevant remaining
    safety/platform/body-routing extensions when this work requires them.
-4. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,
+3. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,
    difficulty modifiers and locally comparable seed results. Contracts follow clear
    scoring, failure/recovery and measured delivery accounting.
-5. **Map variety:** rivers and bridges first, then additional terrain/elevation,
+4. **Map variety:** rivers and bridges first, then additional terrain/elevation,
    tunnels and map settings. Art alone never adds crossing permissions or geometry.
-6. **Operational and business depth:** deterministic fair priorities, richer planning,
+5. **Operational and business depth:** deterministic fair priorities, richer planning,
    wider service/platform choices and full reputation, introduced using existing
    measured evidence. Raise fleet limits only after realistic performance/usability
    tests. Physical depots follow when their gameplay prerequisites justify them.
-7. **Later mechanics (3–5):** optional maintenance, research/eras, weather,
+6. **Later mechanics (3–5):** optional maintenance, research/eras, weather,
    richer content/editor/modding and community tools. Keep workforce, deeper finance,
    rivals and detailed replay behind a satisfying core loop.
 

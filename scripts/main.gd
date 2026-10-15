@@ -407,6 +407,10 @@ var goals_button: Button
 @onready var backup_button: Button = $Interface/HeaderBox/Toolbar/BackupButton
 @onready var inspect_button: Button = $Interface/HeaderBox/Toolbar/InspectButton
 
+const FirstServiceGuide = preload("res://scripts/ui/first_service_guide.gd")
+var first_service_guide: RefCounted
+var first_delivery_notice: String = ""
+
 const Autosaves = preload("res://scripts/core/autosaves.gd")
 var autosave_next_tick: int = 3600
 var autosave_interval: int = 3600
@@ -489,6 +493,8 @@ func _ready() -> void:
 	$Interface.add_child(loans_dialog)
 	_apply_settings()
 	_setup_game_menu()
+	first_service_guide = FirstServiceGuide.new()
+	first_service_guide.configure(self)
 	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
 	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
@@ -518,6 +524,10 @@ func _process(delta: float) -> void:
 
 	_check_autosave()
 	_flush_notifications()
+	first_service_guide.refresh(delta)
+	if not first_delivery_notice.is_empty():
+		_show_notice(first_delivery_notice)
+		first_delivery_notice = ""
 	_update_inspection()
 	_update_instructions()
 	_update_toolbar()
@@ -609,6 +619,7 @@ func _record_event(type: String, subject: String, data: Dictionary = {}) -> void
 
 # True while a dialog owns the keyboard, so game shortcuts stay quiet.
 func _modal_open() -> bool:
+	if first_service_guide != null and first_service_guide.dialog.visible: return true
 	if game_menu != null and game_menu.active: return true
 	if new_game_dialog != null and new_game_dialog.visible: return true
 	return _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
@@ -1461,8 +1472,12 @@ func _unload_passengers(station: String) -> int:
 func _finish_passengers(key: String, station: String, manifest: Dictionary) -> int:
 	var finished: Array = journey_ledger.finish(key, station, manifest, sim_clock.tick)
 	var arrived := PassengerDemand.alight(manifest, station)
+	var first_arrival := passengers_delivered == 0 and arrived > 0
 	passengers_delivered += arrived
-	money += passenger_revenue.record(PassengerClasses.counts(finished))
+	var fare: int = passenger_revenue.record(PassengerClasses.counts(finished))
+	money += fare
+	if first_arrival:
+		first_delivery_notice = "First passengers delivered! %d reached %s; fares £%d. Open Guide to review your progress." % [arrived, station_definitions()[station].name, fare]
 	return arrived
 
 func _charge_operating_cost(delta: float) -> void:
@@ -2090,6 +2105,10 @@ func _load_game(save_path: String = "") -> bool:
 	_reset_track_tools()
 	city_builder.restore_context()
 	_reset_autosave_schedule()
+	first_delivery_notice = ""
+	if first_service_guide != null:
+		first_service_guide.close_guide(false)
+		first_service_guide.refresh(0.0, true)
 	var loaded_notice: String = "Previous save loaded." if save_path.ends_with(".backup.json") else "Game loaded."
 	if migration["migrated"]:
 		loaded_notice += " Upgraded from save version %d; saving again keeps the new format." % int(migration["from_version"])
@@ -4019,12 +4038,21 @@ func _setup_objective_panel() -> void:
 
 func _toggle_objective_panel() -> void:
 	objective_panel.visible = not objective_panel.visible
+	if first_service_guide != null: first_service_guide.refresh(0.0, true)
 	goals_button.set_pressed_no_signal(objective_panel.visible)
 	GameSettings.goals_visible = objective_panel.visible
 	if not GameSettings.save_settings(): _show_notice("Could not save panel visibility; it applies for this session.")
 
 
 func _update_objective_panel() -> void:
+	if city_builder.is_city_game() and first_service_guide != null:
+		var guide: Dictionary = first_service_guide.snapshot
+		objective_heading.text = "FIRST SERVICE COMPLETE" if guide.complete else "FIRST SERVICE — %d / %d" % [guide.done, guide.rows.size()]
+		objective_description.text = "First passengers delivered! Keep expanding." if guide.complete else str(guide.rows[guide.next].title)
+		objective_details.text = "Guide opens the checklist | Seed %s" % world.state.layout_seed
+		objective_progress.max_value = guide.rows.size()
+		objective_progress.value = guide.done
+		return
 	if city_builder.is_city_game():
 		objective_heading.text = "CITY SANDBOX"
 		objective_description.text = "Build stations beside cities, connect track, then buy and start trains in Fleet."

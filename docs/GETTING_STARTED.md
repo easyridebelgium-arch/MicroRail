@@ -6,6 +6,7 @@
 already on the map in a row, with Local fares of £5 and Express fares of £10. You start with £1,000 and track costs £10 per tile.
 
 ## Minute 0–2: start and look around
+- **Guide** beside Map/Goals (also in **Menu**) opens an optional first-service checklist. In a city sandbox it suggests nearby cities and leads to the existing Station, Connect and Fleet tools. It starts closed; reopening it keeps your progress.
 - On the title screen choose a slot and **New game in selected slot**. The map starts paused.
   **Continue** opens your latest readable manual save; **Load game** and **Load previous save** recover a selected slot.
   **Recover autosave** offers three automatic recovery copies per slot. Settings controls their interval (default: one game hour, about one minute at 1×).

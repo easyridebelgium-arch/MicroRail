@@ -41,6 +41,9 @@ func configure(owner_game: Node) -> void:
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(status)
 	save_button = _button(column, "Save game", _save)
+	_button(column, "First service guide", func() -> void:
+		resume_game()
+		game.first_service_guide.open_guide())
 	settings_button = _button(column, "Settings", _settings)
 	return_button = _button(column, "Return to Main Menu", request_return)
 	confirmed.connect(resume_game)

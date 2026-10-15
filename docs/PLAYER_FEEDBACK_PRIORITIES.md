@@ -24,6 +24,8 @@ in one review. The separate v1 artwork pack has 112 proposed art entries.
 | 5 | River/bridge variety (F37/F38/F58) | Maps require different railway choices. Crossing geometry, cost and connectivity work before elevation, tunnels, traction or weather effects are layered on. |
 | 6 | Fair priorities and deeper quality (F02/F18) | Deterministic dispatch avoids starvation; richer reputation rewards documented service quality. Existing advisory arrival targets do not silently become penalties. |
 
+**Priority 1 is now implemented:** [optional guide and first-delivery feedback](FIRST_SERVICE_GUIDE.md), plus [rotating autosaves/recovery](AUTOSAVES.md). Useful-service measurement and bounded city response are next.
+
 ## Important design constraints
 
 - A real completed journey is different from joining a queue or being carried on
@@ -71,5 +73,6 @@ The [v2 art pack](../art/generated/microrail_pack_v2/README.md) adds 16 feedback
 progress icon candidates and 16 city/station/passenger candidates, each exposed
 as a named Godot AtlasTexture. A separate review scene shows large and intended-size
 previews. Original artwork is retained. This batch **does not implement** the
-first-service guide, rotating autosaves, city growth or service cards. They remain
-the next coding steps in the revised [roadmap](ROADMAP.md).
+first-service guide, rotating autosaves, city growth or service cards by itself.
+The guide and autosaves have since been implemented in code; city growth and
+service cards remain future work in the revised [roadmap](ROADMAP.md).

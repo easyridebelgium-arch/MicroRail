@@ -88,12 +88,12 @@ func configure(owner_game: Node) -> void:
 	refresh()
 
 func apply_layout(compact: bool) -> void:
-	var side := 48 if compact else 64
+	var side := 44 if compact else 64
 	for child in game.header_toolbar.get_children():
 		if child is Button and child.has_meta("toolbar_group"):
-			child.custom_minimum_size = Vector2(84 if child == game.speed_selector else side, side)
+			child.custom_minimum_size = Vector2(76 if compact and child == game.speed_selector else 84 if child == game.speed_selector else side, side)
 			if child != game.speed_selector:
-				var icon_size := (24 if compact else 32) if child == game.problems_button else (32 if compact else 48)
+				var icon_size := (20 if compact else 32) if child == game.problems_button else (28 if compact else 48)
 				child.add_theme_constant_override("icon_max_width", icon_size)
 	for separator in separators: separator.custom_minimum_size.y = side
 	for child in status_bar.get_children(): child.add_theme_font_size_override("font_size", 14 if compact else 16)

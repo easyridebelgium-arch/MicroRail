@@ -1,6 +1,7 @@
 extends RefCounted
 
 const Geometry = preload("res://scripts/track_geometry.gd")
+const PLATFORM_HINT := "Start or finish on a highlighted platform end, then drag left or right along the rails. Do not connect from above or below."
 
 
 static func segment(start: Vector2i, finish: Vector2i) -> Array[Vector2i]:
@@ -151,6 +152,9 @@ static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i,
 		else:
 			first = cells[index - 1] - cell
 			second = cells[index + 1] - cell
+		if fixed.has(cell) and (first.y != 0 or second.y != 0):
+			_fail(result, cell, PLATFORM_HINT)
+			continue
 		var kind: Variant = Geometry.from_ports(first, second)
 		if tracks.has(cell):
 			var old: Variant = tracks[cell]
@@ -173,7 +177,7 @@ static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i,
 			if Geometry.same_connections(tracks[cell], kind):
 				continue
 			if fixed.has(cell):
-				_fail(result, cell, "Platform tracks stay horizontal. Leave or enter along their rails.")
+				_fail(result, cell, PLATFORM_HINT)
 				continue
 			var new_ports: Array[Vector2i] = Geometry.connections(kind)
 			for port in Geometry.connections(tracks[cell]):
@@ -196,7 +200,7 @@ static func plan(cells: Array[Vector2i], tracks: Dictionary, map_size: Vector2i,
 				continue
 			if Geometry.connections(tracks[neighbor]).has(-port): continue
 			if fixed.has(neighbor):
-				_fail(result, neighbor, "Platform tracks stay horizontal. Leave or enter along their rails.")
+				_fail(result, neighbor, PLATFORM_HINT)
 				continue
 			var switch_kind: Variant = _automatic_switch(tracks[neighbor], [-port])
 			if switch_kind == null:

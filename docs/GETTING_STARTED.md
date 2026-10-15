@@ -1,5 +1,7 @@
 # MicroRail: your first 15 minutes
 
+**Tutorial mode.** Choose the three-station tutorial in New Game.
+
 **Goal:** connect the stations, run passenger trains and earn enough to grow. Stations A, B and C are
 already on the map in a row, with Local fares of £5 and Express fares of £10. You start with £1,000 and track costs £10 per tile.
 
@@ -12,13 +14,16 @@ already on the map in a row, with Local fares of £5 and Express fares of £10. 
 - Check your **money**, **profit** and the **game clock** in the status bar. **Accounts** shows income, running costs and purchases. Press **G** to see your current objective.
 
 ## Minute 2–6: build track
-1. Pick **Connect track** and drag from one station to the next. Bends, diagonals and platform approaches are automatic.
-2. Prefer to steer? Use **Draw track**: hold the left mouse button and change direction as you go.
-3. Mistakes: use **Undo** (paused only) or the **Remove** tool (**R**; also right-drag). A short right-click returns to Connect track.
-4. Switches are added automatically at junctions. The **Switch** tool adjusts one by hand.
-5. While dragging, the cursor callout shows track/switch cost, placement problems, refunds and affected services. Draft strokes show their own price; review the full plan in **Overlays**.
+1. Pick **Connect track** and drag from Station A’s highlighted rail tile to Station B’s. Start along the rails, left or right—not from above/below the platform. The first A–B connection adds 15 tiles for **£150** and earns the **£100 connection reward**. Bends and diagonals are automatic away from platforms.
+2. In the tutorial, the existing train runs automatically after connecting A–B and resuming. You do not need to open Routes or buy another train for this first service.
+3. Prefer to steer? Use **Draw track**: hold the left mouse button and change direction as you go.
+4. Mistakes: use **Undo** (paused only) or the **Remove** tool (**R**; also right-drag). A short right-click returns to Connect track.
+5. Switches are added automatically at junctions. The **Switch** tool adjusts one by hand.
+6. While dragging, the cursor callout shows track/switch cost, placement problems, refunds and affected services. Draft strokes show their own price; review the full plan in **Overlays**.
 
-## Minute 6–9: make a route
+## Minute 6–9: optionally change or add a route
+The tutorial already has its first route. Use these controls when you want to change it or add a service.
+
 1. Open **Routes**. Give the service a name, choose its mode (**Shuttle** goes back and forth, **Loop** circles) and add stops in order.
 2. Leave each stop's platform on **Auto**. The game chooses a platform when applying the route and can choose a free destination platform before departure; it does not switch platforms while approaching.
 3. Press **Apply**. If the route is not connected, the editor says what is missing.
@@ -45,6 +50,25 @@ already on the map in a row, with Local fares of £5 and Express fares of £10. 
    Waiting room (£700, needs a Shelter, +100 and +10%) or Kiosk (£400, +25 and +10%).
 4. Use **Save game** in the toolbar. There are four slots, with map/time/balance previews.
 5. To return to startup, use **Settings → Return to title screen (save first)**.
+
+## Start a city sandbox instead
+
+Choose **City sandbox**, enter a seed and choose the city count. Build two stations
+near cities, then connect their platforms. Each platform is five tiles long:
+**start on the highlighted left or right end tile and drag horizontally away from
+it**. Approach the destination platform along its rails; do not drag from the tile
+below its white platform/building. Turns belong outside the platform.
+
+A station normally costs £300 (£250 plus five new £10 rail tiles). Open **Fleet**,
+buy a Passenger Shuttle (£400), then use **Start new passenger service** with the
+station choices. Sandbox services need this setup; the tutorial's starting train
+does not. Start with a short link, check the preview price, and resume to carry
+passengers. Queues are not completed deliveries.
+
+Map and Goals start collapsed for new preferences; **M** and **G** reopen them.
+Existing saved panel preferences are respected. **Home** frames the starting area
+below the toolbar. Compact controls are automatic in smaller windows; larger UI
+scales retain wrapping instead of shrinking text or click targets.
 
 ## Next steps
 Short of cash? **Accounts → Bank loans** offers £1,000, £2,500 or £5,000 at 1% interest per game hour, repaid in ten hourly instalments (see [loans](LOANS.md)). Borrow while paused, and repay early if you can.

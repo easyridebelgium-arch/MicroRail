@@ -451,6 +451,7 @@ func _ready() -> void:
 	loans_dialog.configure(self)
 	$Interface.add_child(loans_dialog)
 	_apply_settings()
+	_frame_starting_view.call_deferred()
 	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
 		window.window_input.connect(_tool_window_input.bind(window))
 
@@ -856,7 +857,7 @@ func _can_build_at(cell: Vector2i) -> bool:
 
 
 func _update_instructions() -> void:
-	var direction: String = "Draw track: follow the mouse" if draw_track_mode else "Connect track: drag between two points"
+	var direction: String = "Draw track: follow the mouse" if draw_track_mode else "Connect track: use highlighted platform ends; drag left/right along their rails"
 	if city_builder != null and city_builder.active:
 		direction = "Station: " + str(city_builder.preview(hovered_cell).message)
 	elif inspect_mode:
@@ -875,6 +876,8 @@ func _update_instructions() -> void:
 	if paused:
 		status = "Paused. Press %s to resume." % InputActions.key_label(InputActions.TOGGLE_PAUSE)
 
+	if _starter_route_pending("passenger"):
+		status = "First service: connect Station A to Station B. The train starts automatically when you resume."
 	if notice_remaining > 0.0:
 		status = notice
 	var stranded: PackedStringArray = []
@@ -913,13 +916,19 @@ func _update_instructions() -> void:
 func _on_viewport_size_changed() -> void:
 	_cancel_right_gesture()
 	queue_redraw()
+	_apply_header_mode()
 	_layout_header()
 
 
 # Compact header: no title or key hints, shorter status text, tighter toolbar
 # and a smaller objectives panel, so the map keeps most of the window.
+func _header_is_compact() -> bool:
+	var viewport_size := get_viewport_rect().size
+	return GameSettings.use_compact_header() or viewport_size.x < 1500.0 or viewport_size.y < 800.0
+
+
 func _apply_header_mode() -> void:
-	var compact: bool = GameSettings.use_compact_header()
+	var compact: bool = _header_is_compact()
 	header_title.visible = not compact
 	if header_controls != null: header_controls.apply_layout(compact)
 	header_toolbar.add_theme_constant_override("h_separation", 4 if compact else 8)
@@ -959,7 +968,7 @@ func _layout_header() -> void:
 	var bottom_limit: float = get_viewport_rect().size.y - (64.0 * ui_scale)
 
 	if objective_panel != null:
-		var objective_height: float = (104.0 if GameSettings.use_compact_header() else 140.0) * ui_scale
+		var objective_height: float = (104.0 if _header_is_compact() else 140.0) * ui_scale
 		_set_top_left_rect(objective_panel, column_top, column_top + objective_height)
 
 		if objective_panel.visible:
@@ -987,6 +996,7 @@ func _draw() -> void:
 	city_builder.draw_cities()
 	for cell in tracks:
 		_draw_track(cell, tracks[cell], false)
+	_draw_platform_connection_points()
 	_draw_construction_draft()
 	_draw_inspection_paths()
 	for row in world.facilities():
@@ -2420,13 +2430,60 @@ func _input(event: InputEvent) -> void:
 		camera.position -= event.relative / camera.zoom.x
 		camera.force_update_scroll()
 		get_viewport().set_input_as_handled()
+
+
+func _frame_starting_view() -> void:
+	# Wait for flow containers to settle after icons, fonts and UI scale apply.
+	await get_tree().process_frame
+	_layout_header()
+	_reset_camera()
+
+
 func _reset_camera() -> void:
-	camera.zoom = Vector2.ONE / applied_ui_scale
-	camera.position = get_viewport_rect().size / camera.zoom / 2.0
+	var view := get_viewport_rect()
+	var left := 24.0
+	if (network_map != null and network_map.visible) or (objective_panel != null and objective_panel.visible):
+		left = minf(368.0, view.size.x * 0.45)
+	var top := minf(header_background.offset_bottom + 24.0, view.size.y - 120.0)
+	var usable := Rect2(Vector2(left, top), Vector2(maxf(80.0, view.size.x - left - 24.0), maxf(80.0, view.size.y - top - 64.0)))
+	var focus := Rect2(Vector2(STATION_A - Vector2i(2, 3)) * TILE_SIZE, Vector2(37 * TILE_SIZE, 5 * TILE_SIZE))
 	if city_builder != null and city_builder.is_city_game() and not world.state.settlements.is_empty():
 		var first: Array = world.state.settlements[0].cell
-		camera.position = _cell_center(Vector2i(int(first[0]), int(first[1])))
+		focus = Rect2(_cell_center(Vector2i(int(first[0]), int(first[1]))) - Vector2(192, 128), Vector2(384, 256))
+	var zoom_value := minf(1.0 / applied_ui_scale, minf(usable.size.x / focus.size.x, usable.size.y / focus.size.y))
+	camera.zoom = Vector2.ONE * zoom_value
+	camera.position = focus.get_center() - (usable.get_center() - view.get_center()) / zoom_value
 	camera.force_update_scroll()
+
+
+func platform_connection_points() -> Array[Vector2i]:
+	var ends: Array[Vector2i] = []
+	for station in station_definitions().values():
+		if city_builder.is_city_game():
+			ends.append(station.cell + Vector2i(-2, 0))
+			ends.append(station.cell + Vector2i(2, 0))
+		else:
+			ends.append(station.cell)
+	return ends
+
+
+func _draw_platform_connection_points() -> void:
+	if not paused or draw_track_mode or inspect_mode or demolition_mode or signal_tool_mode or switch_tool_mode or waypoint_tool_mode or city_builder.active:
+		return
+	for cell in platform_connection_points():
+		var marker := Rect2(Vector2(cell) * TILE_SIZE + Vector2(3, 3), Vector2.ONE * (TILE_SIZE - 6))
+		draw_rect(marker, Color(0.88, 0.95, 1.0), false, 2.0)
+		var centre := _cell_center(cell)
+		for side in [-1.0, 1.0]:
+			var tip := centre + Vector2(side * 10.0, 0)
+			draw_line(tip, tip + Vector2(-side * 4.0, -4), Color.WHITE, 2.0)
+			draw_line(tip, tip + Vector2(-side * 4.0, 4), Color.WHITE, 2.0)
+
+
+func _starter_route_pending(key: String) -> bool:
+	if city_builder == null or city_builder.is_city_game(): return false
+	if key == "passenger": return scenario_goals.current_index == 0 and route_cells.is_empty()
+	return key == "freight" and scenario_goals.current_index < 2 and freight_train != null and freight_train.route_cells.is_empty()
 
 
 func _zoom_camera(factor: float) -> void:
@@ -5246,9 +5303,9 @@ func _refresh_directional_routes(notify: bool = true) -> void:
 	if freight_train.route_valid and Fleet.length(Fleet.assigned(fleet, "freight")) > Reservations.VEHICLE_LENGTH:
 		freight_train.route_valid = Consists.stop_clearance(freight_train.route_path, target, Fleet.length(Fleet.assigned(fleet, "freight")), tracks, float(TILE_SIZE), track_signals).is_empty()
 	if notify:
-		if passenger_was_clear and not route_connected:
+		if passenger_was_clear and not route_connected and not _starter_route_pending("passenger"):
 			_show_notice("Passenger train stopped: track incomplete ahead. Repair its path to continue.")
-		if freight_was_clear and not freight_train.route_valid:
+		if freight_was_clear and not freight_train.route_valid and not _starter_route_pending("freight"):
 			_show_notice("Freight train stopped: track incomplete ahead. Repair its path to continue.")
 
 
@@ -5657,6 +5714,7 @@ func problem_rows() -> Array:
 		else:
 			incomplete = not passenger_services[key].connected
 			held = passenger_services[key].held
+		if incomplete and _starter_route_pending(key) and not held and not deadlocks.contains(train.id): continue
 		var stats: Dictionary = traffic_metrics.statistics(train.id)
 		var level := "Warning"
 		var issue := ""

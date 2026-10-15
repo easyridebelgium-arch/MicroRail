@@ -37,8 +37,8 @@ static var _windowed_mode: Window.Mode = Window.MODE_MAXIMIZED
 ## Hides the title and key hints and shortens the status text. Always on at 175%
 ## and above, where the header would otherwise fill the window.
 static var compact_header: bool = false
-static var map_visible: bool = true
-static var goals_visible: bool = true
+static var map_visible: bool = false
+static var goals_visible: bool = false
 static var slow_on_incident: bool = false
 
 ## {action name: [key codes]} as saved. Empty means "use the defaults".
@@ -62,8 +62,8 @@ static func load_settings() -> void:
 	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
 	compact_header = bool(config.get_value("display", "compact_header", false))
 	fullscreen = bool(config.get_value("display", "fullscreen", false))
-	map_visible = bool(config.get_value("panels", "map_visible", true))
-	goals_visible = bool(config.get_value("panels", "goals_visible", true))
+	map_visible = bool(config.get_value("panels", "map_visible", false))
+	goals_visible = bool(config.get_value("panels", "goals_visible", false))
 	slow_on_incident = bool(config.get_value("notifications", "slow_on_incident", false))
 
 	notification_rules = NotificationPolicy.normalize(config.get_value("notifications", "rules", {}))

@@ -235,6 +235,17 @@ slice. Validation: 104/104 regression suites pass on Godot 4.6.3; focused model
 and scene suites pass 25 and 26 checks, and 84 game scripts pass the warning audit.
 See [city demand](CITY_DEMAND.md).
 
+**First-session playtest fixes:** the tutorial already starts its first train
+automatically, so preserve that flow rather than adding a redundant route wizard.
+Fresh Map/Goals preferences now start collapsed; camera/Home frame tutorial
+stations below the header; automatic compact controls fit one row at 720p/default
+scale. Connect mode marks valid passenger platform ends and explains horizontal
+dragging. Unbuilt tutorial routes no longer open as incidents; established route
+damage and freight-stage problems remain visible. The guide records the £150 A–B
+cost and £100 connection reward. Follow-ups are Advanced scheduling, plain-language
+refusals, station queue indicators, consistent dialog art and sandbox first-service
+help. See [playtest evidence and acceptance checks](FIRST_SESSION_FEEDBACK.md).
+
 **Next implementation (revised after player feedback):** a small first-service
 checklist and bounded rotating autosaves, then useful-service measurement from
 completed journeys and city request outcomes, followed by bounded growth/decline.

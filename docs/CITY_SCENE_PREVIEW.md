@@ -43,11 +43,14 @@ use the current passenger demand model, initially with empty queues.
 
 ## Preview limitations
 
-**Generated-game save/load is not enabled yet.** Save is disabled and direct save
-calls are rejected before touching files. Quitting loses this development session.
-Do not build a long-term railway here yet. Normal **F5** still runs the tutorial
-main scene and its existing four save slots; the standard New Game flow is unchanged.
-If custom command-line city arguments are set, clear them to return to normal startup.
+**Generated games can now be saved.** Use **Save** and choose one of the four
+slots; overwriting retains that slot's previous save as a backup. **Load** works
+from this preview or the ordinary main scene and preserves the saved map, train
+positions, queues and finances. See [city saves](CITY_SAVES.md).
+
+Normal **F5** still starts the tutorial; the ordinary seeded New Game chooser is
+next. If custom command-line city arguments are set, clear them to return to normal
+startup. The preview budget and objectives remain provisional.
 
 Station purchases are not undoable and clear the prior construction history so
 old rail undo entries cannot remove a purchased platform. Later track edits still
@@ -63,7 +66,8 @@ godot --path . -- --city-seed=42 --city-count=4
 
 ## Integration and safety
 
-- Normal tutorial startup and save validation retain their existing defaults.
+- Normal tutorial startup and strict validation retain their existing defaults;
+  version 40 migrates older tutorial saves and explicitly supports city companies.
 - The scene no longer draws, reserves, charges or offers phantom primary trains.
   An empty company has usable Fleet/Routes guidance instead of invalid selections.
 - New city passenger services use ordinary `PassengerService` actors and catalog
@@ -77,13 +81,13 @@ godot --path . -- --city-seed=42 --city-count=4
 - Buying another station preserves queues, history, in-flight journey clocks and
   every active train's physical position. It does not recreate existing actors.
 
-The 100-suite regression run passes on headless Godot 4.6.3. The latest scene
-integration suite passes 31 checks covering startup, editor empty states, purchases,
+The scene integration suite passes 31 checks on headless Godot 4.6.3 covering
+startup, editor empty states, purchases,
 JSON/tick command execution, first-route editing and train movement, later station
 construction, independent freight startup under real reservations, and return to
 ordinary tutorial saves. The tests check functional state; a graphical pixel-level
 review of the new preview remains useful when running F6 locally.
 
-Next: full generated-game save validation/restoration, then the ordinary seeded
-new-game chooser and scenario affordability checks. Population/city-owned trip
+Generated-game save validation/restoration is now implemented. Next: the ordinary
+seeded new-game chooser and scenario affordability checks. Population/city-owned trip
 generation and bounded service-driven growth follow the playable persistence slice.

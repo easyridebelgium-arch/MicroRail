@@ -13,7 +13,7 @@ be removed or rebuilt. Godot and GDScript remain the core development tools.
 | Phase 1A — Network integrity | Core implemented and covered by regression tests. | Broaden safety coverage as new platform/body combinations arrive; preserve basic waiting explanations throughout. |
 | Phase 1B — Service operations | Partially complete. | Other repeated-path body routing (planned reversals at stops and crossing figure-eights are done), arrival-time platform switching (lengths, numbering, assignment rule and fixed per-stop sidings exist). Linked services (several trains per route) are done. |
 | Phase 1C — Planning and feedback | Substantial functionality implemented; milestone incomplete. | Evidence-based structural warnings and richer measured planning. Alert acknowledgement/persistence and optional incident slowdown are implemented. Unified waiting inspection is implemented. |
-| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phase 2B first complete freight chain implemented; Phase 2C catalog, generator, station-purchase and empty-start models implemented; main-scene/editor/station UI integrated in a development preview; generated saves/chooser/growth pending. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
+| Phases 2A–2C — Demand, freight chains and growth | Phase 2A demand foundations implemented; Phase 2B first complete freight chain implemented; Phase 2C catalog, generator, station-purchase and empty-start models implemented; main-scene/editor/station UI integrated in a development preview; generated saves implemented; chooser/growth pending. | Direct destination journeys and frequency/timetables implemented; Richer satisfaction, processing chains and growth/scenario rules remain; station waiting-area amenities are implemented. |
 | Phases 3–5 — Maintenance, progression and community | Mostly planned; some building/sharing tools already exist. | Add systems only when their prerequisites and player-facing benefits exist. |
 
 **Current-stage UI work is complete:** all twelve items in the table below are
@@ -171,7 +171,7 @@ transactions recheck stale geometry, funds, signals and train claims; successful
 snapshots preserve existing compatible rails. JSON station identity and routing are
 tested. Validation: 98 regression suites pass, including 42 construction checks
 covering 264 placements across 48 seeded maps. Main-scene placement/startup are now available in the development preview;
-the normal seeded-game chooser and generated saving remain pending. See
+the normal seeded-game chooser remains pending; generated saving is now implemented. See
 [city station construction](CITY_STATION_CONSTRUCTION.md).
 
 **Latest empty-start construction model:** generated geometry, RNG continuation,
@@ -187,13 +187,23 @@ scene and starts an empty seeded company. Fleet/Routes support absent primary
 services; a Station tool previews catchments, footprints and costs and commits
 JSON-safe fixed-tick purchases. Cities are visible and findable; passenger and
 freight trains can be bought, routed and run under existing reservations. Adding
-stations preserves operating trains and passenger state. Development city saving
-is explicitly blocked; the ordinary tutorial flow is unchanged. See
+stations preserves operating trains and passenger state. Generated city saving is now implemented (below); the ordinary tutorial startup
+remains unchanged. See
 [launch steps and limits](CITY_SCENE_PREVIEW.md).
 Validation: 100 regression suites pass; the final scene suite passes 31 checks.
 
-**Next implementation:** full generated-game save validation/restoration, then the
-ordinary seeded sandbox chooser and finance/objective feasibility checks. City-owned
+**Latest generated-game persistence:** root save version 40 explicitly distinguishes
+city companies and tutorial saves. All four slots and per-slot backups now support
+empty companies, stored locomotives, passenger-only, freight-only and mixed games.
+Geometry and physical train positions are restored directly, with queues, journeys,
+loans, amenities, industry inventories and the live RNG stream. Full bodies are
+validated before commit; reservations are rebuilt. Broken routes retain their
+physical trains. Older tutorial saves migrate. Fleet also refreshes the departure/destination pair
+at Start, including programmatic selection. Validation: all 101 regression suites
+passed after correcting and rerunning the multi-service suite (58 checks); the
+final city-save suite passes 60 checks. See [city saves](CITY_SAVES.md).
+
+**Next implementation:** ordinary seeded sandbox chooser and finance/objective feasibility checks. City-owned
 population/trip generation and bounded growth follow that playable persistence slice.
 
 **Artwork preparation:** an AI-generated source pack now contains seven sheets
@@ -534,8 +544,8 @@ history may land earlier once their foundations are reliable.
 
 | Feature | Gameplay or visual benefit | Status, dependencies and scope |
 | --- | --- | --- |
-| Seeded starting layouts | Start new sandbox games with reproducible cities and industries instead of three fixed stations. | Saved catalog foundation is implemented in version 39 with stable facility IDs and validated settlement references. Route/platform and Local demand adapters are implemented. Station-owned journey/amenity/response state is now adapted; Facility geometry and distance-based class adapters are now implemented. The seeded flat-grid generator now validates initial spacing, station clearances, freight-strip separation and land access. City-linked station preview/purchase rules are now implemented as a backend. The empty-start model now preserves dynamic station-owned state. Main-scene startup/editors and placement UI now work in the development preview. Next finish generated save/load before exposing a seed/map-settings chooser; operating routes and startup finances/objectives still need checks. Validate spacing, buildable station approaches, reachable industries and objective feasibility. Save generated geometry plus seed, generator/content versions and rules. Keep A/B/C as the tutorial/legacy scenario; full terrain generation is later. |
-| Player-built stations and city catchments | Build stations beside cities and make location matter for passenger supply. | Horizontal five-tile station previews, exclusive city links, cost/reuse accounting and stale/safety checks are implemented as a backend. Dynamic station-owned state now extends safely in the empty-start model. Placement UI and main-scene adoption are available in the development preview. Generated save/load and city population/trip generation remain before complete seeded starts. Preview population served once that model exists; reject overlaps and preserve existing train positions during edits/load. Passenger origins/destinations belong to settlements; no station or no useful service leaves demand unmet. Clarify overlapping catchments so passengers are not generated twice. Support multiple stations per city after the initial one-station slice. |
+| Seeded starting layouts | Start new sandbox games with reproducible cities and industries instead of three fixed stations. | Saved catalog foundation is implemented in version 39 with stable facility IDs and validated settlement references. Route/platform and Local demand adapters are implemented. Station-owned journey/amenity/response state is now adapted; Facility geometry and distance-based class adapters are now implemented. The seeded flat-grid generator now validates initial spacing, station clearances, freight-strip separation and land access. City-linked station preview/purchase rules are now implemented as a backend. The empty-start model now preserves dynamic station-owned state. Main-scene startup/editors and placement UI now work in the development preview. Generated save/load is implemented in version 40. Next expose a seed/map-settings chooser; operating routes and startup finances/objectives still need checks. Validate spacing, buildable station approaches, reachable industries and objective feasibility. Save generated geometry plus seed, generator/content versions and rules. Keep A/B/C as the tutorial/legacy scenario; full terrain generation is later. |
+| Player-built stations and city catchments | Build stations beside cities and make location matter for passenger supply. | Horizontal five-tile station previews, exclusive city links, cost/reuse accounting and stale/safety checks are implemented as a backend. Dynamic station-owned state now extends safely in the empty-start model. Placement UI and main-scene adoption are available in the development preview. Generated save/load is implemented; ordinary new-game selection and city population/trip generation remain before complete seeded starts. Preview population served once that model exists; reject overlaps and preserve existing train positions during edits/load. Passenger origins/destinations belong to settlements; no station or no useful service leaves demand unmet. Clarify overlapping catchments so passengers are not generated twice. Support multiple stations per city after the initial one-station slice. |
 | City growth and decline | Cities expand with useful service and contract when sustained passenger demand is unmet. | After seeded settlements, stations and catchments work: use bounded population and measured served/unserved demand over a rolling window, including delivered passengers, capacity, frequency and usable destinations. Grow/shrink gradually with grace periods and visible explanations; unserved new cities must not collapse immediately. Preserve existing buildings/station access during visual expansion; never demolish rail or teleport trains. Add slower/no-growth options and later integrate industry supply/jobs and land rights. |
 | Industry growth | Useful cargo service creates production and expansion opportunities. | Retain the existing Phase 2C plan: measured delivered supply and usable demand support bounded industry growth. Extend the saved world catalog and production definitions; keep storage/recipe accounting valid and explain changes. Integrate land rights later. |
 | Sandbox and scenario modes | Offer relaxed construction alongside structured challenges. | Expose unlimited-money and growth-rate options with the supporting systems. Add no-breakdown and maintenance-pressure controls when maintenance exists. Save rule settings and define challenge/achievement eligibility. Reuse introductory objectives for a small early scenario framework; avoid requiring all later simulation features first. |

@@ -5,7 +5,7 @@ seeded game without instantiating the legacy main scene or its default actors.
 It connects generated geometry, RNG continuation and station purchase rules to
 station-owned passenger state. It now drives the
 [main-scene development preview](CITY_SCENE_PREVIEW.md), but is not yet a normal
-New Game choice or a game save format.
+New Game choice. Generated games now persist through [version 40 saves](CITY_SAVES.md).
 
 ## Initial state
 
@@ -51,14 +51,14 @@ tutorial's eight starter passengers into an established network.
 
 `Fleet.is_valid(value, require_primary = true)` and
 `ServiceRoutes.is_valid(value, catalog, positions, require_primary = true)` keep
-the existing defaults. Existing main-scene save callers therefore still require
-the original passenger/freight services and assigned trains.
+the existing defaults. Tutorial save callers still require the original passenger/freight services and
+assigned trains. The validated city save profile explicitly opts into optional actors.
 
 Passing `false` explicitly allows an empty fleet, an unassigned first purchase,
 no services or freight-only operation without passenger stations. IDs, model
 kinds, assignment uniqueness, service geometry and linked instructions remain
 validated. The maximum remains eight passenger services, even without freight.
-The live game loader does not infer this policy from untrusted save fields.
+The live loader checks the selected profile and its geometry before accepting optional actors.
 `PassengerDemand` similarly keeps eight tutorial starter passengers by default;
 the startup helper explicitly requests zero.
 
@@ -72,6 +72,6 @@ atomicity, independent starts and JSON-safe RNG continuation.
 
 Main-scene startup/editor controls and actor access now support absent primary
 services. Station placement, city rendering and dynamic state adoption are connected
-to fixed-tick commands, preserving active physical trains. Next, add full
-generated-game save validation/restoration before exposing the normal new-game
-selector. Root save version 39 and tutorial loading remain unchanged.
+to fixed-tick commands, preserving active physical trains. Generated-game save validation/restoration is now implemented in root save version
+40, including older tutorial migration. Next expose the normal seeded new-game
+selector and validate startup finances/objectives.

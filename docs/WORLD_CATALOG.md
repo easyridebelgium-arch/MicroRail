@@ -40,11 +40,11 @@ A seed alone does not promise identical maps across generator/content versions.
 - JSON numbers are validated by value, then normalized on restore.
 
 The catalog model can describe other station IDs/geometry and settlement links.
-**Current game-load validation accepts only the supported tutorial profile** and
-requires optional industry flags to agree with the industry inventories. A moved
-platform or a different station set is rejected before changing the live game.
-This guard prevents rendering saved geometry while the remaining tutorial-specific
-routing and demand code uses A/B/C elsewhere.
+Current game-load validation supports the tutorial and the versioned `seeded_flat`
+city profile; [version 40 saves](CITY_SAVES.md) explicitly distinguish them.
+Tutorial geometry remains fixed. Generated companies restore saved cities/stations,
+optional services and empty fleets using strict city-specific geometry, catchment,
+platform and physical-body checks. Industry flags must agree with inventories.
 
 ## Next dependency
 
@@ -53,9 +53,8 @@ per-game catalogs ([backend adapters](CATALOG_ROUTING_AND_DEMAND.md)). Retained
 paths and additional-train saves use those identities too. Journey/interchange validation, station-owned amenities/satisfaction/response and
 aggregate reporting are now adapted ([station state](CATALOG_STATION_STATE.md)).
 Facility geometry and distance-based Express adapters are now implemented
-([details](CATALOG_FACILITIES_AND_CLASSES.md)). Next build feasible flat-grid seeded
-layouts plus city-linked station construction and empty-network startup, preserving
-accepted journeys. Then add seeded settlement/industry placement, city-linked station
-construction and a usable sandbox chooser. Growth/decline follows measured useful
-service and unmet demand. These gameplay systems are planned, not enabled by this
-catalog update. See [seeded cities plan](SEEDED_CITIES_PLAN.md).
+([details](CATALOG_FACILITIES_AND_CLASSES.md)). Feasible flat-grid seeded layouts,
+city-linked station construction, empty-network startup and generated persistence
+are now implemented. Next expose the normal seed chooser and verify startup finances.
+City-owned passenger supply and bounded growth/decline follow measured useful
+service and unmet demand. See [seeded cities plan](SEEDED_CITIES_PLAN.md).

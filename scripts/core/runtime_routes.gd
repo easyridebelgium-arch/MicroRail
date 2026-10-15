@@ -79,14 +79,17 @@ static func connected(cells: Array[Vector2i], tracks: Dictionary, station_catalo
 static func defaults() -> Dictionary:
 	return {"passenger_cells": [], "freight_cells": [], "passenger_returning": false, "passenger_return_stop": 0, "passenger_held": false, "freight_returning": false, "freight_held": false}
 
-static func valid_state(value: Variant, services: Dictionary, station_catalog: Dictionary = Services.STATIONS, positions: Dictionary = {}) -> bool:
+static func valid_state(value: Variant, services: Dictionary, station_catalog: Dictionary = Services.STATIONS, positions: Dictionary = {}, require_primary: bool = true) -> bool:
+	if require_primary and (not services.has("passenger") or not services.has("freight")): return false
 	if not value is Dictionary: return false
 	for field in ["passenger_returning", "passenger_held", "freight_returning", "freight_held"]:
 		if typeof(value.get(field)) != TYPE_BOOL: return false
 	var target: Variant = value.get("passenger_return_stop")
-	if typeof(target) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(target)) or float(target) != floor(float(target)) or float(target) < 0 or float(target) >= services["passenger"]["stops"].size(): return false
+	if typeof(target) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(target)) or float(target) != floor(float(target)) or float(target) < 0 or float(target) >= services.get("passenger", {"stops": [""]})["stops"].size(): return false
 	for field in ["passenger_cells", "freight_cells"]:
 		if not valid_cells(value.get(field)): return false
+	if not services.has("passenger") and (not value.passenger_cells.is_empty() or value.passenger_returning or value.passenger_held or target != 0): return false
+	if not services.has("freight") and (not value.freight_cells.is_empty() or value.freight_returning or value.freight_held): return false
 	var passenger := decode(value["passenger_cells"])
 	if not passenger.is_empty() and passenger_path(passenger, services["passenger"]["stops"], 32, services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}), station_catalog).is_empty(): return false
 	var freight := decode(value["freight_cells"])

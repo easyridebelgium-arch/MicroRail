@@ -1,9 +1,9 @@
 # Seeded flat layouts — Phase 2C foundation
 
 `scripts/core/world_generator.gd` generates candidate starting geometry for an
-80×50 flat map. It is not connected to the New Game menu yet. The current game
-loader continues to accept the tutorial profile only; this increment does not
-change save version 39 or move existing trains, tracks or platforms.
+80×50 flat map. It is not connected to the New Game menu yet. The development preview now connects it to the main scene, and
+[version 40 saves](CITY_SAVES.md) restore generated companies without regeneration.
+The ordinary seeded New Game chooser is next; tutorial geometry remains supported.
 
 ## Generation contract
 

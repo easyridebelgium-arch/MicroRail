@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 39
+const CURRENT_VERSION: int = 40
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -65,6 +65,9 @@ static func migrate(data: Dictionary) -> Dictionary:
 
 static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 	match from_version:
+		39:
+			data["game_mode"] = "tutorial"
+			return data
 		14:
 			return _v14_to_v15(data)
 		15:

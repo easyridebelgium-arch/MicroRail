@@ -64,7 +64,7 @@ static func valid_game(data: Dictionary, positions: Dictionary = {}) -> bool:
 	if stock.loaded != stock.sold + int(data.get("factory", {}).get("received", 0)) + (int(cargo) if int(stage) == 1 else 0): return false
 	var loading_cell: Vector2i = positions.get("sawmill", CELL)
 	var cells: Array = data.runtime.freight_cells
-	if count_points(cells, loading_cell) != 1 or count_points(data.services.freight.get("waypoints", {}).get("forest>terminal", []), loading_cell) != 1: return false
+	if count_points(cells, loading_cell) != 1 or count_points(data.services.get("freight", {}).get("waypoints", {}).get("forest>terminal", []), loading_cell) != 1: return false
 	var pad := false
 	for entry in data.tracks:
 		if entry[0] == loading_cell.x and entry[1] == loading_cell.y: pad = typeof(entry[2]) == TYPE_BOOL and entry[2] == false

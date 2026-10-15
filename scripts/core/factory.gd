@@ -63,7 +63,7 @@ static func valid_game(data: Dictionary, positions: Dictionary = {}) -> bool:
 		if point[0] == loading_cell.x and point[1] == loading_cell.y: count += 1
 	if count != 1: return false
 	count = 0
-	for point in data.services.freight.get("waypoints", {}).get("forest>terminal", []):
+	for point in data.services.get("freight", {}).get("waypoints", {}).get("forest>terminal", []):
 		if point[0] == loading_cell.x and point[1] == loading_cell.y: count += 1
 	if count != 1: return false
 	for entry in data.tracks:

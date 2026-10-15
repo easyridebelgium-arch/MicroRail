@@ -258,6 +258,8 @@ func _toggle_service() -> void:
 	refresh()
 
 func _start_service() -> void:
+	# Recheck the origin at submission too; programmatic selection emits no signal.
+	_refresh_start_destinations()
 	var source: String = str(start_copy.get_selected_metadata()) if start_copy.item_count > 0 else ""
 	if source != "": status.text = game.duplicate_passenger_service(selected_id, source.trim_prefix("link:"), source.begins_with("link:"))
 	else: status.text = game.start_passenger_service(selected_id, start_station.get_selected_metadata(), str(start_destination.get_selected_metadata()) if start_destination.item_count > 0 else "")

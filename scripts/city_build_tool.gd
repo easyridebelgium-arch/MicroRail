@@ -31,6 +31,16 @@ func prepare() -> bool:
 	game.train_position = Vector2.ZERO
 	return true
 
+## Rebind saved models directly; loading must never call the generator or reseed RNG.
+func restore_context() -> void:
+	active = false
+	if is_city_game():
+		boot = Start.new()
+		for field in MODEL_FIELDS: boot.set(MODEL_FIELDS[field], game.get(field))
+		boot.initialized = true
+	else: boot = null
+	refresh()
+
 func configure() -> void:
 	button = Button.new()
 	button.name = "BuildCityStation"

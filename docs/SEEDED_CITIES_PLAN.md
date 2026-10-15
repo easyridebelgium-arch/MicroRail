@@ -5,11 +5,13 @@ The saved catalog foundation and flat-grid candidate generator are implemented
 City-linked station preview/purchase rules are also implemented
 ([construction backend](CITY_STATION_CONSTRUCTION.md)); the
 [main-scene preview](CITY_SCENE_PREVIEW.md) now connects startup, editors and station
-placement. Fully saved seeded starts and growth remain planned gameplay.
+placement. [Generated saves](CITY_SAVES.md) are now implemented; the ordinary
+seed chooser and growth remain planned gameplay.
 The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes the
 generated world without default stations/trains and safely extends station-owned
 state as stations are purchased. Main-scene startup/editor integration is available
-in the development preview; normal new-game selection awaits persistence.
+in the development preview; persistence is implemented and normal new-game
+selection is next.
 The fixed three-station map remains the tutorial and supports existing saves.
 New sandbox layouts will instead contain cities and industries, with the player
 building stations beside cities and connecting useful services.
@@ -26,8 +28,8 @@ building stations beside cities and connecting useful services.
    validation and station-owned metrics are now adapted
    ([station state](CATALOG_STATION_STATE.md)). Facility positions and distance-based
    class policy are adapted too ([details](CATALOG_FACILITIES_AND_CLASSES.md)).
-   Generated starts still need feasible layouts, station construction and
-   empty-network/service startup.
+   Feasible layouts, station construction, empty-network/service startup and
+   generated persistence are now available through the development preview.
    Old tutorial saves migrate without moving platforms, trains or passengers.
 2. **Seeded layouts (flat-grid generator implemented):** 3–8 spaced cities and
    four freight-chain sites are generated deterministically on the 80×50 grid.
@@ -36,7 +38,7 @@ building stations beside cities and connecting useful services.
    a playable new-game option. Save the actual generated layout as well as seed,
    generator/content versions and rules; regenerate neither geometry nor passengers
    during load. Startup finances/objectives and operating routes still need validation.
-3. **Station construction and catchments (backend implemented, UI pending):**
+3. **Station construction and catchments (backend, preview UI and saves implemented):**
    horizontal five-tile platform previews, itemized purchase costs, exclusive nearest-city
    links and stale/safety checks are implemented ([details](CITY_STATION_CONSTRUCTION.md)).
    Empty-start, station-owned state expansion, main-scene editors and fixed-tick

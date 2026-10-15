@@ -121,12 +121,12 @@ static func manifests(data: Dictionary) -> Dictionary:
 			if not running is Dictionary or not running.get("passenger_destinations") is Dictionary: return {}
 			result[key] = running.passenger_destinations
 	return result
-static func valid_save(value: Variant, data: Dictionary, tick: int, ids: Array = Demand.STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG) -> bool:
+static func valid_save(value: Variant, data: Dictionary, tick: int, ids: Array = Demand.STATIONS, catalog: Dictionary = Classes.DEFAULT_CATALOG, allow_empty: bool = false) -> bool:
 	if not Demand.valid_ids(ids): return false
 	if not value is Dictionary or not value.get("aboard") is Dictionary or not value.get("completed") is Array: return false
 	if not integer(value.get("unknown_completed"), 0, 1000000000) or value.completed.size() > LIMIT: return false
 	var loads := manifests(data)
-	if loads.is_empty() or loads.size() != value.aboard.size(): return false
+	if (loads.is_empty() and not allow_empty) or loads.size() != value.aboard.size(): return false
 	for key in loads:
 		if not Demand.valid_counts(loads[key], ids): return false
 		var rows: Variant = value.aboard.get(key)

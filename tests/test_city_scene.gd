@@ -77,7 +77,7 @@ func run() -> void:
 	game._update_instructions()
 	game._update_network_map()
 	check(game.reservation_trains.is_empty(), "empty world can advance without actors")
-	check(not game._save_game(4), "development mode cannot write an incompatible save")
+	check(game._save_game(4), "city game can save its constructed station")
 	var queued_stop := Vector2i(candidates[3].cell[0], candidates[3].cell[1])
 	game.paused = false
 	game.city_builder.submit(queued_stop)

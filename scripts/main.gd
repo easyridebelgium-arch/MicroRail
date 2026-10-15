@@ -3,6 +3,7 @@ extends Node2D
 const WorldCatalog = preload("res://scripts/core/world_catalog.gd")
 var world = WorldCatalog.new()
 const CityBuildTool = preload("res://scripts/city_build_tool.gd")
+const CitySavePolicy = preload("res://scripts/core/city_save_policy.gd")
 var city_builder: RefCounted
 @export var startup_city_seed := ""
 @export_range(3, 8, 1) var startup_city_count := 4
@@ -1411,7 +1412,8 @@ func _sample_passenger_occupancy() -> void:
 	passenger_occupancy.sample(sim_clock.tick, samples)
 
 func _saved_journeys() -> Dictionary:
-	var loads: Dictionary = {"passenger": passenger_destinations}
+	var loads: Dictionary = {}
+	if services.has("passenger"): loads["passenger"] = passenger_destinations
 	for key in additional_service_keys(): loads[key] = passenger_services[key].passenger_destinations
 	return journey_ledger.save_state(loads, sim_clock.tick)
 
@@ -1485,9 +1487,6 @@ func _start_new_game(slot: int) -> void:
 
 
 func _save_game(slot: int = 0) -> bool:
-	if city_builder.is_city_game():
-		_show_notice("Development city mode: generated-game save/load is not enabled yet. Tutorial save slots remain available.")
-		return false
 	if slot == 0: slot = active_save_slot
 	if slot < 1 or slot > SaveSlots.COUNT: return false
 	var save_path := SaveSlots.path(slot)
@@ -1521,6 +1520,7 @@ func _save_game(slot: int = 0) -> bool:
 
 	var data: Dictionary = {
 		"version": SAVE_VERSION,
+		"game_mode": "cities" if city_builder.is_city_game() else "tutorial",
 		"world": world.save_state(),
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
@@ -1644,10 +1644,15 @@ func _is_valid_number(value: Variant) -> bool:
 
 func _is_valid_save(data: Dictionary) -> bool:
 	if not Sawmill.valid(data.get("sawmill")) or not Factory.valid(data.get("factory")): return false
-	if not WorldCatalog.valid_tutorial(data.get("world"), data.sawmill.installed, data.factory.installed): return false
+	var city_save: bool = data.get("game_mode") == "cities"
+	if data.get("game_mode") not in ["cities", "tutorial"]: return false
+	if city_save:
+		if not CitySavePolicy.valid_world(data.get("world"), data.sawmill.installed, data.factory.installed): return false
+	else:
+		if not WorldCatalog.valid_tutorial(data.get("world"), data.sawmill.installed, data.factory.installed): return false
 	var saved_catalog := WorldCatalog.new()
 	saved_catalog.restore_state(data.world)
-	if not ServiceRoutes.is_valid(data.get("services"), saved_catalog.stations(), saved_catalog.industry_positions()) or not Fleet.is_valid(data.get("fleet")):
+	if not ServiceRoutes.is_valid(data.get("services"), saved_catalog.stations(), saved_catalog.industry_positions(), not city_save) or not Fleet.is_valid(data.get("fleet"), not city_save):
 		return false
 	if not _valid_service_assignments(data["services"], data["fleet"]): return false
 	var extra: Variant = data.get("passenger_services")
@@ -1656,7 +1661,9 @@ func _is_valid_save(data: Dictionary) -> bool:
 		if key in ["passenger", "freight"]: continue
 		var assigned := Fleet.assigned(data["fleet"], key)
 		if PassengerService.from_save(key, extra.get(key), data["services"][key], Fleet.capacity(assigned), saved_catalog.stations()) == null: return false
-	if extra.size() != data["services"].size() - 2: return false
+	var expected_extra: int = data.services.size() - int(data.services.has("passenger")) - int(data.services.has("freight"))
+	if extra.size() != expected_extra: return false
+	if city_save and data.services.has("passenger"): return false
 	var sim: Variant = data.get("sim")
 	if not sim is Dictionary:
 		return false
@@ -1682,7 +1689,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if version_number != float(SAVE_VERSION):
 		return false
 
-	if not RuntimeRoutes.valid_state(data.get("runtime"), data.get("services", {}), saved_catalog.stations(), saved_catalog.industry_positions()):
+	if not RuntimeRoutes.valid_state(data.get("runtime"), data.get("services", {}), saved_catalog.stations(), saved_catalog.industry_positions(), not city_save):
 		return false
 	if not data.get("signals") is Array:
 		return false
@@ -1718,9 +1725,9 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not Loans.valid_state(data.get("loans"), int(sim.clock.tick)): return false
 	if not Presentation.valid(data.get("presentation"), data.services): return false
 	var state: Dictionary = data["state"]
-	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.passenger, int(sim.clock.tick), saved_catalog.stations().keys(), saved_catalog.stations()): return false
+	if not PassengerDemand.valid_state(data.get("demand"), state, data.services.get("passenger", {}), int(sim.clock.tick), saved_catalog.stations().keys(), saved_catalog.stations()): return false
 	if not PassengerClasses.valid_progress(data.demand.get("class_progress"), saved_catalog.stations()): return false
-	if not JourneyLedger.valid_save(data.get("journeys"), data, int(sim.clock.tick), saved_catalog.stations().keys(), saved_catalog.stations()): return false
+	if not JourneyLedger.valid_save(data.get("journeys"), data, int(sim.clock.tick), saved_catalog.stations().keys(), saved_catalog.stations(), city_save): return false
 
 	for field in SAVE_FIELDS:
 		if not state.has(field):
@@ -1749,7 +1756,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 			if field != "money" and number < 0.0:
 				return false
 
-	if int(state["passenger_stop_index"]) >= data["services"]["passenger"]["stops"].size():
+	if data.services.has("passenger") and int(state["passenger_stop_index"]) >= data.services.passenger.stops.size():
 		return false
 	var saved_capacity_level: int = int(state["capacity_upgrade_level"])
 	var saved_speed_level: int = int(state["speed_upgrade_level"])
@@ -1762,12 +1769,13 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 	var saved_passenger: Dictionary = Fleet.assigned(data["fleet"], "passenger")
 	var saved_freight: Dictionary = Fleet.assigned(data["fleet"], "freight")
-	if int(saved_passenger["capacity_level"]) != saved_capacity_level or int(saved_passenger["speed_level"]) != saved_speed_level:
+	if int(saved_passenger.get("capacity_level", 0)) != saved_capacity_level or int(saved_passenger.get("speed_level", 0)) != saved_speed_level:
 		return false
 	for field in ["capacity_level", "speed_level"]:
-		if not _is_valid_number(data["freight"].get(field)) or float(data["freight"][field]) != float(saved_freight[field]):
+		if not _is_valid_number(data["freight"].get(field)) or float(data["freight"][field]) != float(saved_freight.get(field, 0)):
 			return false
-	var saved_capacity: int = Fleet.capacity(saved_passenger)
+	var saved_capacity: int = 0 if saved_passenger.is_empty() else Fleet.capacity(saved_passenger)
+	if city_save and not CitySavePolicy.valid_absent_actors(data): return false
 
 	if float(state["passengers_on_train"]) > saved_capacity:
 		return false
@@ -1830,13 +1838,12 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not _is_valid_switch_list(data.get("switches"), checked_tracks):
 		return false
 
-	# Every facility must retain its horizontal platform track.
-	for station in facility_cells(1 if data.sawmill.installed else 0, 1 if data.factory.installed else 0, saved_catalog):
-		if not checked_tracks.has(station):
-			return false
-
-		if checked_tracks[station] != false:
-			return false
+	if city_save:
+		if not CitySavePolicy.valid_platforms(data.world, checked_tracks): return false
+	else:
+		# Tutorial facilities retain their original mandatory loading rails.
+		for station in facility_cells(1 if data.sawmill.installed else 0, 1 if data.factory.installed else 0, saved_catalog):
+			if not checked_tracks.has(station) or checked_tracks[station] != false: return false
 	if not _is_valid_number(data.get("scenario_stage")):
 		return false
 
@@ -1845,7 +1852,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if saved_stage != floor(saved_stage):
 		return false
 
-	if saved_stage < 0.0 or saved_stage > ScenarioGoals.OBJECTIVES.size():
+	if saved_stage < 0.0 or saved_stage > ScenarioGoals.OBJECTIVES.size() or (city_save and saved_stage != 0.0):
 		return false
 	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick), saved_catalog.stations().keys()) and PassengerRevenue.valid_save(data.get("passenger_revenue"), state.passengers_delivered) and Sawmill.valid_game(data, saved_catalog.industry_positions()) and Factory.valid_game(data, saved_catalog.industry_positions())
 	
@@ -1883,7 +1890,9 @@ func _load_game(save_path: String = "") -> bool:
 		loaded_tracks[cell] = entry[2]
 	var runtime: Dictionary = data["runtime"]
 	var saved_passenger := RuntimeRoutes.decode(runtime["passenger_cells"])
-	var built: Dictionary = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {}), saved_catalog.stations()) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {}), saved_catalog.stations())
+	var built: Dictionary = {"cells": [], "path": Curve2D.new(), "distances": [], "error": ""}
+	if data.services.has("passenger"):
+		built = ServiceRoutes.build(loaded_tracks, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {}), saved_catalog.stations()) if saved_passenger.is_empty() else RuntimeRoutes.passenger_path(saved_passenger, data["services"]["passenger"]["stops"], float(TILE_SIZE), data["services"]["passenger"].get("waypoints", {}), data["services"]["passenger"].get("mode", "shuttle"), data["services"]["passenger"].get("platforms", {}), saved_catalog.stations())
 	var loaded_cells: Array[Vector2i] = []
 	loaded_cells.assign(built["cells"])
 	var loaded_path: Curve2D = built["path"]
@@ -1917,9 +1926,11 @@ func _load_game(save_path: String = "") -> bool:
 			_show_notice("Saved train is waiting away from a station.")
 			return false
 	var loaded_freight_cells: Array[Vector2i] = RuntimeRoutes.decode(runtime["freight_cells"])
-	if loaded_freight_cells.is_empty(): loaded_freight_cells = WaypointRouter.find_route(loaded_tracks, saved_catalog.cell("industry:forest"), saved_catalog.cell("industry:terminal"), data["services"]["freight"].get("waypoints", {}).get("forest>terminal", []))
+	if loaded_freight_cells.is_empty() and data.services.has("freight"): loaded_freight_cells = WaypointRouter.find_route(loaded_tracks, saved_catalog.cell("industry:forest"), saved_catalog.cell("industry:terminal"), data["services"]["freight"].get("waypoints", {}).get("forest>terminal", []))
 	var loaded_freight_path: Curve2D = RailRouter.make_path(loaded_freight_cells, float(TILE_SIZE))
-	if not FreightTrain.is_valid_state(data["freight"], loaded_freight_path.get_baked_length(), int(Fleet.MODELS[Fleet.assigned(data["fleet"], "freight")["model"]]["capacity"]) + Consists.extra_capacity(Fleet.assigned(data["fleet"], "freight"))):
+	var freight_assignment := Fleet.assigned(data.fleet, "freight")
+	var freight_capacity: int = int(Fleet.MODELS[freight_assignment.model].capacity) + Consists.extra_capacity(freight_assignment) if not freight_assignment.is_empty() else 0
+	if not FreightTrain.is_valid_state(data.freight, loaded_freight_path.get_baked_length(), freight_capacity):
 		_show_notice("Saved freight train state is invalid.")
 		return false
 	if not FreightTrain.valid_chain(data.freight, loaded_freight_cells, data.sawmill.installed, bool(runtime.freight_returning), float(TILE_SIZE), data.factory.installed, saved_catalog.industry_positions()):
@@ -1932,10 +1943,11 @@ func _load_game(save_path: String = "") -> bool:
 	# Validate full bodies even when only the original passenger/freight pair exists.
 	var footprints: Dictionary = {}
 	var helper := Reservations.new()
-	var positions: Array = [
-		{"mode": loaded_services.passenger.get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, "passenger")), "cells": loaded_cells, "path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.stop_cell(loaded_services.passenger.get("platforms", {}), loaded_services.passenger.stops[0], saved_catalog.stations()))), "distance": loaded_distance},
-		{"length": Fleet.length(Fleet.assigned(data.fleet, "freight")), "cells": loaded_freight_cells, "path": _reservation_path(loaded_freight_path, _cell_center(saved_catalog.cell("industry:forest"))), "distance": float(data["freight"]["distance"])}
-	]
+	var positions: Array = []
+	if loaded_services.has("passenger"):
+		positions.append({"mode": loaded_services.passenger.get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, "passenger")), "cells": loaded_cells, "path": _reservation_path(loaded_path, _cell_center(ServiceRoutes.stop_cell(loaded_services.passenger.get("platforms", {}), loaded_services.passenger.stops[0], saved_catalog.stations()))), "distance": loaded_distance})
+	if loaded_services.has("freight"):
+		positions.append({"length": Fleet.length(freight_assignment), "cells": loaded_freight_cells, "path": _reservation_path(loaded_freight_path, _cell_center(saved_catalog.cell("industry:forest"))), "distance": float(data.freight.distance)})
 	for key in loaded_extra: positions.append({"mode": loaded_services[key].get("mode", "shuttle"), "length": Fleet.length(Fleet.assigned(data.fleet, key)), "cells": loaded_extra[key].cells, "path": loaded_extra[key].path, "distance": loaded_extra[key].distance})
 	for train in positions:
 		var shape_error := Consists.route_shape_error(train.path, train.cells, train.length, train.get("mode", "shuttle"), loaded_tracks)
@@ -2023,6 +2035,8 @@ func _load_game(save_path: String = "") -> bool:
 		command_queue.restore_state(data["sim"]["commands"])
 	else:
 		command_queue.clear()
+	_reset_track_tools()
+	city_builder.restore_context()
 	var loaded_notice: String = "Previous save loaded." if save_path.ends_with(".backup.json") else "Game loaded."
 	if migration["migrated"]:
 		loaded_notice += " Upgraded from save version %d; saving again keeps the new format." % int(migration["from_version"])
@@ -2295,9 +2309,8 @@ func _update_toolbar() -> void:
 		InputActions.key_label(InputActions.TOGGLE_PAUSE)
 	]
 
-	save_button.disabled = is_dragging or city_builder.is_city_game()
-	if city_builder.is_city_game(): save_button.tooltip_text = "Development city mode: generated-game saving is pending."
-	else: save_button.tooltip_text = str(save_button.get_meta("toolbar_label", "Save")) + "\nChoose one of four save slots. Its previous save becomes that slot's backup. Opens paused."
+	save_button.disabled = is_dragging
+	save_button.tooltip_text = str(save_button.get_meta("toolbar_label", "Save")) + "\nChoose one of four save slots. Its previous save becomes that slot's backup. Opens paused."
 	load_button.disabled = is_dragging
 	backup_button.disabled = is_dragging
 func _input(event: InputEvent) -> void:
@@ -3365,7 +3378,7 @@ func _passenger_service_is_active() -> bool:
 
 
 func _passenger_service_status() -> String:
-	if not services.has("passenger"): return "City development mode — build stations, connect track and start trains in Fleet. Saving pending."
+	if not services.has("passenger"): return "City game — build stations, connect track and start trains in Fleet."
 	var title: String = services["passenger"]["name"]
 	if not route_connected:
 		return title + ": " + passenger_route_error
@@ -4265,7 +4278,6 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	_update_instructions()
 	_update_station_inspector()
 	queue_redraw()
-	if city_builder.is_city_game(): return "Routes applied. Close and resume. Development city changes cannot be saved yet."
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected or not services.has("passenger") else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:

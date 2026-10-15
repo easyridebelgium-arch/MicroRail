@@ -407,6 +407,36 @@ var goals_button: Button
 @onready var backup_button: Button = $Interface/HeaderBox/Toolbar/BackupButton
 @onready var inspect_button: Button = $Interface/HeaderBox/Toolbar/InspectButton
 
+const Autosaves = preload("res://scripts/core/autosaves.gd")
+var autosave_next_tick: int = 3600
+var autosave_interval: int = 3600
+
+func _reset_autosave_schedule() -> void:
+	autosave_interval = GameSettings.autosave_hours * 3600
+	autosave_next_tick = sim_clock.tick + autosave_interval
+
+func _check_autosave() -> void:
+	if autosave_interval != GameSettings.autosave_hours * 3600:
+		_reset_autosave_schedule()
+	if autosave_interval == 0 or sim_clock.tick < autosave_next_tick: return
+	# Capture only completed ticks, never unfinished gestures or construction drafts.
+	if is_dragging or right_pending or not construction_plan.is_empty() or _modal_open(): return
+	var result := Autosaves.write(active_save_slot, _save_snapshot())
+	# A failed write is retried at the next interval, never once per rendered frame.
+	autosave_next_tick = sim_clock.tick + autosave_interval
+	if result.is_empty():
+		_show_notice("Autosave failed. Previous saves are safe; try a manual save.")
+	else:
+		_show_notice("Autosaved — slot %d (Load → Recover autosave)." % active_save_slot)
+
+func _load_autosave(slot: int, filename: String) -> bool:
+	if slot < 1 or slot > SaveSlots.COUNT or not Autosaves.owns(slot, filename): return false
+	if not _load_game(filename): return false
+	active_save_slot = slot
+	paused = true
+	_show_notice("Autosave recovered in slot %d. Paused; manual saves are unchanged." % slot)
+	return true
+
 func _ready() -> void:
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
 	get_window().focus_exited.connect(_cancel_right_gesture)
@@ -459,6 +489,7 @@ func _ready() -> void:
 	$Interface.add_child(loans_dialog)
 	_apply_settings()
 	_setup_game_menu()
+	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
 	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
 		window.window_input.connect(_tool_window_input.bind(window))
@@ -485,6 +516,7 @@ func _process(delta: float) -> void:
 			_run_due_commands()
 			_simulation_step(SimClock.TICK_SECONDS)
 
+	_check_autosave()
 	_flush_notifications()
 	_update_inspection()
 	_update_instructions()
@@ -1495,7 +1527,7 @@ func _start_new_game(slot: int, configuration: Dictionary = {}) -> void:
 	var tree := get_tree()
 	tree.root.add_child(fresh)
 	if tree.current_scene == self: tree.current_scene = fresh
-	fresh._show_notice("Fresh game in slot %d. Save when ready; its existing saved game has not been replaced." % slot)
+	fresh._show_notice("Fresh game in slot %d. Save when ready; its existing manual save has not been replaced. Autosaves keep separate recovery copies." % slot)
 	queue_free()
 
 
@@ -1517,55 +1549,7 @@ func _save_game(slot: int = 0) -> bool:
 		_execute_command(command)
 	_sync_fleet_upgrades()
 	_sync_timetables()
-	var saved_tracks: Array = []
-
-	for cell in tracks:
-		saved_tracks.append([
-			cell.x,
-			cell.y,
-			tracks[cell]
-		])
-
-	var state: Dictionary = {}
-
-	for field in SAVE_FIELDS:
-		state[field] = get(field)
-
-	var data: Dictionary = {
-		"version": SAVE_VERSION,
-		"game_mode": "cities" if city_builder.is_city_game() else "tutorial",
-		"world": world.save_state(),
-		"city_demand": city_demand.save_state(),
-		"runtime": _saved_runtime_routes(),
-		"amenities": amenities.to_save(),
-		"loans": loans.save_state(),
-		"satisfaction": satisfaction.save_state(),
-		"demand_response": demand_response.save_state(),
-		"journeys": _saved_journeys(),
-		"passenger_revenue": passenger_revenue.save_state(),
-		"sawmill": sawmill.save_state(),
-		"factory": factory.save_state(),
-		"arrivals": arrival_targets.save_state(),
-		"presentation": _saved_presentation(),
-		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
-		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
-		"passenger_services": _saved_passenger_services(),
-		"signals": _saved_signals(),
-		"tracks": saved_tracks,
-		"switches": _saved_switches(),
-		"route_distance": route_distance,
-		"state": state,
-		"freight": freight_train.save_state(),
-		"scenario_stage": scenario_goals.current_index,
-		"services": services.duplicate(true),
-		"fleet": fleet.duplicate(true),
-		"sim": {
-			"clock": sim_clock.save_state(),
-			"rng": sim_rng.save_state(),
-			"events": event_log.save_state(),
-			"commands": command_queue.save_state()
-		}
-	}
+	var data := _save_snapshot()
 
 	# Prepare the new save before touching the existing one.
 	var file := FileAccess.open(temp_path, FileAccess.WRITE)
@@ -1608,7 +1592,59 @@ func _save_game(slot: int = 0) -> bool:
 	active_save_slot = slot
 	_show_notice("Game saved to slot %d." % slot)
 	return true
-	
+
+func _save_snapshot() -> Dictionary:
+	var saved_tracks: Array = []
+
+	for cell in tracks:
+		saved_tracks.append([
+			cell.x,
+			cell.y,
+			tracks[cell]
+		])
+
+	var state: Dictionary = {}
+
+	for field in SAVE_FIELDS:
+		state[field] = get(field)
+
+	return {
+		"version": SAVE_VERSION,
+		"game_mode": "cities" if city_builder.is_city_game() else "tutorial",
+		"world": world.save_state(),
+		"city_demand": city_demand.save_state(),
+		"runtime": _saved_runtime_routes(),
+		"amenities": amenities.to_save(),
+		"loans": loans.save_state(),
+		"satisfaction": satisfaction.save_state(),
+		"demand_response": demand_response.save_state(),
+		"journeys": _saved_journeys(),
+		"passenger_revenue": passenger_revenue.save_state(),
+		"sawmill": sawmill.save_state(),
+		"factory": factory.save_state(),
+		"arrivals": arrival_targets.save_state(),
+		"presentation": _saved_presentation(),
+		"demand": passenger_demand.save_state(passenger_destinations, sim_clock.tick),
+		"dispatch": {"timetables": timetable_state.duplicate(true), "headways": headway_log.duplicate(true)},
+		"passenger_services": _saved_passenger_services(),
+		"signals": _saved_signals(),
+		"tracks": saved_tracks,
+		"switches": _saved_switches(),
+		"route_distance": route_distance,
+		"state": state,
+		"freight": freight_train.save_state(),
+		"scenario_stage": scenario_goals.current_index,
+		"services": services.duplicate(true),
+		"fleet": fleet.duplicate(true),
+		"sim": {
+			"clock": sim_clock.save_state(),
+			"rng": sim_rng.save_state(),
+			"events": event_log.save_state(),
+			"commands": command_queue.save_state()
+		}
+	}
+
+
 # [[x, y, state], ...] for every switch tile.
 func _saved_switches() -> Array:
 	var saved: Array = []
@@ -2053,6 +2089,7 @@ func _load_game(save_path: String = "") -> bool:
 		command_queue.clear()
 	_reset_track_tools()
 	city_builder.restore_context()
+	_reset_autosave_schedule()
 	var loaded_notice: String = "Previous save loaded." if save_path.ends_with(".backup.json") else "Game loaded."
 	if migration["migrated"]:
 		loaded_notice += " Upgraded from save version %d; saving again keeps the new format." % int(migration["from_version"])

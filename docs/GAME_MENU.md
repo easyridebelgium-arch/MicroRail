@@ -24,8 +24,9 @@ construction draft or file error keeps the game open and explains the problem.
 Resume to apply/discard a draft through Overlays, then save again. Opening the
 menu cancels an unfinished mouse stroke but preserves already staged draft edits.
 **Return Without Saving** explicitly discards unsaved progress/drafts and leaves
-the previous saved file untouched. The menu does not add automatic saving or change
-the save schema.
+the previous manual save untouched. Existing autosaves remain available for recovery;
+this action does not create an extra one. Periodic autosaves are configured separately
+in Settings ([autosave recovery](AUTOSAVES.md)); the save schema is unchanged.
 
 Menus use the shared button styling with a navy panel. Content scrolls and windows
 clamp to the viewport at larger UI scales; focus starts on Resume or on Cancel in

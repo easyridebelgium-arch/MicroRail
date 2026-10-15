@@ -12,6 +12,7 @@ var slow_check: CheckBox
 var notification_choices: Dictionary = {}
 
 var scale_choice: OptionButton
+var autosave_choice: OptionButton
 var terrain_choice: OptionButton
 var grid_check: CheckBox
 var palette_choice: OptionButton
@@ -77,6 +78,13 @@ func configure(in_game: bool = false) -> void:
 	compact_header_check = CheckBox.new()
 	compact_header_check.text = "Compact header (always on at 175% and above)"
 	box.add_child(compact_header_check)
+
+	box.add_child(_heading("Save protection"))
+	autosave_choice = OptionButton.new()
+	for hours in Settings.AUTOSAVE_HOURS:
+		autosave_choice.add_item("Autosaves: off" if hours == 0 else "Autosave every game hour" if hours == 1 else "Autosave every %d game hours" % hours)
+	autosave_choice.tooltip_text = "Three recovery copies per game slot, separate from manual saves. One game hour is about one real minute at 1×. Unfinished construction waits until it is safe. Recover via Load game or the main menu."
+	box.add_child(autosave_choice)
 
 	box.add_child(_heading("Operational alerts"))
 	slow_check = CheckBox.new()
@@ -168,6 +176,7 @@ func configure(in_game: bool = false) -> void:
 func open_dialog() -> void:
 	scale_choice.select(Settings.UI_SCALES.find(Settings.ui_scale))
 	palette_choice.select(Settings.palette_mode)
+	autosave_choice.select(maxi(0, Settings.AUTOSAVE_HOURS.find(Settings.autosave_hours)))
 	terrain_choice.select(maxi(0, Settings.TERRAIN_STYLES.find(Settings.terrain_style)))
 	grid_check.button_pressed = Settings.show_grid
 	reduced_motion_check.button_pressed = Settings.reduced_motion
@@ -382,6 +391,7 @@ func _apply() -> void:
 	var scale_index: int = maxi(scale_choice.selected, 0)
 	Settings.ui_scale = Settings.UI_SCALES[scale_index]
 	Settings.palette_mode = maxi(palette_choice.selected, 0)
+	Settings.autosave_hours = Settings.AUTOSAVE_HOURS[maxi(0, autosave_choice.selected)]
 	Settings.terrain_style = Settings.TERRAIN_STYLES[maxi(0, terrain_choice.selected)]
 	Settings.show_grid = grid_check.button_pressed
 	Settings.reduced_motion = reduced_motion_check.button_pressed

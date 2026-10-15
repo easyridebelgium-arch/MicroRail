@@ -14,8 +14,10 @@ save slots, then **New game in selected slot**. The chooser offers:
 
 In a running game, **Load → Start fresh game in selected slot** opens the same
 chooser. Cancel keeps the current company paused. Choosing New Game replaces the
-company in memory, but never writes a save. The selected slot's existing game
-remains intact until explicitly saved; its previous file then becomes the backup.
+company in memory and leaves the selected slot's manual save intact. Its previous
+manual file becomes the backup only when explicitly saved. Enabled autosaves begin
+a fresh interval for the new company and rotate that slot's separate recovery copies
+as game time advances; they never replace the manual save.
 Invalid seed/count settings disable Start and display a reason.
 
 **Random** picks a different valid non-negative 63-bit seed and immediately updates

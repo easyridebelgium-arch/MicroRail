@@ -35,7 +35,7 @@ implemented. Grouped ribbon, compact status/Accounts and summary-first
 train inspection with expandable reservation details are implemented. Four independent
 manual game slots retain separate backups;
 the slot chooser and fresh-game action remain available. The existing save is Slot 1.
-See [save slots](SAVE_SLOTS.md). Periodic autosaves remain Phase 2C work.
+See [save slots](SAVE_SLOTS.md). Configurable rotating autosaves and recovery are now implemented ([autosaves](AUTOSAVES.md)).
 Toolbar refinement instructions are in the [Krita guide](../assets/ui/toolbar/KRITA_GUIDE.md).
 
 **Latest gameplay batch:** Phase 2A connecting journeys are implemented. A–B
@@ -269,8 +269,8 @@ refusals, station queue indicators, consistent dialog art and sandbox first-serv
 help. See [playtest evidence and acceptance checks](FIRST_SESSION_FEEDBACK.md).
 
 **Next implementation (revised after player feedback):** a small first-service
-checklist and bounded rotating autosaves, then useful-service measurement from
-completed journeys and city request outcomes, followed by bounded growth/decline.
+checklist (still planned); bounded rotating autosaves are now implemented. Then
+useful-service measurement from completed journeys and city request outcomes, followed by bounded growth/decline.
 Keep new-city grace periods, population floors, visible causes and slower/no-growth
 rules. Match deliveries to their request cohorts; queued passengers do not earn
 growth, and unfinished long trips must not count as instant failures. Arrival
@@ -633,7 +633,7 @@ history may land earlier once their foundations are reliable.
 | Operating budgets | Break costs down into maintenance, fuel/energy, workforce, vehicles, construction, interest, station upkeep and penalties. | Expand the company dashboard as each cost system arrives; avoid double-counting the same expense across categories. |
 | Leasing and second-hand stock | Offer low-upfront-cost leases and cheaper used vehicles with clear running-cost or reliability trade-offs. | Build on fleet identities, contracts and vehicle condition. Add simple purchase/lease terms before resale-market simulation. |
 | Incident log, journal and lightweight narratives | Generate factual headlines and selected passenger/cargo stories with destinations and senders/recipients. | Consume bounded simulation events and real shipment data. Cap visible stories; keep logs useful even with flavour text disabled. |
-| Rotating autosaves and recovery | Keep a bounded quick-save roster, configurable periodic autosaves and recovery from the last valid save. | Four independent manual slots with per-slot backups and a fresh-game chooser are implemented ([save slots](SAVE_SLOTS.md)). Periodic rotating autosaves remain planned. Build on atomic versioned saves. In-game-hour autosaves are a proposed default, not a real-time guarantee. Never overwrite the only valid save when a write fails. |
+| Rotating autosaves and recovery | Keep a bounded quick-save roster, configurable periodic autosaves and recovery from the last valid save. | Four independent manual slots with per-slot backups and a fresh-game chooser are implemented ([save slots](SAVE_SLOTS.md)). Implemented: three independent rotating recovery copies per manual slot; Settings offers off / 1 / 3 / 6 game hours, default 1. Recovery is available from the title menu and in-game Load. Safe-boundary snapshots preserve queued commands and simulation RNG; failed writes preserve all prior copies. Manual files/backups remain untouched. No schema change. See [autosaves](AUTOSAVES.md). |
 | Recent visual replay | Watch approximately the last ten simulation minutes and jump to incidents. | Combine the event stream with a small ring buffer of sampled train positions, headings, identities and relevant visual/map changes. Set explicit sample-rate and memory limits. This is visual history, not rollback, a save replacement or deterministic input replay. |
 
 ## Phase 3 — Infrastructure, maintenance and business decisions
@@ -744,9 +744,10 @@ implemented slices from remaining extensions. This list describes **remaining wo
 updated after the October 2026 catalogue feedback; it is not the order of feature IDs.
 
 1. **First-session guidance and save protection (1C / 2C):** optional, repeatable
-   first-service checklist; explicit first-delivery feedback; rotating configurable
-   autosaves alongside the four manual slots/backups. Validate beginner affordability
-   before adding rescue rules or changing the economy.
+   first-service checklist; explicit first-delivery feedback. Rotating configurable
+   autosaves alongside the four manual slots/backups are complete
+   ([usage and checks](AUTOSAVES.md)). Validate beginner affordability before adding
+   rescue rules or changing the economy.
 2. **Useful-service measurement and city response (2A / 2C):** match completed
    journeys to request cohorts; separate final deliveries, carried legs and unmet
    reasons. Then add bounded growth/decline, grace periods, population floors,

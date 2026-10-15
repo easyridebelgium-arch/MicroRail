@@ -17,6 +17,8 @@ var settings_window: ConfirmationDialog
 var menu: VBoxContainer
 var pending_slot := 0
 var pending_load := false
+var pending_autosave := ""
+var recovery_picker: ConfirmationDialog
 var busy := false
 var finishing := false
 const GAME := "res://scenes/main/main.tscn"
@@ -65,6 +67,16 @@ func _ready() -> void:
 	slot_choice.clip_text = true
 	menu.add_child(slot_choice)
 	_button("Load game", func() -> void: start(slot_choice.selected + 1, true))
+	recovery_picker = preload("res://scripts/ui/autosave_picker.gd").new()
+	add_child(recovery_picker)
+	recovery_picker.recovery_requested.connect(func(slot: int, filename: String) -> void:
+		if busy: return
+		start(slot, true)
+		if busy:
+			pending_autosave = filename
+			recovery_picker.hide())
+	_button("Recover autosave…", func() -> void:
+		if not busy: recovery_picker.open_slot(slot_choice.selected + 1))
 	_button("Load previous save", func() -> void: start(slot_choice.selected + 1, true, true))
 	new_game_dialog = NewGameDialog.new()
 	new_game_dialog.theme = theme
@@ -86,7 +98,7 @@ func _ready() -> void:
 	_button("Quit", func() -> void: get_tree().quit())
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.text = "New game replaces no saved file until you Save. Load validates the selected game."
+	status.text = "Manual saves change only when you Save. Autosaves keep separate recovery copies. Load validates the selected game."
 	menu.add_child(status)
 	progress = ProgressBar.new()
 	progress.show_percentage = true
@@ -108,6 +120,7 @@ func start(slot: int, load_game: bool, backup: bool = false, configuration: Dict
 	pending_configuration = validated.configuration
 	pending_slot = slot
 	pending_load = load_game
+	pending_autosave = ""
 	set_meta("backup", backup)
 	busy = true
 	status.text = "Loading game resources…"
@@ -142,7 +155,10 @@ func _finish(scene: PackedScene) -> void:
 	get_tree().root.add_child(game)
 	game.get_node("Interface").hide()
 	game.hide()
-	if pending_load and not game._load_slot(pending_slot, bool(get_meta("backup", false))):
+	var loaded := true
+	if pending_load:
+		loaded = game._load_slot(pending_slot, bool(get_meta("backup", false))) if pending_autosave.is_empty() else game._load_autosave(pending_slot, pending_autosave)
+	if not loaded:
 		busy = false
 		finishing = false
 		status.text = "Load failed: " + game.notice + " Select another slot or its previous save."

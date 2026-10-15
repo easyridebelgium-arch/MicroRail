@@ -69,8 +69,9 @@ locations rather than changing simulation rules.
 Each write uses that slot's temporary file, checks write/backup errors, then
 renames it into place. Failed saves retain the selected session/slot; failed loads
 validate before applying state and cannot switch the current slot. Errors appear
-inside the chooser. This is manual slot storage; periodic rotating autosaves remain
-on the roadmap.
+inside the chooser. Periodic autosaves keep three separate recovery copies per slot; they never replace
+manual files or backups. Configure their interval in Settings and use **Recover autosave**
+on the title screen or in the Load chooser. See [autosaves](AUTOSAVES.md).
 
 Validation: `tests/test_save_slots.gd` exercises four independent worlds, isolated
 backups, malformed loads, failed writes, construction guards, chooser feedback and
@@ -91,7 +92,7 @@ per game. See [bank loans](LOANS.md).
 ## Title menu and previews
 
 The title screen supports Continue, selected-slot Load, Load previous save, New,
-Settings and Quit. Continue chooses the most recently modified primary save with
+Recover autosave, Settings and Quit. Continue chooses the most recently modified primary save with
 readable metadata, then validates the complete save before entering gameplay.
 Failed loads leave the title menu usable. New starts paused and changes no saved
 file until you explicitly Save. In-game Settings can return to the title screen;

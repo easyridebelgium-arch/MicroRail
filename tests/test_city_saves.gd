@@ -67,6 +67,12 @@ func run() -> void:
 	check(game.passenger_services[key].passengers == 7 and game.passenger_demand.waiting(destination) == 5, "fixture includes onboard journeys and station queue batches")
 	var physical: Vector2 = game.passenger_services[key].position
 	check(physical != game._cell_center(first), "passenger train is physically away from its start")
+	var auto_before: String = JSON.stringify(game._save_snapshot(), "", true, true)
+	var recovery_path: String = game.Autosaves.write(4, game._save_snapshot())
+	check(not recovery_path.is_empty(), "autosave a moving city train without manual save synchronisation")
+	check(JSON.stringify(game._save_snapshot(), "", true, true) == auto_before, "city autosave preserves live state")
+	check(game._load_autosave(4, recovery_path), "recover moving city train, upgrades, loan and onboard journeys")
+	check(game.passenger_services[key].position.distance_to(physical) < 0.001, "city autosave recovery preserves physical train position")
 	check(game._save_game(3) and game._is_valid_save(payload(3)), "save and validate a moving passenger-only company")
 	var active := payload(3)
 	var before_rng: Dictionary = game.sim_rng.save_state()

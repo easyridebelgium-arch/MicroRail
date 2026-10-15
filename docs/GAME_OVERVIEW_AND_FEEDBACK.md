@@ -5,6 +5,8 @@
 **Current gameplay snapshot: 3bd2913 · Save format 41**  
 **Format: single-player desktop railway-management prototype**
 
+**Update after this snapshot:** configurable rotating autosaves and recovery are now implemented (F70); see [usage and safety](AUTOSAVES.md). The remaining catalogue describes the snapshot above.
+
 This document describes what can be played today and what may be added later. Future features are proposals for discussion, with no promised release dates. Please use the feature IDs when giving feedback.
 
 ## 1. The game we are building
@@ -118,7 +120,7 @@ An existing feature may have a separate future extension. For example, automatic
 - Auto platform changes are limited to supported choices and departure-time Shuttle checks. One-way signals, advanced automatic traffic priorities and in-motion arrival-platform switching are not available.
 - Route/formation changes need safe starting conditions; there is no general moving-train route-editing system. Some repeated-path/long-consist combinations are refused.
 - Historical diagnostic coverage varies: live waiting/occupancy measurements may reset on load, while saved journey, timetable, city-request and financial histories have their own bounded records.
-- No periodic autosave, general scenario editor, mod loader, multiplayer or full rival railway AI is currently provided.
+- No general scenario editor, mod loader, multiplayer or full rival railway AI is currently provided.
 
 ## 5. Immediate development direction
 
@@ -233,7 +235,7 @@ An existing feature may have a separate future extension. For example, automatic
 | F67 | Shared seeds and asynchronous competition | Share runs, campaign medals and results manually first; consider daily/weekly challenges after formats are stable. |
 | F68 | Ghost networks and benchmarks | Compare layouts or construction/performance histories. Executable deterministic replays need additional recording and verification beyond existing logs. |
 | F69 | Controller and Steam Deck support | Add stable focus/navigation, suitable menus and possibly radial controls once the core interface settles. |
-| F70 | Periodic rotating autosaves | Add bounded automatic save rotation and recovery while keeping the existing four manual games and their backups safe. |
+| F70 | Periodic rotating autosaves | Implemented after the snapshot: three recovery copies per manual slot, configurable game-time interval, title/in-game recovery and protected manual saves/backups. See [autosaves](AUTOSAVES.md). |
 
 ## 7. Deliberately deferred or outside the core release scope
 

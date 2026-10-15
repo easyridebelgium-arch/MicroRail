@@ -31,6 +31,8 @@ const TERRAIN_STYLES: Array[String] = ["summer", "autumn", "winter", "plain"]
 const TERRAIN_NAMES: Array[String] = ["Summer grass", "Autumn leaves", "Snow", "Plain grid"]
 static var terrain_style: String = "summer"
 static var show_grid: bool = true
+const AUTOSAVE_HOURS: Array[int] = [0, 1, 3, 6]
+static var autosave_hours: int = 1
 
 static var ui_scale: float = 1.0
 static var palette_mode: int = PaletteMode.DEFAULT
@@ -58,6 +60,8 @@ static func load_settings() -> void:
 	if config.load(SETTINGS_PATH) != OK:
 		return
 
+	var saved_interval: Variant = config.get_value("saves", "autosave_hours", 1)
+	autosave_hours = int(saved_interval) if typeof(saved_interval) == TYPE_INT and saved_interval in AUTOSAVE_HOURS else 1
 	ui_scale = nearest_scale(float(config.get_value("display", "ui_scale", 1.0)))
 	palette_mode = clampi(
 		int(config.get_value("display", "palette", PaletteMode.DEFAULT)),
@@ -86,6 +90,7 @@ static func load_settings() -> void:
 static func save_settings() -> bool:
 	var config := ConfigFile.new()
 
+	config.set_value("saves", "autosave_hours", autosave_hours)
 	config.set_value("display", "terrain_style", terrain_style)
 	config.set_value("display", "show_grid", show_grid)
 	config.set_value("display", "ui_scale", ui_scale)

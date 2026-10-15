@@ -7,7 +7,8 @@ already on the map in a row, with Local fares of £5 and Express fares of £10. 
 
 ## Minute 0–2: start and look around
 - On the title screen choose a slot and **New game in selected slot**. The map starts paused.
-  **Continue** opens your latest readable save; **Load game** and **Load previous save** recover a selected slot.
+  **Continue** opens your latest readable manual save; **Load game** and **Load previous save** recover a selected slot.
+  **Recover autosave** offers three automatic recovery copies per slot. Settings controls their interval (default: one game hour, about one minute at 1×).
 - Press **Space** to play/pause. Building, upgrades and amenities all need the game paused.
 - Move the camera with **W A S D** or the arrow keys (hold **Shift** to go faster), drag with the
   **middle mouse button**, and zoom with the **mouse wheel**. **Home** resets the view.

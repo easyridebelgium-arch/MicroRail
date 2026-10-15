@@ -5,6 +5,9 @@ remaining work. Phases are milestones, not release dates. Preserve completed wor
 when regrouping features; an implemented feature in a later phase does not need to
 be removed or rebuilt. Godot and GDScript remain the core development tools.
 
+For a player-facing catalogue of current and proposed features, with stable IDs
+and a feedback questionnaire, see [Game overview and player feedback](GAME_OVERVIEW_AND_FEEDBACK.md).
+
 ## Current position
 
 | Milestone | Current status | Work still needed to close the milestone |

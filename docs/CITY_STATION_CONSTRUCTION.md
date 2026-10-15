@@ -81,4 +81,5 @@ empty fleet/network and safely extends station-owned state during purchases.
 Main-scene startup/editors, city rendering and an authoritative placement tool are
 now connected in the development preview above. Generated-game save
 validation/restoration and a normal seeded New Game choice are implemented.
-Service-driven city growth/decline follows those foundations.
+City population/trip supply and population previews are now implemented
+([city demand](CITY_DEMAND.md)); service-driven growth/decline follows.

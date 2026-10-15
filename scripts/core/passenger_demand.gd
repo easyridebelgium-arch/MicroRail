@@ -59,6 +59,15 @@ func generate(station: String, batch: int, capacity: int, rng: RefCounted, tick:
 		_add_batch(station, destination, 1, tick, "", -1, true, kind)
 	return room
 
+## Admit one city-owned request with a known final destination; never reroll it.
+func enqueue_trip(origin: String, destination: String, capacity: int, tick: int, kind: String = Classes.LOCAL) -> bool:
+	if not station_ids.has(origin) or not station_ids.has(destination) or origin == destination or waiting(origin) >= capacity: return false
+	if not Classes.valid({"class": kind, "origin": origin, "destination": destination, "known": true}, station_catalog): return false
+	_sync_batches(origin, tick)
+	queues[origin][destination] = int(queues[origin].get(destination, 0)) + 1
+	_add_batch(origin, destination, 1, tick, "", -1, true, kind)
+	return true
+
 static func future_stops(stops: Array, index: int, forward: bool, mode: String) -> Array:
 	var result: Array = []
 	if mode == "loop":

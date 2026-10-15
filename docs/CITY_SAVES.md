@@ -6,9 +6,11 @@ temporary writes and save chooser as the tutorial. Start a generated game throug
 confirm. **Load** restores it from either the preview or the ordinary main scene.
 Starting a new tutorial does not replace an existing save until explicitly saved.
 
-Root save version **40** adds an explicit `game_mode` (`tutorial` or `cities`).
+Root save version **40** added an explicit `game_mode` (`tutorial` or `cities`).
 Version 39 and older supported tutorial saves migrate to `tutorial`; their geometry,
 actors, queues and finances are preserved. The world catalog remains schema 1.
+Root version **41** adds saved [city-owned population/supply](CITY_DEMAND.md), with
+empty historical measurements on v40 migration and no changes to accepted trips.
 Generated saves retain the actual catalog, seed and generator/content versions.
 Loading never calls the generator or reseeds the live random stream.
 
@@ -52,5 +54,5 @@ journey and slot checks also passed. Headless functional testing does not replac
 visual review.
 
 The normal seeded New Game chooser and representative startup affordability checks
-are implemented. City-owned population/trips and bounded service-driven
-growth/decline are next. Artwork remains separate from these mechanics.
+and city-owned population/trip supply are implemented. Bounded service-driven
+growth/decline is next. Artwork remains separate from these mechanics.

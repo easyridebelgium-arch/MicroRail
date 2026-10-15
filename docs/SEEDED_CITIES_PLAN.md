@@ -6,7 +6,7 @@ City-linked station preview/purchase rules are also implemented
 ([construction backend](CITY_STATION_CONSTRUCTION.md)); the
 [main-scene preview](CITY_SCENE_PREVIEW.md) now connects startup, editors and station
 placement. [Generated saves](CITY_SAVES.md) are now implemented; the ordinary
-[seed chooser](NEW_GAME.md) is implemented; population/trips and growth remain planned gameplay.
+[seed chooser](NEW_GAME.md) is implemented; [city population/trip supply](CITY_DEMAND.md) is implemented; growth remains planned gameplay.
 The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes the
 generated world without default stations/trains and safely extends station-owned
 state as stations are purchased. Main-scene startup/editor integration is available
@@ -45,7 +45,7 @@ building stations beside cities and connecting useful services.
    Empty-start, station-owned state expansion, main-scene editors and fixed-tick
    placement and generated persistence are connected to the normal New Game flow.
    The full tool will show price, supported orientation, platform
-   footprint, building clearance and population served once population exists. A passenger station must
+   footprint, building clearance and linked population (now implemented). A passenger station must
    connect to a nearby city's catchment. Cities own trip origins/destinations;
    stations provide access to services. Start with one station per city, then extend
    to several with explicit catchment allocation to avoid duplicating customers.

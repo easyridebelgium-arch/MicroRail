@@ -41,7 +41,9 @@ Version 39 validates facility identities, geometry, enabled industry flags and
 layout versions before changing the game. Version 40 explicitly supports the
 validated generated city profile, optional services and empty companies alongside
 tutorial saves. Loaded geometry is never regenerated; see [city saves](CITY_SAVES.md)
-and [world catalog](WORLD_CATALOG.md).
+and [world catalog](WORLD_CATALOG.md). Version 41 persists [city populations and
+request outcomes](CITY_DEMAND.md), initializing historical measurements empty when
+upgrading v40 while preserving accepted journeys and the live RNG.
 Version 37 migration adds an uninstalled factory, preserving sawmill inventory,
 physical train stages, cash and historical sales. Version 38 retains factory
 processing progress and validates stock transferred between industries and goods

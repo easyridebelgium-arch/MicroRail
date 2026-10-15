@@ -4,7 +4,7 @@ const Start = preload("res://scripts/core/sandbox_start.gd")
 const Construction = preload("res://scripts/core/station_construction.gd")
 const Generator = preload("res://scripts/core/world_generator.gd")
 const Command = preload("res://scripts/core/station_command.gd")
-const MODEL_FIELDS := {"world": "world", "passenger_demand": "demand", "amenities": "amenities", "satisfaction": "satisfaction", "demand_response": "demand_response", "journey_ledger": "journey_ledger", "sim_clock": "sim_clock", "sim_rng": "sim_rng", "command_queue": "command_queue", "tracks": "tracks", "money": "money", "total_construction_cost": "total_construction_cost"}
+const MODEL_FIELDS := {"city_demand": "city_demand", "world": "world", "passenger_demand": "demand", "amenities": "amenities", "satisfaction": "satisfaction", "demand_response": "demand_response", "journey_ledger": "journey_ledger", "sim_clock": "sim_clock", "sim_rng": "sim_rng", "command_queue": "command_queue", "tracks": "tracks", "money": "money", "total_construction_cost": "total_construction_cost"}
 var game: Node2D
 var boot: RefCounted
 var active := false
@@ -74,7 +74,10 @@ func claims() -> Dictionary:
 	return result
 
 func preview(cell: Vector2i) -> Dictionary:
-	return Construction.preview(game.world.save_state(), cell, game.tracks, game.track_signals, claims(), game.money)
+	var result := Construction.preview(game.world.save_state(), cell, game.tracks, game.track_signals, claims(), game.money)
+	if not result.settlement_id.is_empty() and game.city_demand.state.cities.has(result.settlement_id):
+		result.message += " Population served: %d. A connected service is needed to queue trips." % int(game.city_demand.state.cities[result.settlement_id].population)
+	return result
 
 func submit(cell: Vector2i) -> void:
 	game._rebuild_reservations()
@@ -125,7 +128,7 @@ func draw_cities() -> void:
 		var served := false
 		for station in game.world.stations().values():
 			if station.settlement_id == town.id: served = true
-		game.draw_string(ThemeDB.fallback_font, Vector2(bounds.position) * game.TILE_SIZE + Vector2(0, -5), str(town.name) + (" — station built" if served else " — needs a station"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+		game.draw_string(ThemeDB.fallback_font, Vector2(bounds.position) * game.TILE_SIZE + Vector2(0, -5), "%s (%d)" % [town.name, game.city_demand.state.cities[town.id].population] + (" — station built" if served else " — needs a station"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 
 func draw_preview() -> void:
 	if not active or game._modal_open() or game._mouse_is_over_interface(): return

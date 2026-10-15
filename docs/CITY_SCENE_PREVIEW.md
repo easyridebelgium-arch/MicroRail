@@ -37,9 +37,9 @@ placeholder buildings are used; generated artwork remains deferred.
     **Start freight service**. It can operate independently of passenger routes.
 
 The initial camera focuses on the first city. City markers are hollow squares;
-stations/industries retain filled markers. City-owned population/growth is not yet
-implemented, so the interface does not invent population figures. Built stations
-use the current passenger demand model, initially with empty queues.
+stations/industries retain filled markers. City populations now own trip supply;
+[Find City and station inspection](CITY_DEMAND.md) report population and admission
+outcomes. Initial queues are empty. Growth/decline is not active yet.
 
 ## Preview limitations
 
@@ -89,5 +89,5 @@ ordinary tutorial saves. The tests check functional state; a graphical pixel-lev
 review of the new preview remains useful when running F6 locally.
 
 Generated saves and the ordinary seeded new-game chooser are implemented.
-Population/city-owned trip generation and bounded service-driven growth are next;
+City-owned trip supply is implemented; bounded service-driven growth is next;
 scenario/economy balancing remains a later refinement.

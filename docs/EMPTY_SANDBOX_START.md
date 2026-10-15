@@ -75,4 +75,5 @@ services. Station placement, city rendering and dynamic state adoption are conne
 to fixed-tick commands, preserving active physical trains. Generated-game save validation/restoration is now implemented in root save version
 40, including older tutorial migration. The normal seeded new-game
 selector and representative first-service affordability checks are also implemented;
-city-owned passenger supply and growth are next.
+[city-owned passenger supply](CITY_DEMAND.md) is implemented with root save 41;
+service-driven growth/decline is next.

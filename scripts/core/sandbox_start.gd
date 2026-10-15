@@ -1,5 +1,7 @@
 extends RefCounted
 ## Construction-stage startup data. No actors, tutorial services or save-file writes.
+const CityDemand = preload("res://scripts/core/city_demand.gd")
+var city_demand := CityDemand.new()
 const Generator = preload("res://scripts/core/world_generator.gd")
 const World = preload("res://scripts/core/world_catalog.gd")
 const StationConstruction = preload("res://scripts/core/station_construction.gd")
@@ -37,6 +39,7 @@ func initialize(seed_text: String, city_count: int = 4) -> Dictionary:
 	catalog.restore_state(generated.world)
 	var station_state := _expanded_station_state(catalog)
 	world = catalog
+	city_demand.initialize(world.save_state())
 	sim_rng.restore_state(generated.rng_state)
 	sim_clock = Clock.new()
 	command_queue = Commands.new()

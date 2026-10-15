@@ -1,5 +1,7 @@
 extends Node2D
 
+const CityDemand = preload("res://scripts/core/city_demand.gd")
+var city_demand := CityDemand.new()
 const WorldCatalog = preload("res://scripts/core/world_catalog.gd")
 var world = WorldCatalog.new()
 const CityBuildTool = preload("res://scripts/city_build_tool.gd")
@@ -1357,13 +1359,27 @@ func _generate_passengers(delta: float) -> void:
 	passenger_timer += delta
 	while passenger_timer >= PASSENGER_INTERVAL:
 		passenger_timer -= PASSENGER_INTERVAL
+		if city_builder.is_city_game():
+			_generate_city_passengers()
+			continue
 		var network := _passenger_network()
 		for key in passenger_demand.station_ids:
 			var experience: Dictionary = satisfaction.station(key, passenger_demand.waiting_groups(key, sim_clock.tick), sim_clock.tick, amenities.owned[key])
 			var arrivals: int = demand_response.arrivals(key, amenities.arrivals(key, PASSENGERS_PER_BATCH), int(experience.rating), int(experience.boarded), not network[key].is_empty())
 			passenger_demand.generate(key, arrivals, amenities.queue_limit(key), sim_rng, sim_clock.tick, true)
 
+func _generate_city_passengers() -> void:
+	var limits: Dictionary = {}
+	for station in passenger_demand.station_ids: limits[station] = amenities.queue_limit(station)
+	var adjustment := func(station: String, base: int, network: Dictionary) -> int:
+		var experience := satisfaction.station(station, passenger_demand.waiting_groups(station, sim_clock.tick), sim_clock.tick, amenities.owned[station])
+		return demand_response.arrivals(station, amenities.arrivals(station, base), int(experience.rating), int(experience.boarded), not network.get(station, []).is_empty())
+	city_demand.generate(world.save_state(), passenger_demand, _passenger_configurations(), sim_rng, sim_clock.tick, limits, adjustment)
+
 func _passenger_network() -> Dictionary:
+	return PassengerJourneys.graph(_passenger_configurations(), passenger_demand.station_ids)
+
+func _passenger_configurations() -> Dictionary:
 	var available: Dictionary = {}
 	for key in service_keys():
 		if key == "freight" or not service_enabled(key): continue
@@ -1374,7 +1390,7 @@ func _passenger_network() -> Dictionary:
 		var config: Dictionary = services[key]
 		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), config.get("platforms", {}), station_definitions())
 		if not built.cells.is_empty(): available[key] = config
-	return PassengerJourneys.graph(available, passenger_demand.station_ids)
+	return available
 
 func _transfer_passengers(key: String, station: String, manifest: Dictionary) -> int:
 	journey_ledger.ensure(key, manifest, sim_clock.tick)
@@ -1541,6 +1557,7 @@ func _save_game(slot: int = 0) -> bool:
 		"version": SAVE_VERSION,
 		"game_mode": "cities" if city_builder.is_city_game() else "tutorial",
 		"world": world.save_state(),
+		"city_demand": city_demand.save_state(),
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
@@ -1688,6 +1705,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 		return false
 	if not SimClock.is_valid_state(sim.get("clock")):
 		return false
+	if not CityDemand.valid(data.get("city_demand"), data.world, int(sim.clock.tick)): return false
 	if not Timetable.valid_dispatch(data.get("dispatch"), data.services, int(sim.clock.tick)): return false
 	if not SimRng.is_valid_state(sim.get("rng")):
 		return false
@@ -2003,6 +2021,7 @@ func _load_game(save_path: String = "") -> bool:
 			TYPE_FLOAT: set(field, float(state[field]))
 			TYPE_BOOL: set(field, state[field])
 	world.restore_state(data.world)
+	city_demand.restore_state(data.city_demand)
 	freight_train.home_position = _cell_center(FOREST_SITE)
 	network_map.facilities = _facility_markers()
 	passenger_demand.restore_state(data.demand, saved_catalog.stations().keys(), saved_catalog.stations())
@@ -2622,6 +2641,7 @@ func _update_station_inspector() -> void:
 		var experience: Dictionary = satisfaction.station(key, passenger_demand.waiting_groups(key, sim_clock.tick), sim_clock.tick, amenities.owned[key])
 		var rating_text := "%d / 100" % experience.rating if experience.rating >= 0 else "no data yet"
 		station_summary.text = "Waiting passengers: %d / %d\nPassengers aboard for here: %d\nServing routes: %d\nWaiting satisfaction: %s\nDemand response: %d%%\nPause to build amenities; manage trains in Fleet." % [_waiting(key), amenities.queue_limit(key), incoming, count, rating_text, int(demand_response.state[key].factor)]
+		if city_builder.is_city_game(): station_summary.text += "\n\n" + city_demand.describe(station_definitions()[key].settlement_id)
 
 func _update_station_details() -> void:
 	if not station_panel.visible:
@@ -3925,9 +3945,9 @@ func _toggle_objective_panel() -> void:
 
 func _update_objective_panel() -> void:
 	if city_builder.is_city_game():
-		objective_heading.text = "CITY DEVELOPMENT PREVIEW"
+		objective_heading.text = "CITY SANDBOX"
 		objective_description.text = "Build stations beside cities, connect track, then buy and start trains in Fleet."
-		objective_details.text = "Seed %s | %d cities | Save/load pending" % [world.state.layout_seed, world.state.settlements.size()]
+		objective_details.text = "Seed %s | %d cities | %d stations" % [world.state.layout_seed, world.state.settlements.size(), world.stations().size()]
 		objective_progress.max_value = world.state.settlements.size()
 		objective_progress.value = world.stations().size()
 		return
@@ -5999,7 +6019,7 @@ func object_rows() -> Array:
 	var result: Array = []
 	var catchments: Dictionary = CityBuildTool.Construction.catchments(world.save_state())
 	for town in world.state.settlements:
-		result.append({"key": town.id, "kind": "City", "id": -1, "service": "", "title": town.name, "details": "%s\n%s\nBuild a station within six tiles of the city center. One station per city in this version." % [town.name, "No station built" if catchments[town.id] == "" else "Station: " + str(catchments[town.id])], "cell": Vector2i(int(town.cell[0]), int(town.cell[1]))})
+		result.append({"key": town.id, "kind": "City", "id": -1, "service": "", "title": town.name, "details": "%s\n%s\nBuild a station within six tiles of the city center. One station per city in this version." % [town.name, ("No station built" if catchments[town.id] == "" else "Station: " + str(catchments[town.id])) + "\n" + city_demand.describe(town.id)], "cell": Vector2i(int(town.cell[0]), int(town.cell[1]))})
 	var trains: Array = fleet.trains.duplicate()
 	trains.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.id) < int(b.id))
 	for train in trains:

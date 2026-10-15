@@ -41,9 +41,10 @@ simulation RNG, finances or train state. Acceptance validates again before start
 The normal menu's explicit choice overrides development city command-line flags;
 those flags and `scenes/dev/city_preview.tscn` remain available for direct testing.
 
-The interface states the present limits: passenger stations use current demand
-rules; city-owned population/trip generation and growth/decline are next. Tutorial
-rewards do not run in the city sandbox. Root save version remains 40.
+City populations now supply [passenger trip requests](CITY_DEMAND.md), with exclusive
+station access and visible unmet-demand reasons. Population remains fixed; growth/
+decline is next. Tutorial rewards do not run in the city sandbox. Root save version
+is 41; older saves migrate without moving trains or changing accepted passengers.
 
 The shared dialog scrolls and clamps to the viewport. On Godot 4.6.3, the
 new-game suite passes 44 headless functional checks covering title launch, in-game acceptance/cancel, invalid configuration, save/backup

@@ -23,12 +23,12 @@ static func comfort(owned: Array) -> int:
 static func score(wait_ticks: int, bonus: int) -> int:
 	var penalty := mini(90, floori(float(maxi(0, wait_ticks - GRACE_TICKS)) / PENALTY_TICKS))
 	return clampi(100 - penalty + bonus, 0, 100)
-func record(station: String, groups: Array, tick: int, owned: Array) -> void:
+func record(station_key: String, groups: Array, tick: int, owned: Array) -> void:
 	var bonus := comfort(owned)
 	for group in groups:
 		if int(group.count) <= 0: continue
-		history[station].append({"count": int(group.count), "tick": tick, "wait": int(group.wait), "comfort": bonus})
-		if history[station].size() > MAX_GROUPS: history[station].pop_front()
+		history[station_key].append({"count": int(group.count), "tick": tick, "wait": int(group.wait), "comfort": bonus})
+		if history[station_key].size() > MAX_GROUPS: history[station_key].pop_front()
 func station(station_key: String, queues: Array, tick: int, owned: Array) -> Dictionary:
 	var count := 0
 	var points := 0

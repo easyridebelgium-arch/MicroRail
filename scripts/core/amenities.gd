@@ -58,6 +58,7 @@ func buy(station: String, id: String, money: int) -> int:
 ## Whole passengers to generate this interval. Percent bonus is carried in
 ## hundredths, so no randomness is used and a station without amenities
 ## generates exactly `batch`.
+@warning_ignore("integer_division") # Carry preserves the fractional passenger hundredths.
 func arrivals(station: String, batch: int) -> int:
 	var pool: int = int(carry.get(station, 0)) + batch * (100 + demand_bonus(station))
 	carry[station] = pool % 100

@@ -55,6 +55,6 @@ aggregate reporting are now adapted ([station state](CATALOG_STATION_STATE.md)).
 Facility geometry and distance-based Express adapters are now implemented
 ([details](CATALOG_FACILITIES_AND_CLASSES.md)). Feasible flat-grid seeded layouts,
 city-linked station construction, empty-network startup and generated persistence
-are now implemented. Next expose the normal seed chooser and verify startup finances.
+are now implemented. The normal seed chooser and representative startup affordability checks are implemented.
 City-owned passenger supply and bounded growth/decline follow measured useful
 service and unmet demand. See [seeded cities plan](SEEDED_CITIES_PLAN.md).

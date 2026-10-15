@@ -69,7 +69,7 @@ func _run() -> void:
 	await process_frame
 	var editor = game.route_editor
 	editor.station_choice.select(2)
-	editor.add_button.pressed.emit()
+	editor.stop_add_button.pressed.emit()
 	editor.stop_list.select(2)
 	editor.up_button.pressed.emit()
 	editor.route_mode.select(1)

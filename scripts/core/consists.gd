@@ -59,7 +59,7 @@ static func route_shape_error(path: Curve2D, cells: Array, body: float, mode: St
 	return ""
 
 ## Which line a route uses through cells[index]: |direction| of travel.
-static func _passage_axis(cells: Array, index: int, closed: bool) -> Vector2i:
+static func _passage_axis(cells: Array, index: int, _closed: bool) -> Vector2i:
 	var step := Vector2i.ZERO
 	if index > 0: step = cells[index] - cells[index - 1]
 	elif index + 1 < cells.size(): step = cells[index + 1] - cells[index]
@@ -68,7 +68,7 @@ static func _passage_axis(cells: Array, index: int, closed: bool) -> Vector2i:
 ## Planned reversals (A -> C -> B): every leg must be a simple run of track, the
 ## retraced cells may be shared, and legs must be long enough that the body never
 ## spans two reversals at once.
-static func _fold_error(path: Curve2D, cells: Array, body: float, marks: Array) -> String:
+static func _fold_error(_path: Curve2D, cells: Array, body: float, marks: Array) -> String:
 	var folded: Array[int] = []
 	for index in range(1, cells.size() - 1):
 		if cells[index - 1] == cells[index + 1]: folded.append(index)

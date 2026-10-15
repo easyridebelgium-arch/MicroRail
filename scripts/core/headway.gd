@@ -10,20 +10,20 @@ static func remaining_ticks(last_departure: int, target_seconds: int, tick: int)
 	if target_seconds <= 0 or last_departure < 0: return 0
 	return maxi(0, last_departure + target_seconds * TICKS_PER_SECOND - tick)
 
-static func record(log: Array, tick: int) -> Array:
-	var result := log.duplicate()
+static func record(departures: Array, tick: int) -> Array:
+	var result := departures.duplicate()
 	result.append(tick)
 	while result.size() > KEEP: result.pop_front()
 	return result
 
 ## {count, last, average}: intervals in seconds between logged departures.
-static func stats(log: Array) -> Dictionary:
-	var result := {"count": log.size(), "last": 0.0, "average": 0.0}
-	if log.size() < 2: return result
+static func stats(departures: Array) -> Dictionary:
+	var result := {"count": departures.size(), "last": 0.0, "average": 0.0}
+	if departures.size() < 2: return result
 	var total := 0.0
-	for index in range(1, log.size()): total += float(log[index] - log[index - 1]) / TICKS_PER_SECOND
-	result["average"] = total / float(log.size() - 1)
-	result["last"] = float(log[-1] - log[-2]) / TICKS_PER_SECOND
+	for index in range(1, departures.size()): total += float(departures[index] - departures[index - 1]) / TICKS_PER_SECOND
+	result["average"] = total / float(departures.size() - 1)
+	result["last"] = float(departures[-1] - departures[-2]) / TICKS_PER_SECOND
 	return result
 
 ## Seconds for one train to leave the first stop and be back there ready to

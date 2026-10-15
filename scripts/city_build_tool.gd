@@ -14,7 +14,7 @@ func _init(owner_game: Node2D) -> void: game = owner_game
 func is_city_game() -> bool: return game.world.state.layout_id == Generator.PROFILE
 
 func prepare() -> bool:
-	for argument in OS.get_cmdline_user_args():
+	for argument in (OS.get_cmdline_user_args() if game.startup_allow_cli else PackedStringArray()):
 		if argument.begins_with("--city-seed=") and game.startup_city_seed.is_empty(): game.startup_city_seed = argument.trim_prefix("--city-seed=")
 		if argument.begins_with("--city-count=") and argument.trim_prefix("--city-count=").is_valid_int(): game.startup_city_count = argument.trim_prefix("--city-count=").to_int()
 	if game.startup_city_seed.is_empty(): return false

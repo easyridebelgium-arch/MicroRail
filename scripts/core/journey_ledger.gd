@@ -83,10 +83,10 @@ func describe_train(key: String, manifest: Dictionary, tick: int) -> String:
 			oldest = mini(oldest, int(row.start))
 	if measured == 0: return "Journey timing: origins/starts unknown for %d passengers; elapsed unavailable" % Demand.total(manifest)
 	return "Journey timing: %d / %d passengers tracked; oldest tracked elapsed %.1fs from original queue arrival" % [measured, Demand.total(manifest), float(tick - oldest) / 60.0]
-func save_state(manifests: Dictionary, tick: int) -> Dictionary:
-	for key in manifests: ensure(key, manifests[key], tick)
+func save_state(loads: Dictionary, tick: int) -> Dictionary:
+	for key in loads: ensure(key, loads[key], tick)
 	for key in aboard.keys():
-		if not manifests.has(key): aboard.erase(key)
+		if not loads.has(key): aboard.erase(key)
 	return {"aboard": aboard.duplicate(true), "completed": completed.duplicate(true), "unknown_completed": unknown_completed}
 func restore_state(data: Dictionary, ids: Array = Demand.STATIONS) -> void:
 	station_ids.assign(ids)

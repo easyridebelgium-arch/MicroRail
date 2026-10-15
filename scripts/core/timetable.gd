@@ -56,10 +56,10 @@ static func valid_dispatch(value: Variant, services: Dictionary, tick: int) -> b
 			if not _integer(delay) or delay < 0 or delay > now: return false
 	for key in value.headways:
 		if not services.has(key) or key == "freight" or services[key].has("link"): return false
-		var log: Variant = value.headways[key]
-		if not log is Array or log.size() > 128: return false
+		var departures: Variant = value.headways[key]
+		if not departures is Array or departures.size() > 128: return false
 		var previous := -1
-		for departure in log:
+		for departure in departures:
 			if not _integer(departure) or departure < 0 or departure > tick or departure < previous: return false
 			previous = int(departure)
 	return true
@@ -83,13 +83,19 @@ static func normalize_dispatch(value: Dictionary) -> Dictionary:
 	return result
 
 ## Absolute game minutes (since day 1 midnight) at a simulation tick.
+# Whole game minutes/hours/days intentionally discard the incomplete unit.
+@warning_ignore("integer_division")
 static func absolute_minute(tick: int) -> int:
 	return START_MINUTE + tick / TICKS_PER_MINUTE
 
+# Whole game minutes/hours/days intentionally discard the incomplete unit.
+@warning_ignore("integer_division")
 static func format(minute: int) -> String:
 	var m := posmod(minute, DAY)
 	return "%02d:%02d" % [m / 60, m % 60]
 
+# Whole game minutes/hours/days intentionally discard the incomplete unit.
+@warning_ignore("integer_division")
 static func clock_text(absolute: int) -> String:
 	return "Day %d  %s" % [absolute / DAY + 1, format(absolute)]
 
@@ -117,6 +123,8 @@ static func to_text(times: Array) -> String:
 	return ", ".join(parts)
 
 ## Absolute scheduled times in (after, up_to].
+# Whole game minutes/hours/days intentionally discard the incomplete unit.
+@warning_ignore("integer_division")
 static func slots_between(times: Array, after: int, up_to: int) -> Array:
 	var result: Array = []
 	if times.is_empty() or up_to <= after: return result
@@ -127,6 +135,8 @@ static func slots_between(times: Array, after: int, up_to: int) -> Array:
 	return result
 
 ## Smallest scheduled time strictly after `after`.
+# Whole game minutes/hours/days intentionally discard the incomplete unit.
+@warning_ignore("integer_division")
 static func next_slot(times: Array, after: int) -> int:
 	if times.is_empty(): return -1
 	for day in range(maxi(0, after) / DAY, maxi(0, after) / DAY + 2):

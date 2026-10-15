@@ -71,7 +71,9 @@ func _ready() -> void:
 		var button := Button.new()
 		button.text = entry[0]
 		button.focus_mode = Control.FOCUS_NONE
-		button.pressed.connect(emit_signal.bind(entry[1]))
+		button.pressed.connect(func() -> void:
+			if entry[1] == "apply_plan": apply_plan.emit()
+			else: discard_plan.emit())
 		actions.add_child(button)
 	corridor_label = Label.new()
 	corridor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -138,7 +140,9 @@ func _ready() -> void:
 		var share := Button.new()
 		share.text = entry[0]
 		share.focus_mode = Control.FOCUS_NONE
-		share.pressed.connect(emit_signal.bind(entry[1]))
+		share.pressed.connect(func() -> void:
+			if entry[1] == "import_blueprints": import_blueprints.emit()
+			else: export_blueprint.emit())
 		sharing.add_child(share)
 	blueprint_status = Label.new()
 	blueprint_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -182,7 +186,7 @@ func refresh_blueprints(designs: Array) -> void:
 	if names == blueprint_names: return
 	blueprint_names = names
 	blueprint_choice.clear()
-	for name in names: blueprint_choice.add_item(name)
+	for blueprint_title_name in names: blueprint_choice.add_item(blueprint_title_name)
 	if names.is_empty():
 		blueprint_choice.add_item("No matching blueprints")
 		blueprint_choice.disabled = true

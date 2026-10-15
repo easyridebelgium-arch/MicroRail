@@ -1,9 +1,9 @@
 # Seeded flat layouts — Phase 2C foundation
 
 `scripts/core/world_generator.gd` generates candidate starting geometry for an
-80×50 flat map. It is not connected to the New Game menu yet. The development preview now connects it to the main scene, and
+80×50 flat map. It now feeds the [New Game menu](NEW_GAME.md). The development preview now connects it to the main scene, and
 [version 40 saves](CITY_SAVES.md) restore generated companies without regeneration.
-The ordinary seeded New Game chooser is next; tutorial geometry remains supported.
+The ordinary seeded New Game chooser is implemented; tutorial geometry remains supported.
 
 ## Generation contract
 
@@ -60,7 +60,8 @@ clearances and rejection of malformed layouts. The test also verifies that the
 tutorial remains valid and that a generated candidate cannot masquerade as a
 playable tutorial save.
 
-Next: city-linked station placement/catchment previews, purchase validation and
-empty-network/service startup. Integrate seed selection only after an unserved
-city map can be played end to end, including finance/objective feasibility and
-save/load. Bounded service-based growth and decline follow that playable slice.
+City-linked station purchase/placement, empty startup, generated save/load and the
+normal [seed chooser](NEW_GAME.md) are now implemented. Real first-service construction
+checks cover representative seeds/densities with the starting budget. City-owned
+passenger supply and bounded service-based growth/decline are next; deeper scenario
+balance remains separate from the generator's geometry checks.

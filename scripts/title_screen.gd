@@ -6,6 +6,9 @@ const Slots = preload("res://scripts/core/save_slots.gd")
 const Preview = preload("res://scripts/core/save_preview.gd")
 const Legacy = preload("res://scripts/core/legacy_migration.gd")
 const SettingsWindow = preload("res://scripts/settings_dialog.gd")
+const NewGameDialog = preload("res://scripts/new_game_dialog.gd")
+var new_game_dialog: ConfirmationDialog
+var pending_configuration: Dictionary = {}
 var continue_button: Button
 var slot_choice: OptionButton
 var status: Label
@@ -63,7 +66,12 @@ func _ready() -> void:
 	menu.add_child(slot_choice)
 	_button("Load game", func() -> void: start(slot_choice.selected + 1, true))
 	_button("Load previous save", func() -> void: start(slot_choice.selected + 1, true, true))
-	_button("New game in selected slot", func() -> void: start(slot_choice.selected + 1, false))
+	new_game_dialog = NewGameDialog.new()
+	new_game_dialog.theme = theme
+	add_child(new_game_dialog)
+	new_game_dialog.start_requested.connect(func(slot: int, configuration: Dictionary) -> void: start(slot, false, false, configuration))
+	_button("New game in selected slot", func() -> void:
+		if not busy: new_game_dialog.open_dialog(slot_choice.selected + 1))
 	settings_window = SettingsWindow.new()
 	settings_window.theme = theme
 	settings_window.configure()
@@ -91,8 +99,13 @@ func _button(text: String, action: Callable) -> Button:
 	button.pressed.connect(action)
 	menu.add_child(button)
 	return button
-func start(slot: int, load_game: bool, backup: bool = false) -> void:
+func start(slot: int, load_game: bool, backup: bool = false, configuration: Dictionary = {}) -> void:
 	if busy or slot < 1 or slot > Slots.COUNT: return
+	var validated := NewGameDialog.Config.validate(configuration if not configuration.is_empty() else {"mode": "tutorial"})
+	if not validated.ok:
+		status.text = validated.message
+		return
+	pending_configuration = validated.configuration
 	pending_slot = slot
 	pending_load = load_game
 	set_meta("backup", backup)
@@ -120,6 +133,10 @@ func _process(_delta: float) -> void:
 func _finish(scene: PackedScene) -> void:
 	var game = scene.instantiate()
 	game.active_save_slot = pending_slot
+	game.startup_allow_cli = false
+	if not pending_load and pending_configuration.get("mode") == "cities":
+		game.startup_city_seed = pending_configuration.seed
+		game.startup_city_count = pending_configuration.city_count
 	game.paused = true
 	game.set_process(false)
 	get_tree().root.add_child(game)

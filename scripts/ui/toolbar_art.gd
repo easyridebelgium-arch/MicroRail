@@ -60,7 +60,8 @@ static func texture(relative: String, canvas: Vector2i, icon: bool = false) -> T
 		image.resize(fitted.x, fitted.y, Image.INTERPOLATE_NEAREST)
 		var centred := Image.create(canvas.x, canvas.y, false, Image.FORMAT_RGBA8)
 		centred.fill(Color.TRANSPARENT)
-		centred.blit_rect(image, Rect2i(Vector2i.ZERO, fitted), (canvas - fitted) / 2)
+		# Integer pixel placement rounds the spare odd pixel to one side.
+		centred.blit_rect(image, Rect2i(Vector2i.ZERO, fitted), (canvas - fitted) / Vector2i(2, 2))
 		image = centred
 	else:
 		image.resize(canvas.x, canvas.y, Image.INTERPOLATE_NEAREST)

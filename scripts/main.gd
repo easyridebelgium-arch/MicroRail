@@ -3,6 +3,10 @@ extends Node2D
 const WorldCatalog = preload("res://scripts/core/world_catalog.gd")
 var world = WorldCatalog.new()
 const CityBuildTool = preload("res://scripts/city_build_tool.gd")
+const NewGameDialog = preload("res://scripts/new_game_dialog.gd")
+const NewGameConfig = preload("res://scripts/core/new_game_config.gd")
+var new_game_dialog: ConfirmationDialog
+@export var startup_allow_cli := true
 const CitySavePolicy = preload("res://scripts/core/city_save_policy.gd")
 var city_builder: RefCounted
 @export var startup_city_seed := ""
@@ -562,6 +566,7 @@ func _record_event(type: String, subject: String, data: Dictionary = {}) -> void
 
 # True while a dialog owns the keyboard, so game shortcuts stay quiet.
 func _modal_open() -> bool:
+	if new_game_dialog != null and new_game_dialog.visible: return true
 	return _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
 
 
@@ -929,8 +934,8 @@ func _layout_header() -> void:
 	if header_box == null or header_background == null:
 		return
 
-	var scale: float = GameSettings.ui_scale
-	var header_height: float = header_box.position.y + header_box.size.y + (12.0 * scale)
+	var ui_scale: float = GameSettings.ui_scale
+	var header_height: float = header_box.position.y + header_box.size.y + (12.0 * ui_scale)
 	header_background.offset_bottom = header_height
 
 	if station_panel != null:
@@ -942,24 +947,24 @@ func _layout_header() -> void:
 		# The right column has no bottom toolbar. Let scrolling consume the
 		# available space instead of forcing a minimum beyond the viewport.
 		var inspection_bottom := get_viewport_rect().size.y - 8.0
-		inspection_panel.offset_top = minf(header_height + 8.0 * scale, inspection_bottom - 48.0)
+		inspection_panel.offset_top = minf(header_height + 8.0 * ui_scale, inspection_bottom - 48.0)
 		inspection_panel.offset_bottom = inspection_bottom
 
 	# Left column: objectives, then the network map in whatever height is left
 	# above the bottom buttons. Recomputed every frame (cheap, and it follows
 	# the Goals and Map toggles and any window or scale change).
-	var column_top: float = header_height + (16.0 * scale)
-	var bottom_limit: float = get_viewport_rect().size.y - (64.0 * scale)
+	var column_top: float = header_height + (16.0 * ui_scale)
+	var bottom_limit: float = get_viewport_rect().size.y - (64.0 * ui_scale)
 
 	if objective_panel != null:
-		var objective_height: float = (104.0 if GameSettings.use_compact_header() else 140.0) * scale
+		var objective_height: float = (104.0 if GameSettings.use_compact_header() else 140.0) * ui_scale
 		_set_top_left_rect(objective_panel, column_top, column_top + objective_height)
 
 		if objective_panel.visible:
-			column_top += objective_height + (12.0 * scale)
+			column_top += objective_height + (12.0 * ui_scale)
 
 	if network_map != null:
-		var map_height: float = clampf(bottom_limit - column_top, 120.0 * scale, 200.0 * scale)
+		var map_height: float = clampf(bottom_limit - column_top, 120.0 * ui_scale, 200.0 * ui_scale)
 		_set_top_left_rect(network_map, column_top, column_top + map_height)
 
 
@@ -1241,8 +1246,8 @@ func _use_switch_tool(cell: Vector2i) -> void:
 	if planning_mode:
 		var working: Dictionary = construction_plan.projected(tracks)
 		if _plan_protected(cell) or not working.has(cell): return
-		var next: Variant = TrackGeometry.next_switch_variant(working[cell])
-		if next != null: construction_plan.stage({cell: next}, tracks)
+		var draft_variant: Variant = TrackGeometry.next_switch_variant(working[cell])
+		if draft_variant != null: construction_plan.stage({cell: draft_variant}, tracks)
 		return
 	_rebuild_reservations()
 	if reservations.owners.has(cell):
@@ -1474,11 +1479,25 @@ func _load_slot(slot: int, backup: bool = false) -> bool:
 	return true
 
 
-func _start_new_game(slot: int) -> void:
+func _open_new_game(slot: int) -> void:
 	if slot < 1 or slot > SaveSlots.COUNT: return
+	paused = true
+	_reset_track_tools()
+	new_game_dialog.open_dialog(slot)
+
+func _start_new_game(slot: int, configuration: Dictionary = {}) -> void:
+	if slot < 1 or slot > SaveSlots.COUNT: return
+	var validated := NewGameConfig.validate(configuration if not configuration.is_empty() else {"mode": "tutorial"})
+	if not validated.ok:
+		_show_notice(validated.message)
+		return
 	var scene: PackedScene = load("res://scenes/main/main.tscn")
 	var fresh = scene.instantiate()
 	fresh.active_save_slot = slot
+	fresh.startup_allow_cli = false
+	if validated.configuration.mode == "cities":
+		fresh.startup_city_seed = validated.configuration.seed
+		fresh.startup_city_count = validated.configuration.city_count
 	var tree := get_tree()
 	tree.root.add_child(fresh)
 	if tree.current_scene == self: tree.current_scene = fresh
@@ -2080,6 +2099,9 @@ func _update_train_transform() -> void:
 func _setup_toolbar() -> void:
 	save_slots_dialog = SaveSlotsDialog.new()
 	save_slots_dialog.configure(self)
+	new_game_dialog = NewGameDialog.new()
+	$Interface.add_child(new_game_dialog)
+	new_game_dialog.start_requested.connect(func(slot: int, configuration: Dictionary) -> void: _start_new_game.call_deferred(slot, configuration))
 	$Interface.add_child(save_slots_dialog)
 	straight_button.pressed.connect(_select_straight_track)
 	curve_button.pressed.connect(_select_curved_track)
@@ -2415,15 +2437,15 @@ func _setup_station_inspector() -> void:
 	station_panel.name = "StationInspector"
 	$Interface.add_child(station_panel)
 
-	var scale: float = GameSettings.ui_scale
+	var ui_scale: float = GameSettings.ui_scale
 	station_panel.set_anchors_and_offsets_preset(
 		Control.PRESET_TOP_RIGHT
 	)
-	station_panel.offset_left = -304.0 * scale
-	station_panel.offset_right = -16.0 * scale
-	station_panel.offset_top = 176.0 * scale
+	station_panel.offset_left = -304.0 * ui_scale
+	station_panel.offset_right = -16.0 * ui_scale
+	station_panel.offset_top = 176.0 * ui_scale
 	station_panel.anchor_bottom = 1.0
-	station_panel.offset_bottom = -16.0 * scale
+	station_panel.offset_bottom = -16.0 * ui_scale
 	station_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var margin := MarginContainer.new()
@@ -2628,18 +2650,18 @@ func _update_station_details() -> void:
 		var key := _station_key(selected_station)
 		var serving: PackedStringArray = []
 		var states: PackedStringArray = []
-		var incoming := 0
+		var incoming_for_station := 0
 		for service in service_keys():
 			if service == "freight" or not services[service].stops.has(key): continue
 			var train := Fleet.assigned(fleet, service)
 			serving.append("#%d %s" % [int(train.id), services[service].name])
 			states.append(fleet_train_status(int(train.id)))
 			if service == "passenger":
-				incoming += _incoming_passengers(service, key)
+				incoming_for_station += _incoming_passengers(service, key)
 			else:
-				incoming += _incoming_passengers(service, key)
+				incoming_for_station += _incoming_passengers(service, key)
 		station_title.text = station_definitions()[key].name
-		station_details.text = "Services: %s\n\nWaiting passengers: %d\nPassengers aboard for this station: %d\n\n%s\n\nManage individual trains and upgrades in Fleet." % [", ".join(serving) if not serving.is_empty() else "None", _waiting(key), incoming, "\n".join(states)]
+		station_details.text = "Services: %s\n\nWaiting passengers: %d\nPassengers aboard for this station: %d\n\n%s\n\nManage individual trains and upgrades in Fleet." % [", ".join(serving) if not serving.is_empty() else "None", _waiting(key), incoming_for_station, "\n".join(states)]
 		station_details.text += "\n\n" + _destination_queue_text(key)
 		station_details.text += "\n" + PassengerClasses.describe(passenger_demand.waiting_groups(key, sim_clock.tick), station_definitions())
 		station_details.text += "\n\n" + _platform_text(selected_station)
@@ -3319,14 +3341,14 @@ func _setup_history_controls() -> void:
 	controls.name = "ConstructionHistory"
 	$Interface.add_child(controls)
 
-	var scale: float = GameSettings.ui_scale
+	var ui_scale: float = GameSettings.ui_scale
 	controls.set_anchors_and_offsets_preset(
 		Control.PRESET_BOTTOM_LEFT
 	)
-	controls.offset_left = 24.0 * scale
-	controls.offset_right = 224.0 * scale
-	controls.offset_top = -48.0 * scale
-	controls.offset_bottom = -12.0 * scale
+	controls.offset_left = 24.0 * ui_scale
+	controls.offset_right = 224.0 * ui_scale
+	controls.offset_top = -48.0 * ui_scale
+	controls.offset_bottom = -12.0 * ui_scale
 	controls.add_theme_constant_override("separation", 8)
 
 	undo_button = Button.new()
@@ -3724,15 +3746,15 @@ func _setup_network_map() -> void:
 
 	$Interface.add_child(network_map)
 
-	var scale: float = GameSettings.ui_scale
+	var ui_scale: float = GameSettings.ui_scale
 	network_map.set_anchors_and_offsets_preset(
 		Control.PRESET_BOTTOM_LEFT
 	)
 
-	network_map.offset_left = 24.0 * scale
-	network_map.offset_right = 304.0 * scale
-	network_map.offset_top = -264.0 * scale
-	network_map.offset_bottom = -64.0 * scale
+	network_map.offset_left = 24.0 * ui_scale
+	network_map.offset_right = 304.0 * ui_scale
+	network_map.offset_top = -264.0 * ui_scale
+	network_map.offset_bottom = -64.0 * ui_scale
 
 	network_map.navigation_requested.connect(
 		_on_map_navigation_requested
@@ -3840,15 +3862,15 @@ func _setup_objective_panel() -> void:
 	objective_panel.name = "Objectives"
 	$Interface.add_child(objective_panel)
 
-	var scale: float = GameSettings.ui_scale
+	var ui_scale: float = GameSettings.ui_scale
 	objective_panel.set_anchors_and_offsets_preset(
 		Control.PRESET_TOP_LEFT
 	)
 
-	objective_panel.offset_left = 24.0 * scale
-	objective_panel.offset_right = 344.0 * scale
-	objective_panel.offset_top = 176.0 * scale
-	objective_panel.offset_bottom = 316.0 * scale
+	objective_panel.offset_left = 24.0 * ui_scale
+	objective_panel.offset_right = 344.0 * ui_scale
+	objective_panel.offset_top = 176.0 * ui_scale
+	objective_panel.offset_bottom = 316.0 * ui_scale
 	objective_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var margin := MarginContainer.new()
@@ -4191,9 +4213,9 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 				continue
 			var body := Fleet.length(Fleet.assigned(fleet, key)) if Fleet.assigned(fleet, key).has("id") else Reservations.VEHICLE_LENGTH
 			var options := Platforms.for_station(tracks, track_signals, stop, station_definitions()[stop]["cell"], float(TILE_SIZE))
-			var probe := func(number: int) -> bool:
+			var probe := func(candidate_number: int) -> bool:
 				var trial: Dictionary = platforms.duplicate()
-				trial[stop] = number
+				trial[stop] = candidate_number
 				for other in trial.keys():
 					if int(trial[other]) == 0: trial[other] = 1
 				return not ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), trial, station_definitions())["cells"].is_empty()
@@ -4672,8 +4694,8 @@ func _timetable_hold(service: String) -> bool:
 func _headway_hold(service: String) -> bool:
 	if _timetable_hold(service): return true
 	var group := _headway_group(service)
-	var log: Array = headway_log.get(group, [])
-	var remaining := Headway.remaining_ticks(int(log.back()) if not log.is_empty() else -1, _headway_target(service), sim_clock.tick)
+	var departure_history: Array = headway_log.get(group, [])
+	var remaining := Headway.remaining_ticks(int(departure_history.back()) if not departure_history.is_empty() else -1, _headway_target(service), sim_clock.tick)
 	if remaining <= 0:
 		if str(reservation_waits.get(service, "")).begins_with("Holding for"): reservation_waits.erase(service)
 		return false
@@ -4864,8 +4886,8 @@ func _section_check(id: int, service: String, path: Curve2D, current: float, pro
 		result["distance"] = current
 		var cell := Vector2i(floori(path.sample_baked(current).x / TILE_SIZE), floori(path.sample_baked(current).y / TILE_SIZE))
 		var place := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE), station_definitions())
-		var name := str(Fleet.find(fleet, blocker).get("name", "another train"))
-		result["conflict"] = {"owner": blocker, "cell": cell, "reason": "Waiting for %s to clear the single-track section%s" % [name, " (%s)" % place if not place.is_empty() else ""]}
+		var display_name := str(Fleet.find(fleet, blocker).get("name", "another train"))
+		result["conflict"] = {"owner": blocker, "cell": cell, "reason": "Waiting for %s to clear the single-track section%s" % [display_name, " (%s)" % place if not place.is_empty() else ""]}
 	else:
 		section_held.erase(id)
 		if absf(allowed - current) > 0.001: section_claims[id] = {"corridor": corridor, "target": target}
@@ -4885,18 +4907,18 @@ func _reserved_movement(service: String, path: Curve2D, current: float, proposed
 		movement_conflicts[id] = conflict.duplicate(true)
 		movement_conflicts[id]["revision"] = authority_revision
 		var cell: Vector2i = conflict.get("cell", Vector2i(-1, -1))
-		var owner := int(conflict.get("owner", -1))
-		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001 and owner > 0:
-			movement_blocks[id] = owner
-		var other := Fleet.find(fleet, owner)
-		var name: String = str(other.get("name", "another train"))
+		var blocking_owner := int(conflict.get("owner", -1))
+		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001 and blocking_owner > 0:
+			movement_blocks[id] = blocking_owner
+		var other := Fleet.find(fleet, blocking_owner)
+		var display_name: String = str(other.get("name", "another train"))
 		var place := "switch" if TrackGeometry.is_switch(tracks.get(cell)) else "track"
 		var platform_label := Platforms.label_for_cell(tracks, track_signals, cell, float(TILE_SIZE), station_definitions())
-		var reason := str(conflict.get("reason", "Waiting for %s at %s (%s %d,%d)" % [name, platform_label, place, cell.x, cell.y] if not platform_label.is_empty() else "Waiting for %s at %s %d,%d" % [name, place, cell.x, cell.y]))
+		var reason := str(conflict.get("reason", "Waiting for %s at %s (%s %d,%d)" % [display_name, platform_label, place, cell.x, cell.y] if not platform_label.is_empty() else "Waiting for %s at %s %d,%d" % [display_name, place, cell.x, cell.y]))
 		if absf(allowed - current) < 0.001 and absf(proposed - current) > 0.001:
 			traffic_wait_samples[id] = {"reason": reason, "cell": cell}
 		if reservation_waits.get(service, "") != reason:
-			_record_event(EventLog.TRAIN_WAITING, str(id), {"reason": reason, "blocked_by": owner, "x": cell.x, "y": cell.y})
+			_record_event(EventLog.TRAIN_WAITING, str(id), {"reason": reason, "blocked_by": blocking_owner, "x": cell.x, "y": cell.y})
 		reservation_waits[service] = reason
 	else:
 		reservation_waits.erase(service)
@@ -5278,7 +5300,7 @@ func start_passenger_service(id: int, home: String = "a", destination: String = 
 	if train.is_empty() or train.service != "" or Fleet.MODELS[train.model].kind != "passenger": return "Choose a stored passenger train."
 	if not station_definitions().has(home): return "Choose a passenger starting station."
 	if station_definitions().size() < 2: return "Build at least two passenger stations first."
-	if service_keys().filter(func(key: String) -> bool: return key != "freight").size() >= ServiceRoutes.MAX_PASSENGER_SERVICES: return "This prototype supports up to eight active passenger services."
+	if service_keys().filter(func(candidate_key: String) -> bool: return candidate_key != "freight").size() >= ServiceRoutes.MAX_PASSENGER_SERVICES: return "This prototype supports up to eight active passenger services."
 	var service_id := id
 	# Replacement can leave the original service attached to a different train.
 	while services.has("passenger_%d" % service_id): service_id = service_id % 999999999 + 1
@@ -5673,8 +5695,8 @@ func incident_rows() -> Array:
 		var id := int(event.subject) if str(event.subject).is_valid_int() else -1
 		if id < 0 and event.data.has("trains") and not event.data.trains.is_empty(): id = int(event.data.trains[0])
 		var train := Fleet.find(fleet, id)
-		var name: String = str(train.get("name", ""))
-		var title := "%.1fs: %s %s" % [float(event.tick) / 60.0, EventLog.summary(event), name]
+		var display_name: String = str(train.get("name", ""))
+		var title := "%.1fs: %s %s" % [float(event.tick) / 60.0, EventLog.summary(event), display_name]
 		var cell := Vector2i(int(event.data.get("x", -1)), int(event.data.get("y", -1)))
 		rows.append({"key": "event:%d" % int(event.id), "id": id, "severity": severity, "title": title, "details": "Historical incident; it may already be resolved.\n" + title + "\nLocate follows the train's current position if it is still active, otherwise the recorded track location.", "cell": cell})
 	return rows
@@ -5861,12 +5883,12 @@ func _save_blueprint() -> bool:
 	if not _is_inside_map(blueprint_first) or not _is_inside_map(blueprint_last):
 		_show_notice("Choose both rectangle corners first.")
 		return false
-	var name: String = inspection_panel.blueprint_name.text.strip_edges()
+	var display_name: String = inspection_panel.blueprint_name.text.strip_edges()
 	for design in blueprints:
-		if design.name == name:
+		if design.name == display_name:
 			_show_notice("That blueprint name already exists. Choose a different name.")
 			return false
-	var data: Dictionary = TrackBlueprints.capture(tracks, track_signals, blueprint_first, blueprint_last, name, _plan_protected)
+	var data: Dictionary = TrackBlueprints.capture(tracks, track_signals, blueprint_first, blueprint_last, display_name, _plan_protected)
 	if data.is_empty():
 		_show_notice("Enter a name and select built track outside platforms or facility grounds.")
 		return false
@@ -5878,17 +5900,17 @@ func _save_blueprint() -> bool:
 	blueprints = proposed
 	inspection_panel.blueprint_search.clear()
 	inspection_panel.refresh_blueprints(blueprints)
-	inspection_panel.blueprint_choice.select(inspection_panel.blueprint_names.find(name))
-	inspection_panel.blueprint_status.text = "Saved %s: %d×%d tiles, %d tracks and %d signals." % [name, data.width, data.height, data.tiles.size(), data.signals.size()]
+	inspection_panel.blueprint_choice.select(inspection_panel.blueprint_names.find(display_name))
+	inspection_panel.blueprint_status.text = "Saved %s: %d×%d tiles, %d tracks and %d signals." % [display_name, data.width, data.height, data.tiles.size(), data.signals.size()]
 	_show_notice("Blueprint saved locally; its prior library is kept as a backup.")
 	return true
 
 func _place_blueprint(anchor: Vector2i) -> bool:
 	if not planning_mode: return false
-	var name: String = inspection_panel.selected_blueprint()
+	var display_name: String = inspection_panel.selected_blueprint()
 	var data: Dictionary = {}
 	for design in blueprints:
-		if design.name == name: data = design
+		if design.name == display_name: data = design
 	if data.is_empty():
 		_show_notice("Select a saved blueprint first.")
 		return false
@@ -5943,11 +5965,11 @@ func _export_blueprint(path: String) -> bool:
 	if ProjectSettings.globalize_path(path) in [ProjectSettings.globalize_path(BLUEPRINT_PATH), ProjectSettings.globalize_path(BLUEPRINT_PATH + ".backup")]:
 		_show_notice("Choose an export filename outside the active library and its backup.")
 		return false
-	var name: String = inspection_panel.selected_blueprint()
+	var display_name: String = inspection_panel.selected_blueprint()
 	for design in blueprints:
-		if design.name != name: continue
+		if design.name != display_name: continue
 		if TrackBlueprints.save_library(path, [design]):
-			_show_notice("Exported '%s' as a versioned JSON design." % name)
+			_show_notice("Exported '%s' as a versioned JSON design." % display_name)
 			return true
 		_show_notice("Could not write the exported blueprint.")
 		return false

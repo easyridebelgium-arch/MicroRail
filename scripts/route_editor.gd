@@ -14,8 +14,8 @@ var stop_list: ItemList
 var station_choice: OptionButton
 var status: Label
 var editing_controls: HBoxContainer
-var add_button: Button
-var remove_button: Button
+var stop_add_button: Button
+var stop_remove_button: Button
 var up_button: Button
 var down_button: Button
 var platform_choice: OptionButton
@@ -107,7 +107,7 @@ func configure(owner_game: Node) -> void:
 	style_label.placeholder_text = "Route label"
 	appearance.add_child(style_label)
 	style_colour = OptionButton.new()
-	for name in game.Presentation.NAMES: style_colour.add_item(name)
+	for colour_name in game.Presentation.NAMES: style_colour.add_item(colour_name)
 	appearance.add_child(style_colour)
 	var apply_style := Button.new()
 	apply_style.text = "Apply appearance"
@@ -182,8 +182,8 @@ func configure(owner_game: Node) -> void:
 		station_choice.add_item(game.station_definitions()[key]["name"])
 		station_choice.set_item_metadata(station_choice.item_count - 1, key)
 	editing_controls.add_child(station_choice)
-	add_button = _button("Add", _add_stop)
-	remove_button = _button("Remove", _remove_stop)
+	stop_add_button = _button("Add", _add_stop)
+	stop_remove_button = _button("Remove", _remove_stop)
 	up_button = _button("Up", _move_stop.bind(-1))
 	down_button = _button("Down", _move_stop.bind(1))
 	platform_choice = OptionButton.new()

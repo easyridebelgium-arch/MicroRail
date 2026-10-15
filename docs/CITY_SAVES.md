@@ -2,7 +2,7 @@
 
 Generated companies now use the same four manual save slots, slot-specific backups,
 temporary writes and save chooser as the tutorial. Start a generated game through
-[the city preview](CITY_SCENE_PREVIEW.md), then use **Save**, choose a slot and
+[New Game](NEW_GAME.md) (or the development preview), then use **Save**, choose a slot and
 confirm. **Load** restores it from either the preview or the ordinary main scene.
 Starting a new tutorial does not replace an existing save until explicitly saved.
 
@@ -51,6 +51,6 @@ then passed all 58 checks, completing coverage of all 101 suites. Final scene,
 journey and slot checks also passed. Headless functional testing does not replace
 visual review.
 
-The next Phase 2C increment is the normal seeded New Game chooser and startup
-finance/objective feasibility checks. City-owned population/trips and bounded
-service-driven growth/decline follow. Artwork remains separate from these mechanics.
+The normal seeded New Game chooser and representative startup affordability checks
+are implemented. City-owned population/trips and bounded service-driven
+growth/decline are next. Artwork remains separate from these mechanics.

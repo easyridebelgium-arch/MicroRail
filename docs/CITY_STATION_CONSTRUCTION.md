@@ -2,8 +2,8 @@
 
 `scripts/core/station_construction.gd` provides pure placement previews, catchment
 ownership and purchase transactions for the `seeded_flat` city profile. This
-increment does not add a station tool to the current tutorial or enable generated
-games in New Game. Placement UI and empty startup are now connected in the
+backend is used by the city sandbox; the tutorial keeps its original stations.
+Generated games are available through [New Game](NEW_GAME.md). Placement UI and empty startup are now connected in the
 [main-scene development preview](CITY_SCENE_PREVIEW.md); generated-game saving is now implemented in [version 40](CITY_SAVES.md).
 
 ## First station rules
@@ -67,7 +67,7 @@ read live train actors itself. UI clicks must not bypass that authoritative comm
 New city/station links use the existing world catalog representation. JSON restores
 their geometry and stable identity. The playable loader now supports generated
 companies as well as tutorial saves in root version 40; see [city saves](CITY_SAVES.md).
-The ordinary seeded new-game selector follows persistence.
+The ordinary seeded new-game selector is now implemented.
 
 All 98 regression suites pass. The focused suite passes 42 checks covering
 affordability, reuse, footprint safety, stale drafts,
@@ -80,5 +80,5 @@ The [empty-start construction model](EMPTY_SANDBOX_START.md) now initializes an
 empty fleet/network and safely extends station-owned state during purchases.
 Main-scene startup/editors, city rendering and an authoritative placement tool are
 now connected in the development preview above. Generated-game save
-validation/restoration is implemented; next expose a normal seeded New Game choice.
+validation/restoration and a normal seeded New Game choice are implemented.
 Service-driven city growth/decline follows those foundations.

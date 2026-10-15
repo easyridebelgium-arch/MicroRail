@@ -9,8 +9,8 @@ Opening it pauses gameplay; close it and press Play/Space to resume.
 - **Load:** select a saved slot and press **Load selected slot**. Loading changes
   the game in memory and makes that slot current. Empty slots cannot be loaded.
 - **Start fresh:** open Load, select any slot, then press **Start fresh game in
-  selected slot**. This replaces the current in-memory session with a fresh map.
-  Save it when ready. Starting fresh does not overwrite any saved file.
+  selected slot**. Choose Tutorial or City sandbox in the [New Game dialog](NEW_GAME.md).
+  Starting then replaces the current in-memory session; Cancel keeps it. Save when ready. Starting fresh does not overwrite any saved file.
 - **Previous save** (history/curved-arrow button): choose a slot to load its backup.
   Each slot has its own backup; this does not load another slot's history.
 - **Save folder:** opens the Godot user-data folder containing these files.
@@ -38,8 +38,10 @@ completed timing, plus active arrival targets and bounded punctuality history.
 Version 38 migration adds the saved tutorial world/facility catalog. It preserves
 physical positions, passengers, inventories, money and simulation RNG state.
 Version 39 validates facility identities, geometry, enabled industry flags and
-layout versions before changing the game. Unsupported relocated/generated layouts
-are rejected until backend catalog integration is complete. See [world catalog](WORLD_CATALOG.md).
+layout versions before changing the game. Version 40 explicitly supports the
+validated generated city profile, optional services and empty companies alongside
+tutorial saves. Loaded geometry is never regenerated; see [city saves](CITY_SAVES.md)
+and [world catalog](WORLD_CATALOG.md).
 Version 37 migration adds an uninstalled factory, preserving sawmill inventory,
 physical train stages, cash and historical sales. Version 38 retains factory
 processing progress and validates stock transferred between industries and goods

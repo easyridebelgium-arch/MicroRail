@@ -47,12 +47,12 @@ static func corridor(path: Curve2D, from: float, to: float, tracks: Dictionary, 
 	var result: Dictionary = {}
 	var cache: Dictionary = {}
 	if path == null or path.point_count < 2 or absf(to - from) < 0.001: return result
-	var sign := 1.0 if to > from else -1.0
+	var travel_sign := 1.0 if to > from else -1.0
 	var length := path.get_baked_length()
 	var d := clampf(from, 0.0, length)
 	var end := clampf(to, 0.0, length)
-	while (end - d) * sign > -0.001:
-		var ahead := clampf(d + sign * SAMPLE_STEP, 0.0, length)
+	while (end - d) * travel_sign > -0.001:
+		var ahead := clampf(d + travel_sign * SAMPLE_STEP, 0.0, length)
 		var here := path.sample_baked(d)
 		var delta := path.sample_baked(ahead) - here
 		var cell := Vector2i(floori(here.x / tile_size), floori(here.y / tile_size))
@@ -61,7 +61,7 @@ static func corridor(path: Curve2D, from: float, to: float, tracks: Dictionary, 
 			var heading := Vector2i(roundi(direction.x), roundi(direction.y))
 			if heading != Vector2i.ZERO and not result.has(cell): result[cell] = heading
 		if absf(d - end) < 0.001: break
-		d = clampf(d + sign * SAMPLE_STEP, minf(from, end), maxf(from, end))
+		d = clampf(d + travel_sign * SAMPLE_STEP, minf(from, end), maxf(from, end))
 	return result
 
 ## Id of the first claimant whose corridor crosses `mine` head-on, else -1.

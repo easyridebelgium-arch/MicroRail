@@ -87,7 +87,7 @@ func configure(in_game: bool = false) -> void:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(label)
 		var choice := OptionButton.new()
-		for mode in ["Off", "Notice", "Notice + pause"]: choice.add_item(mode)
+		for incident_mode in ["Off", "Notice", "Notice + pause"]: choice.add_item(incident_mode)
 		box.add_child(choice)
 		notification_choices[category] = choice
 
@@ -269,12 +269,12 @@ func _input(event: InputEvent) -> void:
 			_refresh_mouse_buttons()
 			return
 
-		var code: int = int(mouse_event.button_index)
+		var mouse_code: int = int(mouse_event.button_index)
 
-		if code <= 0:
+		if mouse_code <= 0:
 			return
 
-		_assign_mouse_button(capturing_action, code)
+		_assign_mouse_button(capturing_action, mouse_code)
 		_stop_capture()
 		_refresh_mouse_buttons()
 		return

@@ -48,8 +48,8 @@ slots; overwriting retains that slot's previous save as a backup. **Load** works
 from this preview or the ordinary main scene and preserves the saved map, train
 positions, queues and finances. See [city saves](CITY_SAVES.md).
 
-Normal **F5** still starts the tutorial; the ordinary seeded New Game chooser is
-next. If custom command-line city arguments are set, clear them to return to normal
+Normal **F5** now opens the title menu, where [New Game](NEW_GAME.md) offers
+Tutorial or City sandbox with seed and city-count controls. If custom command-line city arguments are set, clear them to return to normal
 startup. The preview budget and objectives remain provisional.
 
 Station purchases are not undoable and clear the prior construction history so
@@ -88,6 +88,6 @@ construction, independent freight startup under real reservations, and return to
 ordinary tutorial saves. The tests check functional state; a graphical pixel-level
 review of the new preview remains useful when running F6 locally.
 
-Generated-game save validation/restoration is now implemented. Next: the ordinary
-seeded new-game chooser and scenario affordability checks. Population/city-owned trip
-generation and bounded service-driven growth follow the playable persistence slice.
+Generated saves and the ordinary seeded new-game chooser are implemented.
+Population/city-owned trip generation and bounded service-driven growth are next;
+scenario/economy balancing remains a later refinement.

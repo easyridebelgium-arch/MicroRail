@@ -10,12 +10,12 @@ var _facility_cells: Dictionary = {}
 func _init() -> void: _refresh_station_views()
 
 static func tutorial(sawmill: bool = false, factory: bool = false) -> Dictionary:
-	var facilities: Array = []
+	var sites: Array = []
 	for row in [["a", "Station A", 4], ["b", "Station B", 20], ["c", "Station C", 36]]:
-		facilities.append({"id": "station:" + row[0], "stop_id": row[0], "kind": "station", "name": row[1], "cell": [row[2], 8], "settlement_id": "", "enabled": true})
+		sites.append({"id": "station:" + row[0], "stop_id": row[0], "kind": "station", "name": row[1], "cell": [row[2], 8], "settlement_id": "", "enabled": true})
 	for row in [["forest", "Forest", 8, true], ["terminal", "Terminal", 28, true], ["sawmill", "Sawmill", 18, sawmill], ["factory", "Factory", 23, factory]]:
-		facilities.append({"id": "industry:" + row[0], "stop_id": row[0], "kind": row[0], "name": row[1], "cell": [row[2], 24], "settlement_id": "", "enabled": row[3]})
-	return {"schema_version": SCHEMA_VERSION, "layout_id": "tutorial_abc", "generator_version": 1, "content_version": 1, "layout_seed": "0", "size": [80, 50], "settlements": [], "facilities": facilities}
+		sites.append({"id": "industry:" + row[0], "stop_id": row[0], "kind": row[0], "name": row[1], "cell": [row[2], 24], "settlement_id": "", "enabled": row[3]})
+	return {"schema_version": SCHEMA_VERSION, "layout_id": "tutorial_abc", "generator_version": 1, "content_version": 1, "layout_seed": "0", "size": [80, 50], "settlements": [], "facilities": sites}
 
 func save_state() -> Dictionary: return state.duplicate(true)
 func restore_state(value: Dictionary) -> void:
@@ -91,8 +91,8 @@ static func valid(value: Variant) -> bool:
 	if not value is Dictionary or value.size() != 8: return false
 	if not whole(value.get("schema_version"), 1, 1) or not identifier(value.get("layout_id")): return false
 	if not whole(value.get("generator_version"), 1, 1000000) or not whole(value.get("content_version"), 1, 1000000): return false
-	var seed: Variant = value.get("layout_seed")
-	if not seed is String or not seed.is_valid_int() or str(seed.to_int()) != seed or seed.to_int() < 0: return false
+	var seed_text: Variant = value.get("layout_seed")
+	if not seed_text is String or not seed_text.is_valid_int() or str(seed_text.to_int()) != seed_text or seed_text.to_int() < 0: return false
 	var size: Variant = value.get("size")
 	if not size is Array or size.size() != 2 or not whole(size[0], 4, 512) or not whole(size[1], 4, 512): return false
 	if not value.get("settlements") is Array or value.settlements.size() > MAX_SETTLEMENTS: return false

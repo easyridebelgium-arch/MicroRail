@@ -70,7 +70,8 @@ func _run() -> void:
 	game.money = 1
 	check(game._load_slot(2), "load")
 	check(game.amenities.has("a", "shelter") and game.amenities.carry.a == 40 and game.money == 4700, "amenities and carry survive load")
-	game.selected_station = game.FOREST_SITE
+	# Loading closes stale inspection windows; reopen the freight site as a player does.
+	game._inspect_station_at(game.FOREST_SITE)
 	game._update_station_inspector()
 	check(not game.amenity_buttons.shelter.visible, "amenity buttons hidden at freight sites")
 	print("Amenities: %d checks, %d failures" % [checks, failures])

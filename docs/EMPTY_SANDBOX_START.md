@@ -4,8 +4,8 @@
 seeded game without instantiating the legacy main scene or its default actors.
 It connects generated geometry, RNG continuation and station purchase rules to
 station-owned passenger state. It now drives the
-[main-scene development preview](CITY_SCENE_PREVIEW.md), but is not yet a normal
-New Game choice. Generated games now persist through [version 40 saves](CITY_SAVES.md).
+[main-scene development preview](CITY_SCENE_PREVIEW.md), and the normal
+[New Game chooser](NEW_GAME.md). Generated games now persist through [version 40 saves](CITY_SAVES.md).
 
 ## Initial state
 
@@ -73,5 +73,6 @@ atomicity, independent starts and JSON-safe RNG continuation.
 Main-scene startup/editor controls and actor access now support absent primary
 services. Station placement, city rendering and dynamic state adoption are connected
 to fixed-tick commands, preserving active physical trains. Generated-game save validation/restoration is now implemented in root save version
-40, including older tutorial migration. Next expose the normal seeded new-game
-selector and validate startup finances/objectives.
+40, including older tutorial migration. The normal seeded new-game
+selector and representative first-service affordability checks are also implemented;
+city-owned passenger supply and growth are next.

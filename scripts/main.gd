@@ -3,6 +3,8 @@ extends Node2D
 const GameMenu = preload("res://scripts/ui/game_menu.gd")
 var game_menu: AcceptDialog
 
+const TerrainArt = preload("res://scripts/art/terrain_art.gd")
+
 const WorldArt = preload("res://scripts/art/world_art.gd")
 
 const CityDemand = preload("res://scripts/core/city_demand.gd")
@@ -1052,28 +1054,16 @@ func _draw_grid() -> void:
 		MAP_HEIGHT * TILE_SIZE
 	)
 
-	draw_rect(
-		Rect2(Vector2.ZERO, map_size),
-		Color(0.10, 0.15, 0.13)
-	)
-
-	for column in range(MAP_WIDTH + 1):
-		var x: float = float(column * TILE_SIZE)
-
-		draw_line(
-			Vector2(x, 0.0),
-			Vector2(x, map_size.y),
-			GRID_COLOR
-		)
-
-	for row in range(MAP_HEIGHT + 1):
-		var y: float = float(row * TILE_SIZE)
-
-		draw_line(
-			Vector2(0.0, y),
-			Vector2(map_size.x, y),
-			GRID_COLOR
-		)
+	var style := TerrainArt.effective_style(GameSettings.terrain_style, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
+	TerrainArt.draw_ground(self, map_size, style)
+	if GameSettings.show_grid or GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST:
+		var grid_color := TerrainArt.grid_color(style)
+		for column in range(MAP_WIDTH + 1):
+			var x := float(column * TILE_SIZE)
+			draw_line(Vector2(x, 0), Vector2(x, map_size.y), grid_color)
+		for row in range(MAP_HEIGHT + 1):
+			var y := float(row * TILE_SIZE)
+			draw_line(Vector2(0, y), Vector2(map_size.x, y), grid_color)
 
 	draw_rect(
 		Rect2(Vector2.ZERO, map_size),
@@ -1088,6 +1078,8 @@ func _draw_track(cell: Vector2i, track_type: Variant, preview: bool) -> void:
 	if geometry.is_empty():
 		return
 	draw_set_transform(Vector2(cell) * TILE_SIZE)
+	if not preview and TerrainArt.effective_style(GameSettings.terrain_style, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST) != "plain":
+		TerrainArt.draw_track_bed(self, geometry)
 	var rail_color: Color = Palette.get_color(Palette.Role.PREVIEW) if preview else RAIL_COLOR
 	var sleeper_color: Color = SLEEPER_COLOR
 	if preview:
@@ -1148,7 +1140,7 @@ func _draw_station(cell: Vector2i, station_name: String) -> void:
 	var cursor := 0.0
 	while cursor < platform_width:
 		var width := minf(32.0, platform_width - cursor)
-		draw_texture_rect(WorldArt.texture("platform"), Rect2(platform_start + Vector2(cursor, 0), Vector2(width, platform_height)), false)
+		WorldArt.draw_stretched(self, "platform", Rect2(platform_start + Vector2(cursor, 0), Vector2(width, platform_height)))
 		cursor += width
 	draw_line(platform_start + Vector2(0, platform_height), platform_start + Vector2(platform_width, platform_height), Color("#F1D16A"), 1.0)
 	var badge := Rect2(footprint.position + Vector2(2, 1), Vector2(92, 15))

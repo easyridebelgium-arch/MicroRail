@@ -19,7 +19,16 @@ static func fitted_rect(id: String, bounds: Rect2) -> Rect2:
 	return Rect2(bounds.get_center() - fitted * 0.5, fitted)
 
 static func draw_fitted(canvas: CanvasItem, id: String, bounds: Rect2) -> void:
-	canvas.draw_texture_rect(texture(id), fitted_rect(id, bounds), false)
+	draw_stretched(canvas, id, fitted_rect(id, bounds))
+
+static func draw_stretched(canvas: CanvasItem, id: String, bounds: Rect2) -> void:
+	var image := texture(id)
+	if image is AtlasTexture:
+		# Explicit sheet UVs avoid per-region clipping state when the same
+		# source sheet is used by many objects in a redraw/batch.
+		canvas.draw_texture_rect_region(image.atlas, bounds, image.region, Color.WHITE, false, false)
+	else:
+		canvas.draw_texture_rect(image, bounds, false)
 
 ## The supplied vehicle noses face north. Callers add PI/2 to the existing
 ## positive-X train heading, without changing the simulation's heading or pose.

@@ -2,8 +2,9 @@
 
 A first generated source pack is now available at
 [MicroRail art pack v1](../generated/microrail_pack_v1/README.md), including seven
-sheets, the exact prompts used, an entry manifest and review notes. These sources
-need cleanup and sizing before individual exports become approved runtime art.
+sheets, the exact prompts used, an entry manifest and review notes. Selected ground
+textures are now live through [terrain artwork integration](../../docs/TERRAIN_ART.md).
+Other source entries still need review before integration.
 
 Use the tile introduction for ground/water, and the object introduction for isolated
 objects/overlays. Append one asset-specific prompt below. Generate each separately.

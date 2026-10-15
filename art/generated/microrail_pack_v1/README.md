@@ -5,7 +5,10 @@ Created on 2026-10-14 using the OpenAI image generation tool at the user's reque
 These remain the original review/editing sources. A selected **14-texture subset**
 from the rolling-stock and facility sheets is now used by the live game through
 runtime copies and measured AtlasTexture regions. See [live artwork integration](../../../docs/WORLD_ART.md).
-Other entries remain candidates. Existing toolbar/logo and simulation rules are preserved.
+The terrain sheet now also supplies live summer/autumn/snow backgrounds, with all
+16 ground materials exposed as named resources and in a review gallery. See
+[terrain integration](../../../docs/TERRAIN_ART.md). Remaining sheets stay candidates.
+Existing toolbar/logo and simulation rules are preserved.
 
 ## Files
 
@@ -34,7 +37,8 @@ the other six sheets have real alpha transparency.
 
 `.gdignore` keeps these original sheets out of Godot's importer. Reviewed live
 selections use unchanged copies under `assets/vehicles/` and
-`assets/world/facilities/`; the remainder stays here. Adding source sheets does
+`assets/world/facilities/`, with ground materials under `assets/environment/terrain/`;
+the remainder stays here. Adding source sheets does
 not unlock the depicted stock, industries, terrain, seasons or weather mechanics.
 
 ## Cleanup and export targets
@@ -81,11 +85,12 @@ filtering for pixel-art previews/imports. Match pixel density across categories.
   sizes are separate shapes, not an ordered, seamless animation. Weather particles
   must remain cosmetic until the relevant mechanics are deliberately implemented.
 
-The first live integration covers the current locomotives/coaches, log wagons,
-station roofs, concrete platform and forest/terminal/sawmill/factory presentation.
+Live integration covers the current locomotives/coaches, log wagons,
+station roofs, concrete platform, forest/terminal/sawmill/factory presentation
+and selectable summer/autumn/snow ground.
 The authoritative graph, occupancy footprints, accessibility overlays and waiting
 information remain intact. City placement and seeded starts are already implemented;
-city roof art, terrain/scenery and the other stock/facility entries remain later work.
+city roof art, scenery, water obstacles and the other stock/facility entries remain later work.
 
 Provenance is the generation record above; this pack is not third-party CC0 art.
 No external reference art was supplied for these generations. Review and record

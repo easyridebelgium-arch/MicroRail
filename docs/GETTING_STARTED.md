@@ -121,6 +121,10 @@ Upgrades, amenities and undo only work while paused. Keys can be changed in **Se
 Hover toolbar controls for their action and description. Relevant shortcuts and
 mouse controls follow your current Settings bindings; this reference lists defaults.
 
+For textured backgrounds, open **Menu → Settings → Ground** and select Summer
+grass, Autumn leaves, Snow or Plain grid, then Apply. Turn **Show map grid** off
+for a cleaner view. These choices are cosmetic; high contrast keeps the plain grid.
+
 ## Check whether your trains need more seats
 
 Click a passenger train and compare **Seats occupied** with its recent occupancy

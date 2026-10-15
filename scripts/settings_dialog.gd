@@ -12,6 +12,8 @@ var slow_check: CheckBox
 var notification_choices: Dictionary = {}
 
 var scale_choice: OptionButton
+var terrain_choice: OptionButton
+var grid_check: CheckBox
 var palette_choice: OptionButton
 var reduced_motion_check: CheckBox
 var compact_header_check: CheckBox
@@ -58,6 +60,15 @@ func configure(in_game: bool = false) -> void:
 	for palette_name in Settings.PALETTE_NAMES:
 		palette_choice.add_item("Colours: " + palette_name)
 	box.add_child(palette_choice)
+
+	terrain_choice = OptionButton.new()
+	for ground_name in Settings.TERRAIN_NAMES: terrain_choice.add_item("Ground: " + ground_name)
+	terrain_choice.tooltip_text = "Cosmetic appearance only. Snow does not affect trains. High contrast uses the plain background."
+	box.add_child(terrain_choice)
+	grid_check = CheckBox.new()
+	grid_check.text = "Show map grid"
+	grid_check.tooltip_text = "Hide grid lines for a cleaner view. High-contrast mode always shows the grid."
+	box.add_child(grid_check)
 
 	reduced_motion_check = CheckBox.new()
 	reduced_motion_check.text = "Reduced motion (fewer moving effects as they are added)"
@@ -157,6 +168,8 @@ func configure(in_game: bool = false) -> void:
 func open_dialog() -> void:
 	scale_choice.select(Settings.UI_SCALES.find(Settings.ui_scale))
 	palette_choice.select(Settings.palette_mode)
+	terrain_choice.select(maxi(0, Settings.TERRAIN_STYLES.find(Settings.terrain_style)))
+	grid_check.button_pressed = Settings.show_grid
 	reduced_motion_check.button_pressed = Settings.reduced_motion
 	compact_header_check.button_pressed = Settings.compact_header
 	slow_check.button_pressed = Settings.slow_on_incident
@@ -369,6 +382,8 @@ func _apply() -> void:
 	var scale_index: int = maxi(scale_choice.selected, 0)
 	Settings.ui_scale = Settings.UI_SCALES[scale_index]
 	Settings.palette_mode = maxi(palette_choice.selected, 0)
+	Settings.terrain_style = Settings.TERRAIN_STYLES[maxi(0, terrain_choice.selected)]
+	Settings.show_grid = grid_check.button_pressed
 	Settings.reduced_motion = reduced_motion_check.button_pressed
 	Settings.compact_header = compact_header_check.button_pressed
 	Settings.fullscreen = fullscreen_check.button_pressed

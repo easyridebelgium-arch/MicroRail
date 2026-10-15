@@ -27,6 +27,11 @@ const PALETTE_NAMES: Array[String] = [
 	"High contrast"
 ]
 
+const TERRAIN_STYLES: Array[String] = ["summer", "autumn", "winter", "plain"]
+const TERRAIN_NAMES: Array[String] = ["Summer grass", "Autumn leaves", "Snow", "Plain grid"]
+static var terrain_style: String = "summer"
+static var show_grid: bool = true
+
 static var ui_scale: float = 1.0
 static var palette_mode: int = PaletteMode.DEFAULT
 static var reduced_motion: bool = false
@@ -59,6 +64,9 @@ static func load_settings() -> void:
 		0,
 		PaletteMode.size() - 1
 	)
+	var ground_choice: String = str(config.get_value("display", "terrain_style", "summer"))
+	terrain_style = ground_choice if ground_choice in TERRAIN_STYLES else "summer"
+	show_grid = bool(config.get_value("display", "show_grid", true))
 	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
 	compact_header = bool(config.get_value("display", "compact_header", false))
 	fullscreen = bool(config.get_value("display", "fullscreen", false))
@@ -78,6 +86,8 @@ static func load_settings() -> void:
 static func save_settings() -> bool:
 	var config := ConfigFile.new()
 
+	config.set_value("display", "terrain_style", terrain_style)
+	config.set_value("display", "show_grid", show_grid)
 	config.set_value("display", "ui_scale", ui_scale)
 	config.set_value("display", "palette", palette_mode)
 	config.set_value("display", "reduced_motion", reduced_motion)

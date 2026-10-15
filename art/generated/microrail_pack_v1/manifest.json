@@ -25,112 +25,128 @@
           "row": 1,
           "column": 1,
           "suggested_export": "assets/environment/terrain/grass_summer.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "live_ground_background",
+          "runtime_resource": "assets/environment/terrain/materials/grass_summer.tres"
         },
         {
           "id": "terrain:grass_meadow",
           "row": 1,
           "column": 2,
           "suggested_export": "assets/environment/terrain/grass_meadow.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/grass_meadow.tres"
         },
         {
           "id": "terrain:grass_dry",
           "row": 1,
           "column": 3,
           "suggested_export": "assets/environment/terrain/grass_dry.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/grass_dry.tres"
         },
         {
           "id": "terrain:leaf_litter",
           "row": 1,
           "column": 4,
           "suggested_export": "assets/environment/terrain/leaf_litter.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "live_ground_background",
+          "runtime_resource": "assets/environment/terrain/materials/leaf_litter.tres"
         },
         {
           "id": "terrain:snow_fresh",
           "row": 2,
           "column": 1,
           "suggested_export": "assets/environment/terrain/snow_fresh.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "live_ground_background",
+          "runtime_resource": "assets/environment/terrain/materials/snow_fresh.tres"
         },
         {
           "id": "terrain:snow_patchy",
           "row": 2,
           "column": 2,
           "suggested_export": "assets/environment/terrain/snow_patchy.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/snow_patchy.tres"
         },
         {
           "id": "terrain:ice_packed",
           "row": 2,
           "column": 3,
           "suggested_export": "assets/environment/terrain/ice_packed.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/ice_packed.tres"
         },
         {
           "id": "terrain:mountain_rock",
           "row": 2,
           "column": 4,
           "suggested_export": "assets/environment/terrain/mountain_rock.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/mountain_rock.tres"
         },
         {
           "id": "terrain:water_deep",
           "row": 3,
           "column": 1,
           "suggested_export": "assets/environment/terrain/water_deep.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/water_deep.tres"
         },
         {
           "id": "terrain:water_shallow",
           "row": 3,
           "column": 2,
           "suggested_export": "assets/environment/terrain/water_shallow.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/water_shallow.tres"
         },
         {
           "id": "terrain:sand",
           "row": 3,
           "column": 3,
           "suggested_export": "assets/environment/terrain/sand.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/sand.tres"
         },
         {
           "id": "terrain:gravel",
           "row": 3,
           "column": 4,
           "suggested_export": "assets/environment/terrain/gravel.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/gravel.tres"
         },
         {
           "id": "terrain:soil",
           "row": 4,
           "column": 1,
           "suggested_export": "assets/environment/terrain/soil.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/soil.tres"
         },
         {
           "id": "terrain:ploughed_soil",
           "row": 4,
           "column": 2,
           "suggested_export": "assets/environment/terrain/ploughed_soil.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/ploughed_soil.tres"
         },
         {
           "id": "terrain:asphalt",
           "row": 4,
           "column": 3,
           "suggested_export": "assets/environment/terrain/asphalt.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/asphalt.tres"
         },
         {
           "id": "terrain:station_paving",
           "row": 4,
           "column": 4,
           "suggested_export": "assets/environment/terrain/station_paving.png",
-          "status": "requires_manual_selection_cleanup_and_sizing"
+          "status": "prepared_material_in_review_gallery",
+          "runtime_resource": "assets/environment/terrain/materials/station_paving.tres"
         }
       ]
     },
@@ -916,5 +932,6 @@
     "status": "superseded_camera_reference_not_part_of_112_candidates",
     "sha256": "06dcd978f87b17e14e24276a9d0ca4c2227411bea03058c24548f35146bb3fcd"
   },
-  "runtime_subset_manifest": "../../../assets/world/facilities/runtime_manifest.json"
+  "runtime_subset_manifest": "../../../assets/world/facilities/runtime_manifest.json",
+  "runtime_terrain_manifest": "../../../assets/environment/terrain/manifest.json"
 }

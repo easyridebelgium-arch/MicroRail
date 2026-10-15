@@ -249,6 +249,14 @@ flow. Simulation pause/speed, drafts, existing save slots and backups are preser
 this is not periodic autosave. Menus scroll/clamp at 200% UI scale. See
 [game menu and exit behaviour](GAME_MENU.md).
 
+**Terrain-art integration:** summer grass is now the live default. Settings adds
+Summer grass/Autumn leaves/Snow/Plain grid and grid visibility, persisted outside
+game saves. Textures are muted, visible-area culled and clipped to the map; a dark
+track bed keeps rails readable on snow. High contrast retains plain ground/grid.
+All sixteen source materials, including deep/shallow water, are available as
+named resources and in an F6 gallery. No dynamic seasons, water obstacles, bridges,
+movement penalties or changes to seeded layouts are implied. See [terrain artwork](TERRAIN_ART.md).
+
 **First-session playtest fixes:** the tutorial already starts its first train
 automatically, so preserve that flow rather than adding a redundant route wizard.
 Fresh Map/Goals preferences now start collapsed; camera/Home frame tutorial

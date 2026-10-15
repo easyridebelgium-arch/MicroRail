@@ -53,7 +53,7 @@ The tutorial already has its first route. Use these controls when you want to ch
 
 ## Start a city sandbox instead
 
-Choose **City sandbox**, enter a seed and choose the city count. Build two stations
+Choose **City sandbox**, enter a seed (or click **Random**) and choose the city count. Build two stations
 near cities, then connect their platforms. Each platform is five tiles long:
 **start on the highlighted left or right end tile and drag horizontally away from
 it**. Approach the destination platform along its rails; do not drag from the tile

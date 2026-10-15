@@ -28,6 +28,13 @@ func run() -> void:
 	check(chooser.get_ok_button().disabled and not chooser.validation.ok, "invalid seed disables Start")
 	chooser.confirmed.emit()
 	check(chooser.visible and game.money == 1234, "invalid acceptance preserves current game")
+	chooser._seed_picker.seed = 2026
+	for attempt in range(8):
+		var previous_seed: String = chooser.seed_field.text
+		chooser.random_seed_button.pressed.emit()
+		check(chooser.seed_field.text != previous_seed and chooser.validation.ok and not chooser.get_ok_button().disabled, "Random replaces invalid or previous text with a valid different seed")
+	check(chooser.city_count.value == 4 and chooser.mode_choice.selected == 0, "Random preserves city count and game mode")
+	check(game.sim_rng.save_state() == original_rng and game.money == 1234 and FileAccess.get_file_as_string(game.SaveSlots.path(4)) == original_save, "Random changes no running simulation, balance or save")
 	chooser.seed_field.text = "42"
 	chooser.city_count.value = 8
 	chooser.refresh()
@@ -41,7 +48,9 @@ func run() -> void:
 	await process_frame
 	current_scene = title
 	title.new_game_dialog.open_dialog(4)
-	title.new_game_dialog.seed_field.text = "42"
+	title.new_game_dialog._seed_picker.seed = 42
+	title.new_game_dialog.random_seed_button.pressed.emit()
+	var chosen_seed: String = title.new_game_dialog.seed_field.text
 	title.new_game_dialog.city_count.value = 8
 	title.new_game_dialog.refresh()
 	title.new_game_dialog.confirmed.emit()
@@ -54,7 +63,7 @@ func run() -> void:
 		quit(1)
 		return
 	fresh.set_process(false)
-	check(fresh.city_builder.is_city_game() and fresh.world.state.layout_seed == "42" and fresh.world.state.settlements.size() == 8 and fresh.active_save_slot == 4, "chosen seed, density, profile and slot reach startup")
+	check(fresh.city_builder.is_city_game() and fresh.world.state.layout_seed == chosen_seed and fresh.world.state.settlements.size() == 8 and fresh.active_save_slot == 4, "randomly chosen seed, density, profile and slot reach startup")
 	check(fresh.money == 5000 and fresh.tracks.is_empty() and fresh.fleet.trains.is_empty() and fresh.paused, "sandbox starts paused with stated budget and no prebuilt company")
 	check(FileAccess.get_file_as_string(fresh.SaveSlots.path(4)) == original_save, "starting a generated game never overwrites the chosen slot")
 	# Show that the quoted budget supports a complete first passenger service.

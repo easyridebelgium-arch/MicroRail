@@ -6,12 +6,15 @@ const Slots = preload("res://scripts/core/save_slots.gd")
 var slot := 1
 var mode_choice: OptionButton
 var seed_field: LineEdit
+var random_seed_button: Button
+var _seed_picker := RandomNumberGenerator.new()
 var city_count: SpinBox
 var city_controls: VBoxContainer
 var explanation: Label
 var validation: Dictionary = {}
 
 func _ready() -> void:
+	_seed_picker.randomize()
 	title = "New game"
 	ok_button_text = "Start new game"
 	get_cancel_button().text = "Cancel"
@@ -41,7 +44,16 @@ func _ready() -> void:
 	seed_field.max_length = 19
 	seed_field.placeholder_text = "0 to 9223372036854775807"
 	seed_field.text_changed.connect(func(_text: String) -> void: refresh())
-	city_controls.add_child(seed_field)
+	var seed_row := HBoxContainer.new()
+	city_controls.add_child(seed_row)
+	seed_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	seed_row.add_child(seed_field)
+	random_seed_button = Button.new()
+	random_seed_button.text = "Random"
+	random_seed_button.accessibility_name = "Choose random map seed"
+	random_seed_button.tooltip_text = "Choose a different map seed. Keep or copy the number to recreate this layout with the same city count."
+	random_seed_button.pressed.connect(_choose_random_seed)
+	seed_row.add_child(random_seed_button)
 	var count_label := Label.new()
 	count_label.text = "Cities (80 × 50 map)"
 	city_controls.add_child(count_label)
@@ -71,6 +83,15 @@ func refresh() -> void:
 	validation = Config.validate({"mode": "cities", "seed": seed_field.text, "city_count": city_count.value} if mode_choice.selected == 0 else {"mode": "tutorial"})
 	explanation.text = validation.message + "\n\nStarting replaces the current game in memory. Existing saved files change only when you Save. Cancel keeps the current game."
 	get_ok_button().disabled = not validation.ok
+
+func _choose_random_seed() -> void:
+	# This UI-only generator never consumes the live simulation's seeded stream.
+	# Combine two 32-bit draws into the supported non-negative 63-bit range.
+	var next_seed: int = ((_seed_picker.randi() & 0x7fffffff) << 32) | _seed_picker.randi()
+	if str(next_seed) == seed_field.text:
+		next_seed = 0 if next_seed == 9223372036854775807 else next_seed + 1
+	seed_field.text = str(next_seed)
+	refresh()
 
 func _accept() -> void:
 	if city_count.get_line_edit().has_focus(): city_count.apply()

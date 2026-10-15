@@ -3,7 +3,8 @@
 Run the project normally (**F5**). On the title screen, choose one of the four
 save slots, then **New game in selected slot**. The chooser offers:
 
-- **City sandbox:** enter a whole-number seed and choose 3–8 cities on the 80×50
+- **City sandbox:** enter a whole-number seed or press **Random** beside the seed
+  field, then choose 3–8 cities on the 80×50
   map. There are four industry sites. The company starts paused with £5000 and
   no prebuilt stations, rails, locomotives or routes. The same seed and city count
   reproduce the initial layout. The seed remains a decimal string to preserve
@@ -16,6 +17,12 @@ chooser. Cancel keeps the current company paused. Choosing New Game replaces the
 company in memory, but never writes a save. The selected slot's existing game
 remains intact until explicitly saved; its previous file then becomes the backup.
 Invalid seed/count settings disable Start and display a reason.
+
+**Random** picks a different valid non-negative 63-bit seed and immediately updates
+validation. It keeps your city count, mode and save slot. You can edit or copy the
+result before starting. The button exists in both the title and in-game chooser;
+it uses a separate UI-only random generator and never advances a running company's
+simulation RNG, finances or saves.
 
 ## Building the first city service
 
@@ -47,6 +54,7 @@ decline is next. Tutorial rewards do not run in the city sandbox. Root save vers
 is 41; older saves migrate without moving trains or changing accepted passengers.
 
 The shared dialog scrolls and clamps to the viewport. On Godot 4.6.3, the
-new-game suite passes 44 headless functional checks covering title launch, in-game acceptance/cancel, invalid configuration, save/backup
+new-game suite passes 54 headless functional checks covering Random seed selection,
+title launch, in-game acceptance/cancel, invalid configuration, save/backup
 protection, startup construction and 200% UI scaling. A local visual review remains
 useful for appearance and input feel.

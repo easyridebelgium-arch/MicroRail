@@ -235,6 +235,12 @@ slice. Validation: 104/104 regression suites pass on Godot 4.6.3; focused model
 and scene suites pass 25 and 26 checks, and 84 game scripts pass the warning audit.
 See [city demand](CITY_DEMAND.md).
 
+**Seed chooser refinement:** both New Game entry points now have a **Random**
+button beside the seed field. It chooses a different supported seed, keeps the
+city count/slot, refreshes validation and leaves the running simulation RNG and
+save files untouched. The chosen number remains editable/copyable for shared starts.
+See [New Game](NEW_GAME.md).
+
 **First-session playtest fixes:** the tutorial already starts its first train
 automatically, so preserve that flow rather than adding a redundant route wizard.
 Fresh Map/Goals preferences now start collapsed; camera/Home frame tutorial

@@ -33,7 +33,7 @@ func restore_state(value: Dictionary) -> void:
 			for field in sample: sample[field] = int(sample[field])
 
 ## Existing amenity/response modifiers are optional; they never create station-owned trips.
-func generate(world: Dictionary, queues: RefCounted, configurations: Dictionary, rng: RefCounted, tick: int, limits: Dictionary = {}, adjust_amount: Callable = Callable()) -> void:
+func generate(world: Dictionary, queues: RefCounted, configurations: Dictionary, rng: RefCounted, tick: int, limits: Dictionary = {}, adjust_amount: Callable = Callable(), on_requests: Callable = Callable()) -> void:
 	var ids: Array = state.cities.keys()
 	ids.sort()
 	var catchments := Construction.catchments(world)
@@ -46,6 +46,7 @@ func generate(world: Dictionary, queues: RefCounted, configurations: Dictionary,
 		var origin: String = catchments[id]
 		if not origin.is_empty() and adjust_amount.is_valid(): count = clampi(int(adjust_amount.call(origin, count, network)), 0, MAX_REQUESTS)
 		var sample := {"tick": tick, "requested": count, "queued": 0, "no_station": 0, "no_service": 0, "no_express": 0, "full": 0}
+		var admissions: Array = []
 		for _request in range(count):
 			var destination_city := choose_destination(id, ids, rng)
 			var destination: String = catchments.get(destination_city, "")
@@ -57,11 +58,14 @@ func generate(world: Dictionary, queues: RefCounted, configurations: Dictionary,
 					if int(row.express_progress) == 0: kind = Classes.EXPRESS
 				if Journeys.plan(network, origin, destination).is_empty(): outcome = "no_service"
 				elif kind == Classes.EXPRESS and not direct_service(configurations, origin, destination): outcome = "no_express"
-				elif queues.enqueue_trip(origin, destination, int(limits.get(origin, 100)), tick, kind): outcome = "queued"
+				elif queues.enqueue_trip(origin, destination, int(limits.get(origin, 100)), tick, kind):
+					outcome = "queued"
+					admissions.append({"destination": destination, "class": kind})
 				else: outcome = "full"
 			sample[outcome] += 1
 		row.history.append(sample)
 		if row.history.size() > WINDOW: row.history.pop_front()
+		if on_requests.is_valid(): on_requests.call(id, sample.duplicate(true), origin, admissions)
 
 func choose_destination(origin: String, ids: Array, rng: RefCounted) -> String:
 	var total := 0

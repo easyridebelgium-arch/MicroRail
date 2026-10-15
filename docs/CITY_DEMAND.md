@@ -87,6 +87,7 @@ UI reports, v40 migration, rejected-save atomicity, active-train save/load and
 matching simulation at 30/60/120 FPS. The existing city-save suite still covers
 freight-only/mixed companies and processing/consist persistence.
 
-Next: use actual completed journeys and unmet requests to measure useful service,
-then add bounded population growth/decline with grace periods, clear reasons and
+Implemented next slice: [useful-service cohorts](USEFUL_SERVICE.md) connect actual
+completed journeys and unmet requests, preserving unfinished/transfer identities.
+Next add fair scoring and bounded population growth/decline with grace periods, clear reasons and
 slower/no-growth settings. Merely filling queues must never earn growth.

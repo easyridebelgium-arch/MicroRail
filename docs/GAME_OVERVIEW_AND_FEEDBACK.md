@@ -5,7 +5,7 @@
 **Current gameplay snapshot: 3bd2913 · Save format 41**  
 **Format: single-player desktop railway-management prototype**
 
-**Update after this snapshot:** configurable rotating autosaves and recovery are now implemented (F70); see [usage and safety](AUTOSAVES.md). The optional [first-service checklist](FIRST_SERVICE_GUIDE.md), nearest-city suggestion and first-final-delivery feedback are also implemented. This is an initial slice of F63; full tutorial campaigns remain planned. The remaining catalogue describes the snapshot above.
+**Update after this snapshot:** configurable rotating autosaves and recovery are now implemented (F70); see [usage and safety](AUTOSAVES.md). The optional [first-service checklist](FIRST_SERVICE_GUIDE.md), nearest-city suggestion and first-final-delivery feedback are also implemented. This is an initial slice of F63; full tutorial campaigns remain planned. [Useful-service measurement](USEFUL_SERVICE.md) (N01) is also implemented in save version 42; city growth (N02/N03) remains planned. The remaining catalogue describes the snapshot above.
 
 This document describes what can be played today and what may be added later. Future features are proposals for discussion, with no promised release dates. Please use the feature IDs when giving feedback.
 
@@ -126,7 +126,7 @@ An existing feature may have a separate future extension. For example, automatic
 
 | ID | Planned next step | Intended outcome |
 | --- | --- | --- |
-| N01 | Useful-service measurement | Combine actual completed passenger journeys with unmet city requests. Distinguish delivering people from merely filling a queue. |
+| N01 | Useful-service measurement | Implemented after the snapshot: matched request cohorts, final deliveries, pending journeys, arrived transfer legs and unmet reasons. See [measurement](USEFUL_SERVICE.md). Growth scoring remains next. |
 | N02 | Bounded city growth and decline | Let sustained useful service support growth and unmet demand support gradual decline, with grace periods and population floors. Preserve existing track, stations and accepted trips. |
 | N03 | Clear growth reasons and settings | Show trends and causes, with slower/no-growth choices. Extend the measured economy and later industry growth without presenting invisible or arbitrary penalties. |
 

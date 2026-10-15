@@ -30,7 +30,7 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 39, including amenities, loan state, route appearance,
+schema is version 42, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
 history, gradual demand factor/carry, and original journey clocks with recent
@@ -43,7 +43,11 @@ validated generated city profile, optional services and empty companies alongsid
 tutorial saves. Loaded geometry is never regenerated; see [city saves](CITY_SAVES.md)
 and [world catalog](WORLD_CATALOG.md). Version 41 persists [city populations and
 request outcomes](CITY_DEMAND.md), initializing historical measurements empty when
-upgrading v40 while preserving accepted journeys and the live RNG.
+upgrading v40 while preserving accepted journeys and the live RNG. Version 42
+persists [useful-service request cohorts](USEFUL_SERVICE.md) and cross-checks
+unfinished measurements against queued/onboard passengers. Version 41 migrations
+start this measurement at the saved clock with an empty baseline, preserving all
+existing company and passenger state.
 Version 37 migration adds an uninstalled factory, preserving sawmill inventory,
 physical train stages, cash and historical sales. Version 38 retains factory
 processing progress and validates stock transferred between industries and goods

@@ -274,8 +274,14 @@ feedback and [rotating autosaves](AUTOSAVES.md) are implemented. Tutorial automa
 startup and existing rewards remain unchanged. City Goals shows the live next step;
 the full guide opens only on request.
 
-**Next implementation:** useful-service measurement from completed journeys and
-city request outcomes, followed by bounded growth/decline.
+**Useful-service measurement implemented (2A / 2C):** [request cohorts and final
+deliveries](USEFUL_SERVICE.md) now distinguish unmet requests, accepted unfinished
+journeys, actual transfer legs and final completions. Older unfinished cohorts are
+retained, recent history is bounded, and v41 saves migrate to an empty measurement
+baseline in v42 without changing their passengers/RNG. City and station inspectors
+show the results.
+
+**Next implementation:** fair scoring and bounded city growth/decline.
 Keep new-city grace periods, population floors, visible causes and slower/no-growth
 rules. Match deliveries to their request cohorts; queued passengers do not earn
 growth, and unfinished long trips must not count as instant failures. Arrival
@@ -632,7 +638,7 @@ history may land earlier once their foundations are reliable.
 | --- | --- | --- |
 | Seeded starting layouts | Start new sandbox games with reproducible cities and industries instead of three fixed stations. | Saved catalog foundation is implemented in version 39 with stable facility IDs and validated settlement references. Route/platform and Local demand adapters are implemented. Station-owned journey/amenity/response state is now adapted; Facility geometry and distance-based class adapters are now implemented. The seeded flat-grid generator now validates initial spacing, station clearances, freight-strip separation and land access. City-linked station preview/purchase rules are now implemented as a backend. The empty-start model now preserves dynamic station-owned state. Main-scene startup/editors and placement UI now work in the development preview. Generated save/load is implemented in version 40. A seed/city-count chooser is implemented, with actual first-service affordability checks and tutorial rewards separated. City-owned population and trip supply are implemented; growth/decline is next; deeper finance/scenario balance remains. Validate spacing, buildable station approaches, reachable industries and objective feasibility. Save generated geometry plus seed, generator/content versions and rules. Keep A/B/C as the tutorial/legacy scenario; full terrain generation is later. |
 | Player-built stations and city catchments | Build stations beside cities and make location matter for passenger supply. | Horizontal five-tile station previews, exclusive city links, cost/reuse accounting and stale/safety checks are implemented as a backend. Dynamic station-owned state now extends safely in the empty-start model. Placement UI and main-scene adoption are available in the development preview. Generated save/load is implemented; ordinary new-game selection is implemented; city population/trip generation and population previews/reports are implemented; reject overlaps and preserve existing train positions during edits/load. Passenger origins/destinations belong to settlements; no station or no useful service leaves demand unmet. Clarify overlapping catchments so passengers are not generated twice. Support multiple stations per city after the initial one-station slice. |
-| City growth and decline | Cities expand with useful service and contract when sustained passenger demand is unmet. | After seeded settlements, stations and catchments work: use bounded population and measured served/unserved demand over a rolling window, including delivered passengers, capacity, frequency and usable destinations. Grow/shrink gradually with grace periods and visible explanations; unserved new cities must not collapse immediately. Preserve existing buildings/station access during visual expansion; never demolish rail or teleport trains. Add slower/no-growth options and later integrate industry supply/jobs and land rights. |
+| City growth and decline | Cities expand with useful service and contract when sustained passenger demand is unmet. | Request cohorts, matched final deliveries, pending journeys and completed transfer legs are implemented in v42 ([measurement](USEFUL_SERVICE.md)); population changes are still planned. Next: use bounded population and measured served/unserved demand over a rolling window, including delivered passengers, capacity, frequency and usable destinations. Grow/shrink gradually with grace periods and visible explanations; unserved new cities must not collapse immediately. Preserve existing buildings/station access during visual expansion; never demolish rail or teleport trains. Add slower/no-growth options and later integrate industry supply/jobs and land rights. |
 | Industry growth | Useful cargo service creates production and expansion opportunities. | Retain the existing Phase 2C plan: measured delivered supply and usable demand support bounded industry growth. Extend the saved world catalog and production definitions; keep storage/recipe accounting valid and explain changes. Integrate land rights later. |
 | Sandbox and scenario modes | Offer relaxed construction alongside structured challenges. | Expose unlimited-money and growth-rate options with the supporting systems. Add no-breakdown and maintenance-pressure controls when maintenance exists. Save rule settings and define challenge/achievement eligibility. Reuse introductory objectives for a small early scenario framework; avoid requiring all later simulation features first. |
 | Operating budgets | Break costs down into maintenance, fuel/energy, workforce, vehicles, construction, interest, station upkeep and penalties. | Expand the company dashboard as each cost system arrives; avoid double-counting the same expense across categories. |
@@ -753,9 +759,9 @@ checklist, first-delivery feedback and rotating autosaves. Representative startu
 affordability checks remain in the regression suite; broader balance changes and
 rescue rules still need playtesting.
 
-1. **Useful-service measurement and city response (2A / 2C):** match completed
-   journeys to request cohorts; separate final deliveries, carried legs and unmet
-   reasons. Then add bounded growth/decline, grace periods, population floors,
+1. **City response (2A / 2C):** request-to-delivery measurement, arrived transfer
+   legs and unmet reasons are implemented ([useful service](USEFUL_SERVICE.md)).
+   Define fair scoring and add bounded growth/decline, grace periods, population floors,
    readable reasons and slower/no-growth settings. Advisory arrival budgets must
    not become arbitrary growth penalties.
 2. **Visible operational progress (1C / 2A):** compact service cards, per-game

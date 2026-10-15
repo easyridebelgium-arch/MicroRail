@@ -85,6 +85,7 @@ func advance(game: Node, delta: float) -> void:
 		var cost := FleetData.running_cost(train)
 		game.money -= cost
 		game.total_operating_cost += cost
+		game.service_performance.record(key, "cost", cost)
 	if dwell > 0:
 		dwell = maxf(0, dwell - delta)
 		return

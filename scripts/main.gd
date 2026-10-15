@@ -87,7 +87,11 @@ var problems_button: Button
 const Consists = preload("res://scripts/core/consists.gd")
 const ObjectBrowser = preload("res://scripts/object_browser.gd")
 var object_browser: ConfirmationDialog
+const Watchlist = preload("res://scripts/core/watchlist.gd")
+const ServicePerformance = preload("res://scripts/core/service_performance.gd")
+var service_performance := ServicePerformance.new()
 var object_pins: Dictionary = {}
+var service_cards: ConfirmationDialog
 
 const TrackBlueprints = preload("res://scripts/core/track_blueprints.gd")
 const BLUEPRINT_PATH := "user://track_blueprints.json"
@@ -504,7 +508,7 @@ func _ready() -> void:
 	first_service_guide.configure(self)
 	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards]:
 		window.window_input.connect(_tool_window_input.bind(window))
 
 func _process(delta: float) -> void:
@@ -644,7 +648,7 @@ func _modal_open() -> bool:
 	if first_service_guide != null and first_service_guide.dialog.visible: return true
 	if game_menu != null and game_menu.active: return true
 	if new_game_dialog != null and new_game_dialog.visible: return true
-	return _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
+	return (service_cards != null and service_cards.visible) or _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1449,6 +1453,7 @@ func _transfer_passengers(key: String, station: String, manifest: Dictionary) ->
 	var changed: int = passenger_demand.interchange(station, services[key].stops, manifest, sim_clock.tick, rows)
 	if changed > 0:
 		city_service.record_arrivals(rows, false, station_definitions())
+		service_performance.record(key, "transfers", changed)
 		_record_event(EventLog.PASSENGERS_TRANSFERRED, key, {"stop": station, "passengers": changed})
 	return changed
 
@@ -1505,6 +1510,8 @@ func _finish_passengers(key: String, station: String, manifest: Dictionary) -> i
 	passengers_delivered += arrived
 	var fare: int = passenger_revenue.record(PassengerClasses.counts(finished))
 	money += fare
+	service_performance.record(key, "finals", arrived)
+	service_performance.record(key, "income", fare)
 	if first_arrival:
 		first_delivery_notice = "First passengers delivered! %d reached %s; fares £%d. Open Guide to review your progress." % [arrived, station_definitions()[station].name, fare]
 	return arrived
@@ -1517,6 +1524,7 @@ func _charge_operating_cost(delta: float) -> void:
 		var cost: int = Fleet.running_cost(Fleet.assigned(fleet, "passenger"))
 		money -= cost
 		total_operating_cost += cost
+		service_performance.record("passenger", "cost", cost)
 
 
 func _show_notice(message: String) -> void:
@@ -1660,6 +1668,8 @@ func _save_snapshot() -> Dictionary:
 		"city_demand": city_demand.save_state(),
 		"city_service": city_service.save_state(),
 		"city_growth": city_growth.save_state(),
+		"watchlist": saved_watchlist(),
+		"service_performance": service_performance.save_state(services),
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
@@ -1769,6 +1779,8 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not CityDemand.valid(data.get("city_demand"), data.world, int(sim.clock.tick)): return false
 	if not CityService.valid(data.get("city_service"), data.world, int(sim.clock.tick), data, saved_catalog.stations()): return false
 	if not CityGrowth.valid(data.get("city_growth"), data.world, data.city_demand, data.city_service, int(sim.clock.tick)): return false
+	if not Watchlist.valid(data.get("watchlist"), Watchlist.keys(data)): return false
+	if not ServicePerformance.valid(data.get("service_performance"), data, int(sim.clock.tick)): return false
 	if not Timetable.valid_dispatch(data.get("dispatch"), data.services, int(sim.clock.tick)): return false
 	if not SimRng.is_valid_state(sim.get("rng")):
 		return false
@@ -2125,7 +2137,9 @@ func _load_game(save_path: String = "") -> bool:
 	notifications.reset()
 	construction_plan.clear()
 	if train_inspector != null: train_inspector.hide()
-	object_pins.clear()
+	object_pins = data.watchlist.duplicate(true)
+	service_performance.restore_state(data.service_performance)
+	if service_cards != null: service_cards.hide()
 	corridor_pick = 0
 	corridor_cells.clear()
 	planning_mode = false
@@ -2241,7 +2255,7 @@ func _reset_track_tools(keep_right_gesture: bool = false) -> void:
 	demolition_cells.clear()
 	demolition_blocked.clear()
 	_close_station_inspector()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards]:
 		if window != null: window.hide()
 	_update_toolbar()
 	queue_redraw()
@@ -5562,6 +5576,8 @@ func remove_passenger_service(id: int) -> String:
 	arrival_targets.cancel(key)
 	passenger_services.erase(key)
 	services.erase(key)
+	service_performance.state.services.erase(key)
+	object_pins.erase("service:" + key)
 	for other in services:
 		if services[other].get("link", "") == key: services[other].erase("link")
 	train.service = ""
@@ -6143,13 +6159,16 @@ func _export_blueprint(path: String) -> bool:
 	return false
 
 func _setup_object_browser() -> void:
+	service_cards = preload("res://scripts/service_performance_dialog.gd").new()
+	$Interface.add_child(service_cards)
+	service_cards.configure(self)
 	object_browser = ObjectBrowser.new()
 	object_browser.configure(self)
 	$Interface.add_child(object_browser)
 	find_button = Button.new()
 	find_button.text = "Find"
 	find_button.focus_mode = Control.FOCUS_NONE
-	find_button.tooltip_text = "Search objects, locate trains and facilities, and pin a session watchlist. Opens paused."
+	find_button.tooltip_text = "Search objects, locate trains and facilities, and pin a saved company watchlist or open service performance cards. Opens paused."
 	find_button.pressed.connect(func() -> void:
 		paused = true
 		is_dragging = false
@@ -6160,6 +6179,16 @@ func _setup_object_browser() -> void:
 		_update_toolbar()
 		object_browser.open_dialog())
 	$Interface/HeaderBox/Toolbar.add_child(find_button)
+
+func saved_watchlist() -> Dictionary:
+	var available: Dictionary = {}
+	for row in object_rows(): available[row.key] = true
+	return Watchlist.clean(object_pins, available)
+
+func open_service_cards(key: String = "") -> void:
+	paused = true
+	_update_toolbar()
+	service_cards.open_dialog(key)
 
 func object_rows() -> Array:
 	var result: Array = []

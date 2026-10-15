@@ -8,6 +8,7 @@ var items: ItemList
 var details: Label
 var inspect_button: Button
 var pin_button: Button
+var performance_button: Button
 var count_label: Label
 var rows: Array = []
 
@@ -39,7 +40,16 @@ func configure(owner_game: Node) -> void:
 	pinned_only.text = "Pinned only"
 	pinned_only.toggled.connect(func(_enabled: bool) -> void: refresh())
 	filters.add_child(pinned_only)
+	performance_button = Button.new()
+	performance_button.text = "Service performance cards"
+	performance_button.pressed.connect(func() -> void:
+		var selection := items.get_selected_items()
+		var key := str(rows[selection[0]].get("service", "")) if not selection.is_empty() else ""
+		hide()
+		game.open_service_cards(key))
+	box.add_child(performance_button)
 	count_label = Label.new()
+	count_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(count_label)
 	items = ItemList.new()
 	items.custom_minimum_size.y = 130
@@ -60,10 +70,11 @@ func configure(owner_game: Node) -> void:
 
 func open_dialog() -> void:
 	refresh()
-	popup_centered_clamped(Vector2i(620, 470), 0.95)
+	popup_centered_clamped(Vector2i(620, 470), 0.85)
 
 func refresh() -> void:
 	var previous := selected_key()
+	game.object_pins = game.saved_watchlist()
 	rows.clear()
 	items.clear()
 	var query := search.text.strip_edges().to_lower()
@@ -77,7 +88,7 @@ func refresh() -> void:
 		items.set_item_tooltip(items.item_count - 1, row.details)
 		if row.key == previous: items.select(items.item_count - 1)
 	if items.get_selected_items().is_empty() and not rows.is_empty(): items.select(0)
-	count_label.text = "%d matching objects. Pins last until game reload or exit." % rows.size()
+	count_label.text = "%d matching objects. Pins are saved with this company." % rows.size()
 	describe()
 
 func selected_key() -> String:
@@ -103,7 +114,7 @@ func toggle_pin() -> void:
 	var key := selected_key()
 	if key.is_empty(): return
 	if game.object_pins.has(key): game.object_pins.erase(key)
-	else: game.object_pins[key] = true
+	elif game.object_pins.size() < game.Watchlist.LIMIT: game.object_pins[key] = true
 	refresh()
 
 func locate() -> void:

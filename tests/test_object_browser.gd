@@ -72,7 +72,11 @@ func _run() -> void:
 	game._apply_settings()
 	game._save_game()
 	game._load_game()
-	check(game.object_pins.is_empty(), "loading must clear session pins to avoid referring to another run's reused IDs")
+	check(game.object_pins == {"train:3": true}, "loading restores this company's stable pins")
+	browser.open_dialog()
+	browser.performance_button.pressed.emit()
+	check(game.service_cards.visible and not browser.visible and game._modal_open(), "Find performance action opens exclusive service cards and releases Find")
+	game.service_cards.hide()
 	game.queue_free()
 	await process_frame
 	print("Object browser: %d checks, %d failures" % [checks, failures])

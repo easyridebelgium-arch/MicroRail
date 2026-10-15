@@ -5,7 +5,7 @@
 **Current gameplay snapshot: 3bd2913 · Save format 41**  
 **Format: single-player desktop railway-management prototype**
 
-**Update after this snapshot:** configurable rotating autosaves and recovery are now implemented (F70); see [usage and safety](AUTOSAVES.md). The optional [first-service checklist](FIRST_SERVICE_GUIDE.md), nearest-city suggestion and first-final-delivery feedback are also implemented. This is an initial slice of F63; full tutorial campaigns remain planned. [Useful-service measurement](USEFUL_SERVICE.md) (N01) is also implemented in save version 42; initial bounded city response (N02/N03) is now implemented in save version 43 ([rules](CITY_GROWTH.md)); broader reputation/jobs/urban expansion remain future work. The remaining catalogue describes the snapshot above.
+**Update after this snapshot:** configurable rotating autosaves and recovery are now implemented (F70); see [usage and safety](AUTOSAVES.md). The optional [first-service checklist](FIRST_SERVICE_GUIDE.md), nearest-city suggestion and first-final-delivery feedback are also implemented. This is an initial slice of F63; full tutorial campaigns remain planned. [Useful-service measurement](USEFUL_SERVICE.md) (N01) is also implemented in save version 42; initial bounded city response (N02/N03) is now implemented in save version 43 ([rules](CITY_GROWTH.md)); broader reputation/jobs/urban expansion remain future work. [Service performance cards and persistent company watchlists](SERVICE_PERFORMANCE.md) are now implemented in save version 44. The remaining catalogue describes the snapshot above.
 
 This document describes what can be played today and what may be added later. Future features are proposals for discussion, with no promised release dates. Please use the feature IDs when giving feedback.
 
@@ -103,7 +103,7 @@ An existing feature may have a separate future extension. For example, automatic
 | C42 | Why-waiting diagnostics | See the blocker, physical footprint, requests/authority, reserved blocks and switch locks, with relevant actions such as locating the blocker, releasing a hold or reversing safely. |
 | C43 | Operational overlays | View service paths, signal blocks, hatched reservations and measured waiting hot spots. These display operational measurements, not guaranteed predictions of future traffic. |
 | C44 | Problems, incidents and alerts | Search current problems/history, filter severity, jump to locations and acknowledge conditions. Configurable notifications can pause or optionally slow high-speed play when qualifying incidents occur. |
-| C45 | Find and watchlists | Search trains, services, stations, cities and industries; filter, locate and pin objects in a session watchlist. Pins are not yet persistent across loading/exiting. |
+| C45 | Find and watchlists | Search trains, services, stations, cities and industries; filter, locate and pin objects; after the snapshot these pins are saved per company and survive loading/exiting. |
 | C46 | Blueprints and local sharing | Capture reusable track/switch/signal layouts, search a local library and import/export validated JSON designs. Placement is priced and safety-checked; station blueprints, rotation and mirroring remain future extensions. |
 | C47 | Grouped interface | A grouped icon ribbon, compact status/Accounts, collapsible Map/Goals panels, readable tooltips, route badges and a branded title screen are implemented. |
 | C48 | Accessibility and controls | 100–200% UI scaling, colour-blind-safe/high-contrast options, text/shapes/patterns alongside colour, reduced-motion settings and keyboard/mouse remapping. Full controller support is future work. |
@@ -148,7 +148,7 @@ An existing feature may have a separate future extension. For example, automatic
 | F10 | Better planning and path advice | Recommend routes with estimated cost/time, itemise more construction costs and flag evidence-based single-track bottlenecks and affected services. |
 | F11 | Expanded corridor tools | Add double-tracking, speed upgrades, electrification and platform batches when their underlying systems exist. |
 | F12 | Richer blueprints | Include compatible stations/platforms, rotation, mirroring, tags and footprint/cost thumbnail previews. |
-| F13 | More persistent search and alerts | Keep watchlists/presets across sessions and refine actionable notification filtering and operational labels. |
+| F13 | More persistent search and alerts | Company watchlists are now persistent. Saved search presets and refined actionable notification filtering/operational labels remain future work. |
 
 ### 6.2 Passenger demand and service quality
 

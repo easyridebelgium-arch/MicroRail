@@ -290,10 +290,16 @@ persists the rule and assessment state; v42 migrations preserve the company and
 start a fresh grace/baseline. No arrival-budget penalty or geographic land expansion
 is introduced.
 
-**Next implementation:** service performance cards and per-game persistent
-watchlists, followed by an actionable network summary and optional reports.
+**Service cards and watchlists implemented:** [service performance](SERVICE_PERFORMANCE.md)
+combines saved passenger final/interchange outcomes and actual fares/running costs
+with existing capacity, waiting and targeted-arrival measurements. Linked members
+share a card; measurement periods and attribution are explicit. Stable object pins
+are saved per company/slot. Version 44 starts older route counters from a fresh
+baseline without inventing historical attribution.
 
-Next expose the results through service performance cards, saved watchlists and
+**Next implementation:** an actionable network summary and optional progress reports.
+
+Next expose the results through
 an actionable network summary (not an unexplained composite score). Add optional
 progress reports and short scenarios, then river/bridge map variety before broader
 terrain complexity. Contracts, fair dispatch priorities and full reputation follow
@@ -452,7 +458,7 @@ the tail's route and the extension past a reversal stop intact. Figure-eight rou
 - Passenger coaches and log wagons with full-body protection, saved composition
   continuous two-/three-stop carriage Shuttles and carriage Loops on continuous circuits.
 - Atomic construction drafts, corridor signals, searchable blueprints and JSON sharing.
-- Route/block/wait overlays, Problems/Find, session watchlists and alert preferences.
+- Route/block/wait overlays, Problems/Find, saved company watchlists and alert preferences.
 - Station inspection, camera scrolling, minimap, introductory objectives and saves.
 - Maximized desktop startup, map/toolbars filling the window and saved fullscreen
   through Settings or remappable F11; UI scale remains independent of map zoom.
@@ -564,10 +570,10 @@ instead of creating another competing source of operational state.
 | Construction planning and conflict preview | Draft ghost tracks, stations, bridges, signals and blueprints before committing; show cost and affected services. | Implemented: multi-stroke track/switch/removal drafts, aggregate cost/refund and affected-service previews, atomic reservation-aware application and grouped Undo/Redo. Extend aggregate quotes to itemised track/switch/signal/platform costs as those systems exist. Add evidence-based structural warnings for shared single-track sections without passing places. These identify layout risks, not guaranteed future congestion. Demand/timetable forecasts remain in Phase 2A; terrain/ownership checks follow their systems. See [construction planning](CONSTRUCTION_PLANNING.md). |
 | Corridor selection and batch tools | Upgrade long segments, double-track, electrify, add signals/platforms or demolish in bulk. | Implemented: connected-corridor selection, spaced automatic/manual signals and whole-corridor signal removal through atomic drafts with grouped Undo/Redo. Track drag-demolition remains available. Track-speed, double-track, electrification and platform batches depend on their underlying systems; see [corridor signals](CORRIDOR_SIGNALS.md). |
 | Track inspection and route overlays | Toggle service paths, block occupancy, reservations, signals, speed limits and congestion; later add gradients, electrification, ownership and condition. | Implemented: collapsible service-path filtering, actual signal-block IDs/authority, hatched reservations, directional affected-service construction reports and measured waiting by conflict cell. Speed limits, occupancy/utilisation measurements and richer planning remain future work. Never substitute decorative colours for operational state. |
-| Search, filtering, pinning and jump-to | Find trains, stations, industries, services and later contracts; filter by type or status, highlight routes and maintain watchlists. | Implemented: searchable current problems and recent incidents, train/service names, severity filters and map location for original and independent trains. Implemented: global object search by name/ID/model/route/status, type filters, current-location map jump, selected-service route highlighting and a session watchlist that survives renaming. Persistent watchlists and preset status filters remain later refinements; see [object search](OBJECT_SEARCH.md). |
+| Search, filtering, pinning and jump-to | Find trains, stations, industries, services and later contracts; filter by type or status, highlight routes and maintain watchlists. | Implemented: searchable current problems and recent incidents, train/service names, severity filters and map location for original and independent trains. Implemented: global object search by name/ID/model/route/status, type filters, current-location map jump, selected-service route highlighting and a saved per-company watchlist that survives renaming and loading. Preset status filters remain later refinements; see [object search](OBJECT_SEARCH.md). |
 | Advisory pathfinding | Recommend a route between stations with cost, travel time and supported conflict warnings without building it. | Reuse route and construction validation. Start with read-only advice; reserve shared pathfinding work for any later rival AI. |
-| Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Implemented: searchable current problems/history, severity filters, click-to-locate and per-category Off/Notice/Notice + pause applied after a complete fixed tick. Extend this existing centre with acknowledgement, persistent watchlists and actionable evidence. Add optional highlight/slow-to-1×/pause for sustained incidents at 5×/10×, with deduplication and thresholds so routine signal waits do not repeatedly interrupt play. Respect no-pause rules; see [notifications](NOTIFICATIONS.md). |
-| Route performance panel and company dashboard | Compare income, running costs, occupancy, waiting passengers and delays. Expand into historical graphs of profit, ridership, occupancy and punctuality per route and across the company. | Measured continuous/recent/total traffic waiting already exists. Add bounded history for deliveries per simulation-time interval, occupancy, profit and incident episodes. Separate loading/dwell, deliberate holds and traffic waits; state denominators and whether loading resets each measure. Punctuality requires schedules, and forecasts require demand/operating history. |
+| Configurable alerts and notification centre | Persist incidents with severity filters; let players choose which events notify or pause. | Implemented: searchable current problems/history, severity filters, click-to-locate and per-category Off/Notice/Notice + pause applied after a complete fixed tick. Acknowledgement and company watchlists are implemented; extend this centre with more actionable evidence. Add optional highlight/slow-to-1×/pause for sustained incidents at 5×/10×, with deduplication and thresholds so routine signal waits do not repeatedly interrupt play. Respect no-pause rules; see [notifications](NOTIFICATIONS.md). |
+| Route performance panel and company dashboard | Compare income, running costs, occupancy, waiting passengers and delays. Expand into historical graphs of profit, ridership, occupancy and punctuality per route and across the company. | Service performance cards now combine saved per-service final/interchange outcomes and actual fares/running costs, current-vehicle capacity/waiting and saved targeted-arrival history. Attribution and reset scopes are explicit. Measured continuous/recent/total traffic waiting already exists. Add broader bounded history for deliveries per simulation-time interval, occupancy, profit and incident episodes. Separate loading/dwell, deliberate holds and traffic waits; state denominators and whether loading resets each measure. Punctuality requires schedules, and forecasts require demand/operating history. |
 
 ### Phase 1 exit criteria
 
@@ -770,9 +776,9 @@ final-delivery evidence, explicit unmet demand, grace, pending-trip protection,
 bounds, readable reasons and saved growth-rate rules. More detailed reputation,
 service-frequency scoring, industry/jobs and geographic expansion remain extensions.
 
-1. **Visible operational progress (1C / 2A):** compact service cards, per-game
-   persistent watchlists, actionable network summary, optional end-of-day reports
-   and proportionate historical trends. Distinguish company final-journey totals
+1. **Visible operational progress (1C / 2A):** actionable network summary, optional
+   end-of-day reports and proportionate historical trends. Service cards and
+   persistent company watchlists are implemented. Distinguish company final-journey totals
    from the legs carried by individual services. Complete relevant remaining
    safety/platform/body-routing extensions when this work requires them.
 2. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,

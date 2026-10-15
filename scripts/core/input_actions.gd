@@ -80,7 +80,7 @@ static func label(action: StringName) -> String:
 		SELECT_REMOVE: return "Select Remove tool"
 		TOGGLE_LOG: return "Show / hide event log"
 		RESET_CAMERA: return "Reset camera"
-		CANCEL: return "Cancel"
+		CANCEL: return "Cancel tool / game menu"
 		CAMERA_UP: return "Camera up"
 		CAMERA_DOWN: return "Camera down"
 		CAMERA_LEFT: return "Camera left"

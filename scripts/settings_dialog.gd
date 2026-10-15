@@ -73,7 +73,7 @@ func configure(in_game: bool = false) -> void:
 	box.add_child(slow_check)
 	if in_game:
 		var menu_button := Button.new()
-		menu_button.text = "Return to title screen (save first)"
+		menu_button.text = "Return to Main Menu"
 		menu_button.pressed.connect(func() -> void: hide(); main_menu_requested.emit())
 		box.add_child(menu_button)
 

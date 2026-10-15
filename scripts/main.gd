@@ -1,5 +1,8 @@
 extends Node2D
 
+const GameMenu = preload("res://scripts/ui/game_menu.gd")
+var game_menu: AcceptDialog
+
 const WorldArt = preload("res://scripts/art/world_art.gd")
 
 const CityDemand = preload("res://scripts/core/city_demand.gd")
@@ -453,6 +456,7 @@ func _ready() -> void:
 	loans_dialog.configure(self)
 	$Interface.add_child(loans_dialog)
 	_apply_settings()
+	_setup_game_menu()
 	_frame_starting_view.call_deferred()
 	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser]:
 		window.window_input.connect(_tool_window_input.bind(window))
@@ -571,6 +575,7 @@ func _record_event(type: String, subject: String, data: Dictionary = {}) -> void
 
 # True while a dialog owns the keyboard, so game shortcuts stay quiet.
 func _modal_open() -> bool:
+	if game_menu != null and game_menu.active: return true
 	if new_game_dialog != null and new_game_dialog.visible: return true
 	return _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
 
@@ -614,17 +619,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed(InputActions.CANCEL):
-		if city_builder.active:
+		if city_builder.active or right_pending or is_dragging or is_panning or corridor_pick > 0 or inspect_mode or signal_tool_mode or switch_tool_mode or waypoint_tool_mode or demolition_mode or draw_track_mode:
 			_reset_track_tools()
-			return
-		if right_pending:
-			_reset_track_tools()
-			return
-		_clear_direct_inspection()
-		corridor_pick = 0
-		is_dragging = false
-		demolition_cells.clear()
-		demolition_blocked.clear()
+		elif station_panel.visible:
+			_close_station_inspector()
+		else:
+			_open_game_menu()
+		get_viewport().set_input_as_handled()
 		return
 
 	if event.is_action_pressed(InputActions.TOGGLE_INSPECT):
@@ -3729,10 +3730,29 @@ func _setup_toolbar_icons() -> void:
 	curve_button.tooltip_text = "Draw track — hold left mouse and change direction; bends are automatic"
 	_update_toolbar()
 
+func _setup_game_menu() -> void:
+	game_menu = GameMenu.new()
+	game_menu.configure(self)
+	$Interface.add_child(game_menu)
+	var button := Button.new()
+	button.text = "Menu"
+	button.accessibility_name = "Open game menu"
+	button.tooltip_text = "Resume, save, settings or return to Main Menu. Escape by default; follows your Cancel/menu key binding. Cancel an active tool first."
+	button.pressed.connect(_open_game_menu)
+	header_controls.status_bar.add_child(button)
+
+func _open_game_menu() -> void:
+	if _modal_open(): return
+	game_menu.open_menu()
+
+func _request_main_menu() -> void:
+	game_menu.request_return()
+
+
 func _setup_settings_dialog() -> void:
 	settings_dialog = SettingsDialog.new()
 	settings_dialog.configure(true)
-	settings_dialog.main_menu_requested.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/ui/title.tscn"))
+	settings_dialog.main_menu_requested.connect(_request_main_menu)
 	settings_dialog.settings_applied.connect(_apply_settings)
 	$Interface.add_child(settings_dialog)
 

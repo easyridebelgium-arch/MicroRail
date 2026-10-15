@@ -23,10 +23,15 @@ func key_event(code: Key, echo: bool = false) -> InputEventKey:
 	return event
 
 func _run() -> void:
+	# Startup now fits stations to the available play area. Use a desktop
+	# viewport before startup instead of headless's default 64 x 64 window.
+	root.size = Vector2i(1280, 720)
 	var existed := FileAccess.file_exists(Settings.SETTINGS_PATH)
 	var previous := FileAccess.get_file_as_bytes(Settings.SETTINGS_PATH) if existed else PackedByteArray()
 	var game = load("res://scenes/main/main.tscn").instantiate()
 	root.add_child(game)
+	await process_frame
+	await process_frame
 	await process_frame
 	game.set_process(false)
 	game.paused = true

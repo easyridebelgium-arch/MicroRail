@@ -241,6 +241,14 @@ city count/slot, refreshes validation and leaves the running simulation RNG and
 save files untouched. The chosen number remains editable/copyable for shared starts.
 See [New Game](NEW_GAME.md).
 
+**Game-menu refinement:** a visible Menu button beside Accounts and idle Escape
+open Resume/active-slot Save/Settings/Return to Main Menu. Active tools cancel
+first. Returning offers Save and Return, explicit Return Without Saving and Cancel;
+a failed save keeps the current company available. Settings uses the same exit
+flow. Simulation pause/speed, drafts, existing save slots and backups are preserved;
+this is not periodic autosave. Menus scroll/clamp at 200% UI scale. See
+[game menu and exit behaviour](GAME_MENU.md).
+
 **First-session playtest fixes:** the tutorial already starts its first train
 automatically, so preserve that flow rather than adding a redundant route wizard.
 Fresh Map/Goals preferences now start collapsed; camera/Home frame tutorial

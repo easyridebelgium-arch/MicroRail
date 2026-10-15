@@ -49,7 +49,9 @@ The tutorial already has its first route. Use these controls when you want to ch
 3. Build an **amenity** at a busy station: Shelter (£300, waiting limit +50, arrivals +5%),
    Waiting room (£700, needs a Shelter, +100 and +10%) or Kiosk (£400, +25 and +10%).
 4. Use **Save game** in the toolbar. There are four slots, with map/time/balance previews.
-5. To return to startup, use **Settings → Return to title screen (save first)**.
+5. Press **Escape** with no active tool, or click **Menu** beside Accounts.
+   Choose **Return to Main Menu → Save and Return** to keep your progress.
+   **Return Without Saving** discards changes; **Cancel** keeps your game open.
 
 ## Start a city sandbox instead
 
@@ -88,7 +90,7 @@ route editor, and **signals** where trains share track.
 | Pan / zoom | middle mouse drag / mouse wheel |
 | Reset camera | **Home** |
 | Fullscreen | **F11** |
-| Cancel | **Esc** |
+| Cancel active tool; otherwise open game menu | **Esc** |
 | Network map | **M** |
 | Objectives | **G** |
 | Inspect trains and stations | **I** |
@@ -110,6 +112,7 @@ route editor, and **signals** where trains share track.
 | **Traffic** | inspect blocked trains; reverse one in a deadlock |
 | **Undo / Redo** | paused construction only; cleared when play resumes |
 | **Accounts** | company income, running costs, purchases and the **Bank loans** offers |
+| **Menu** | Resume, save to active slot, Settings, return to Main Menu with save/discard choice |
 | **Save game / Load** | four save slots |
 | **Settings** | interface scale, colours and key bindings |
 

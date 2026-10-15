@@ -235,11 +235,20 @@ slice. Validation: 104/104 regression suites pass on Godot 4.6.3; focused model
 and scene suites pass 25 and 26 checks, and 84 game scripts pass the warning audit.
 See [city demand](CITY_DEMAND.md).
 
-**Next implementation:** measure useful service from actual completed journeys,
-combined with city unmet-request outcomes. Then enable bounded growth/decline,
-new-city grace periods, visible reasons and slower/no-growth rules. Queuing alone
-must not earn growth. Deeper scenario budget balancing/scoring remain refinements;
-tutorial rewards stay separate.
+**Next implementation (revised after player feedback):** a small first-service
+checklist and bounded rotating autosaves, then useful-service measurement from
+completed journeys and city request outcomes, followed by bounded growth/decline.
+Keep new-city grace periods, population floors, visible causes and slower/no-growth
+rules. Match deliveries to their request cohorts; queued passengers do not earn
+growth, and unfinished long trips must not count as instant failures. Arrival
+budgets remain advisory until fair scoring rules exist.
+
+Next expose the results through service performance cards, saved watchlists and
+an actionable network summary (not an unexplained composite score). Add optional
+progress reports and short scenarios, then river/bridge map variety before broader
+terrain complexity. Contracts, fair dispatch priorities and full reputation follow
+stable measurements. This is a development order, not a claim that the new items
+are implemented. Rationale and acceptance points: [player feedback priorities](PLAYER_FEEDBACK_PRIORITIES.md).
 
 **Artwork preparation:** an AI-generated source pack now contains seven sheets
 with 112 proposed terrain, city, facility, vehicle, scenery, railway-equipment and
@@ -693,40 +702,43 @@ instead of adding a separate campaign simulation.
 
 ## Agreed next implementation order
 
-1. **Unified why-waiting inspector (1C, implemented):** current occupancy, requested/granted
-   authority, named blocker, measured waiting and evidence-based actions. Build on
-   existing Problems/Traffic/Overlays; keep routine waits distinct from incidents.
-2. **Continuous consist body routing (1B, planned reversals implemented):** continuous
-   two-/three-stop Shuttles now retain every vehicle through intermediate stops,
-   return visits, saved dwell and manual recovery. Continuous carriage circuits now
-   preserve periodic body/vehicle poses, tail locks, signal authority and save/load
-   through the Loop boundary. Planned reversals at intermediate stops now preserve the
-   rigid formation, extension ownership, tail locks and signals. Still needed: figure-eights
-   and other repeated paths before enabling those combinations.
-   Extend regression tests for tail locks and save/load.
-3. **Formal platform lengths and multiple platforms (1B, lengths, IDs and assignment rule implemented; fixed per-stop platform choice implemented; automatic choice at arrival pending):** physical geometry,
-   stable IDs, train fit, basic assignment and safe arrival/departure reservations;
-   improve passing-loop branch selection while preserving waypoint intent.
-4. **Service editor expansion and frequency foundation (1B → 2A):** draft-based
-   route copying is implemented with draft preview, safe Apply and vanished-leg warnings.
-   Still needed: full service duplication/drag reordering, safe multiple trains per service, then measured
-   headways and frequency targets with clear attainable limits.
-5. **Passenger demand (2A, destinations, amenities and basic transfers implemented):**
-   waiting-age fairness and waiting-experience satisfaction are implemented;
-   waiting-based demand response and complete journey timing are implemented;
-   occupancy/capacity-denial measurement is implemented; directional arrival targets and basic punctuality are implemented; advisory target-feasibility guidance and per-direction reports are implemented; Express/Local eligibility is implemented; differentiated fares and recorded revenue are implemented; player fare controls, richer choices and scoring remain refinements before full reputation/contract systems. Departure timetables are implemented;
-   Arrival targets now measure actual trips; punitive contracts still follow demand/contract rules.
-6. **One complete freight chain (2B):** logs → sawmill → timber delivery, followed
-   by factory/finished goods (implemented); recipes, storage, physical delivery and conservation are covered.
-7. **Seeded settlements and growth (2C):** stable world IDs → seeded city/industry layouts → player-built stations and catchments → service-driven growth/decline,
-   eligibility-aware scenario rules, bounded metrics and reliable rotating saves.
-8. **Later mechanics (3–5):** opt-in maintenance, terrain/economy, research/eras,
-   optional weather effects, full scenario/editor/community expansion.
+Completed work stays in place. The detailed milestone tables above distinguish
+implemented slices from remaining extensions. This list describes **remaining work**,
+updated after the October 2026 catalogue feedback; it is not the order of feature IDs.
 
-Introduce versioned .tres stock definitions alongside the relevant fleet work and
-cargo/industry definitions before processing chains. Small scenario modifiers,
-cosmetic art/sound, accessible feedback and save reliability may proceed alongside
-their prerequisite milestone. No global reservation SignalBus is planned.
+1. **First-session guidance and save protection (1C / 2C):** optional, repeatable
+   first-service checklist; explicit first-delivery feedback; rotating configurable
+   autosaves alongside the four manual slots/backups. Validate beginner affordability
+   before adding rescue rules or changing the economy.
+2. **Useful-service measurement and city response (2A / 2C):** match completed
+   journeys to request cohorts; separate final deliveries, carried legs and unmet
+   reasons. Then add bounded growth/decline, grace periods, population floors,
+   readable reasons and slower/no-growth settings. Advisory arrival budgets must
+   not become arbitrary growth penalties.
+3. **Visible operational progress (1C / 2A):** compact service cards, per-game
+   persistent watchlists, actionable network summary, optional end-of-day reports
+   and proportionate historical trends. Distinguish company final-journey totals
+   from the legs carried by individual services. Complete relevant remaining
+   safety/platform/body-routing extensions when this work requires them.
+4. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,
+   difficulty modifiers and locally comparable seed results. Contracts follow clear
+   scoring, failure/recovery and measured delivery accounting.
+5. **Map variety:** rivers and bridges first, then additional terrain/elevation,
+   tunnels and map settings. Art alone never adds crossing permissions or geometry.
+6. **Operational and business depth:** deterministic fair priorities, richer planning,
+   wider service/platform choices and full reputation, introduced using existing
+   measured evidence. Raise fleet limits only after realistic performance/usability
+   tests. Physical depots follow when their gameplay prerequisites justify them.
+7. **Later mechanics (3–5):** optional maintenance, research/eras, weather,
+   richer content/editor/modding and community tools. Keep workforce, deeper finance,
+   rivals and detailed replay behind a satisfying core loop.
+
+Introduce resource-driven definitions with the corresponding fleet/content work.
+Small scenario modifiers, cosmetic art/sound, accessible feedback and save reliability
+may proceed alongside their prerequisite milestone. No global reservation SignalBus
+is planned. The new [feedback/growth artwork](../art/generated/microrail_pack_v2/README.md)
+provides 32 review candidates and a separate F6 gallery; no future gameplay mechanic
+is marked implemented merely because its icon or sprite now exists.
 
 Implemented tools and evidence: [foundations](phase-0-foundations.md),
 [reservations](RESERVATIONS.md), [signals](SIGNALS.md), [recovery](DEADLOCKS.md),

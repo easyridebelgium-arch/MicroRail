@@ -1,0 +1,455 @@
+{
+  "pack_id": "microrail_pack_v2",
+  "created": "2026-10-15",
+  "generator": "OpenAI image_gen",
+  "external_references": false,
+  "status": "review_candidates",
+  "gameplay_integration": false,
+  "resource_integration": "Godot AtlasTexture resources and separate art-review scene",
+  "sheets": [
+    {
+      "category": "ui",
+      "file": "assets/ui/feedback/source_atlas.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "sha256": "643019de5c54085f21442ca177da6ef33a308fc03e03980c0e2b8031fc95c13c",
+      "entries": [
+        {
+          "id": "ui:first_service_guide",
+          "label": "First service guide",
+          "resource": "assets/ui/feedback/icons/first_service_guide.tres",
+          "region": [
+            47,
+            95,
+            268,
+            211
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:rotating_autosave",
+          "label": "Rotating autosave",
+          "resource": "assets/ui/feedback/icons/rotating_autosave.tres",
+          "region": [
+            370,
+            76,
+            219,
+            235
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:service_report",
+          "label": "Service report",
+          "resource": "assets/ui/feedback/icons/service_report.tres",
+          "region": [
+            672,
+            92,
+            223,
+            230
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:watchlist",
+          "label": "Watchlist",
+          "resource": "assets/ui/feedback/icons/watchlist.tres",
+          "region": [
+            1004,
+            86,
+            161,
+            220
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:city_growth",
+          "label": "City growth",
+          "resource": "assets/ui/feedback/icons/city_growth.tres",
+          "region": [
+            54,
+            372,
+            257,
+            242
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:city_decline",
+          "label": "City decline",
+          "resource": "assets/ui/feedback/icons/city_decline.tres",
+          "region": [
+            354,
+            375,
+            253,
+            240
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:city_stable",
+          "label": "City stable",
+          "resource": "assets/ui/feedback/icons/city_stable.tres",
+          "region": [
+            656,
+            399,
+            254,
+            218
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:city_grace_period",
+          "label": "City grace period",
+          "resource": "assets/ui/feedback/icons/city_grace_period.tres",
+          "region": [
+            969,
+            408,
+            237,
+            211
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:completed_journey",
+          "label": "Completed journey",
+          "resource": "assets/ui/feedback/icons/completed_journey.tres",
+          "region": [
+            54,
+            685,
+            261,
+            217
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:waiting_queue",
+          "label": "Waiting queue",
+          "resource": "assets/ui/feedback/icons/waiting_queue.tres",
+          "region": [
+            361,
+            660,
+            245,
+            253
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:unmet_demand",
+          "label": "Unmet demand",
+          "resource": "assets/ui/feedback/icons/unmet_demand.tres",
+          "region": [
+            650,
+            728,
+            267,
+            156
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:on_time_departure",
+          "label": "On time departure",
+          "resource": "assets/ui/feedback/icons/on_time_departure.tres",
+          "region": [
+            968,
+            676,
+            236,
+            221
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:network_summary",
+          "label": "Network summary",
+          "resource": "assets/ui/feedback/icons/network_summary.tres",
+          "region": [
+            71,
+            943,
+            209,
+            246
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:delivery_objective",
+          "label": "Delivery objective",
+          "resource": "assets/ui/feedback/icons/delivery_objective.tres",
+          "region": [
+            367,
+            952,
+            229,
+            247
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:beginner_assistance",
+          "label": "Beginner assistance",
+          "resource": "assets/ui/feedback/icons/beginner_assistance.tres",
+          "region": [
+            647,
+            962,
+            259,
+            227
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "ui:trace_blocker",
+          "label": "Trace blocker",
+          "resource": "assets/ui/feedback/icons/trace_blocker.tres",
+          "region": [
+            964,
+            969,
+            243,
+            219
+          ],
+          "suggested_display_px": 32,
+          "status": "review_candidate_not_used_by_main_game"
+        }
+      ]
+    },
+    {
+      "category": "gameplay",
+      "file": "assets/world/growth/source_atlas.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "sha256": "de3b7a014deb982ee3b7c4e128885139786ad39f5af508c3c30234a61e93c01b",
+      "entries": [
+        {
+          "id": "gameplay:city_small_cluster",
+          "label": "City small cluster",
+          "resource": "assets/world/growth/props/city_small_cluster.tres",
+          "region": [
+            67,
+            123,
+            227,
+            248
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:city_town_block",
+          "label": "City town block",
+          "resource": "assets/world/growth/props/city_town_block.tres",
+          "region": [
+            342,
+            127,
+            264,
+            244
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:city_dense_block",
+          "label": "City dense block",
+          "resource": "assets/world/growth/props/city_dense_block.tres",
+          "region": [
+            650,
+            123,
+            265,
+            262
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:construction_foundation",
+          "label": "Construction foundation",
+          "resource": "assets/world/growth/props/construction_foundation.tres",
+          "region": [
+            973,
+            135,
+            227,
+            220
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:garden_allotment",
+          "label": "Garden allotment",
+          "resource": "assets/world/growth/props/garden_allotment.tres",
+          "region": [
+            69,
+            439,
+            224,
+            227
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:new_tree_grove",
+          "label": "New tree grove",
+          "resource": "assets/world/growth/props/new_tree_grove.tres",
+          "region": [
+            358,
+            437,
+            237,
+            239
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:civic_plaza",
+          "label": "Civic plaza",
+          "resource": "assets/world/growth/props/civic_plaza.tres",
+          "region": [
+            665,
+            434,
+            223,
+            232
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:vacant_plot",
+          "label": "Vacant plot",
+          "resource": "assets/world/growth/props/vacant_plot.tres",
+          "region": [
+            968,
+            450,
+            231,
+            218
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:platform_bench",
+          "label": "Platform bench",
+          "resource": "assets/world/growth/props/platform_bench.tres",
+          "region": [
+            95,
+            796,
+            171,
+            77
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:platform_shelter",
+          "label": "Platform shelter",
+          "resource": "assets/world/growth/props/platform_shelter.tres",
+          "region": [
+            359,
+            768,
+            240,
+            133
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:station_kiosk",
+          "label": "Station kiosk",
+          "resource": "assets/world/growth/props/station_kiosk.tres",
+          "region": [
+            691,
+            752,
+            178,
+            165
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:waiting_room",
+          "label": "Waiting room",
+          "resource": "assets/world/growth/props/waiting_room.tres",
+          "region": [
+            975,
+            749,
+            229,
+            168
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:passengers_north_candidate",
+          "label": "Passengers north candidate",
+          "resource": "assets/world/growth/props/passengers_north_candidate.tres",
+          "region": [
+            68,
+            1003,
+            240,
+            136
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:passengers_east_candidate",
+          "label": "Passengers east candidate",
+          "resource": "assets/world/growth/props/passengers_east_candidate.tres",
+          "region": [
+            379,
+            1003,
+            230,
+            131
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:passengers_accessible_candidate",
+          "label": "Passengers accessible candidate",
+          "resource": "assets/world/growth/props/passengers_accessible_candidate.tres",
+          "region": [
+            662,
+            1007,
+            243,
+            142
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        },
+        {
+          "id": "gameplay:luggage_trolley",
+          "label": "Luggage trolley",
+          "resource": "assets/world/growth/props/luggage_trolley.tres",
+          "region": [
+            995,
+            1020,
+            172,
+            125
+          ],
+          "suggested_display_px": 64,
+          "status": "review_candidate_not_used_by_main_game"
+        }
+      ]
+    }
+  ]
+}

@@ -1,14 +1,15 @@
 # Phase 0 - Foundations
 
-Status: first version written against the scripts supplied on 11 Oct 2026.
-**It has not been run in Godot yet.** Work through the checklist at the end
-before building Phase 1 on top of it.
+Status: integrated with the merged fleet and route code and checked headlessly in
+Godot 4.6.3. Foundation module and merge integration tests pass. Phase 0 accessibility
+work is now complete (UI scale to 200%, mouse button remapping, command queue persistence).
+Test with the checklist below before building on this.
 
 ## What was added
 
 | File | Purpose |
 |---|---|
-| `scripts/core/sim_clock.gd` | Fixed 60 Hz simulation steps, tick counter, speed multiplier |
+| `scripts/core/sim_clock.gd` | Fixed 60 Hz simulation steps, tick counter, 1×/2×/5×/10× multiplier with bounded stall catch-up |
 | `scripts/core/sim_rng.gd` | The one random number generator for simulation code, saved in saves |
 | `scripts/core/event_log.gd` | Bounded event stream (tick, subject, type, data) |
 | `scripts/core/save_migrations.gd` | Upgrades old saves one version at a time |
@@ -16,27 +17,55 @@ before building Phase 1 on top of it.
 | `scripts/core/palette.gd` | Colours by role: Default, Colour-blind safe, High contrast |
 | `scripts/core/input_actions.gd` | All keyboard commands as InputMap actions, with remapping |
 | `scripts/settings_dialog.gd` | Settings window: scale, palette, reduced motion, keys |
+| `scripts/core/command_queue.gd` | Construction commands scheduled and executed by `main.gd`, with save persistence |
 | `tests/phase0_selftest.gd` | Headless checks for the modules above |
+| `tests/test_command_queue.gd` | Headless checks for the command queue |
 
-Patched files (replace your copies; `phase0-changes.diff` shows every change):
-`main.gd`, `freight_train.gd`, `network_map.gd`.
+The running code is under `scripts/`. The `patched/` folder and
+`phase0-changes.diff` are historical copies, not installation instructions for the
+merged game. `patched/.gdignore` keeps those backups out of Godot imports; do not
+copy them over the current scripts.
 
 ## What changed in behaviour
 
 - **Simulation steps are fixed at 1/60 s** instead of using each frame's
-  `delta`. Timers, movement and income now give the same result at any frame
-  rate. Rendering, camera, notices and UI still use the real frame time.
-- **Saves are version 15.** Version 14 saves still load: they are upgraded in
-  memory and get a fixed RNG seed and an empty event log. Saving again writes
-  v15, and your previous save is copied to the backup slot as before. Saves
-  older than 14 are rejected, as before.
+  `delta`. Integration tests compare timers and moving trains at 30, 60 and
+  120 FPS. The toolbar now offers [gameplay speeds](GAMEPLAY_SPEED.md) of 1×,
+  2×, 5× and 10×, with remappable number-row shortcuts. Every system still advances
+  in 1/60-second ticks. Long stalls deliberately drop excess catch-up time; this is not yet
+  a full deterministic command/replay system. Rendering, camera, notices and UI
+  still use real frame time.
+- **Saves are version 26**, defined only by `SaveMigrations.CURRENT_VERSION`.
+  Version 14 route saves and both version 15 variants (fleet-only and
+  simulation-only) migrate in memory. The v16→v17 migration adds the command queue; v17→v18 adds switch positions; v18→v19 adds retained runtime paths,
+  physical recovery/dispatch state and signal modes; v19→v20 adds waypoint directives; v20→v21 adds route modes, defaulting existing
+  services to Shuttle without changing their retained positions. The v21→v22 step
+  adds an empty additional-passenger-service runtime table; new saves retain each
+  independent service and reject inconsistent assignments, loads and positions.
+  The v22→v23 step adds empty wagon lists for the new coach/log-wagon consists.
+  The v23→v24 step adds empty dispatch history; current saves retain directional
+  timetable cursors, bounded punctuality history and actual origin departure ticks.
+  The v24→v25 step splits existing station totals by destination and assigns old
+  onboard riders to their next stop, preserving counts and physical positions.
+  Existing data is preserved; missing systems receive defaults. Pre-fleet saves
+  reconstruct starter-train upgrades and their purchase costs. Validation
+  completes before the live game changes. Saving again writes v25 and retains
+  the previous save as a backup. Saves older than 14, future versions and
+  invalid current-format data are rejected.
 - **Keys go through the InputMap.** Defaults match the old keys (Space, M, G,
   I, Home, Esc, WASD/arrows, Shift). Letter shortcuts follow the letter
   printed on the key; camera movement follows the physical key position (WASD
-  stays under the left hand on AZERTY and other layouts).
+  stays under the left hand on AZERTY and other layouts). Simulation speed keys
+  use the physical number-row positions 1–4, so AZERTY does not require Shift.
+- **Mouse buttons go through the InputMap.** Build (left), demolish (right),
+  pan (middle), zoom in (wheel up) and zoom out (wheel down) are now remappable
+  in the settings dialog alongside keyboard commands.
 - **New Settings button** in the toolbar (next to Routes).
 - **Trains, build preview and map markers use the palette.** Default colours
   are unchanged.
+- **UI scale now supports 200%** with a 175% step. The compact header mode
+  activates at 175% instead of 150%. All UI offsets scale with the interface
+  factor.
 
 ## Rules for new code
 
@@ -62,12 +91,16 @@ Patched files (replace your copies; `phase0-changes.diff` shows every change):
 
 ## Known limits (deliberate, for later)
 
-- **Interface scale scales the whole view** (map and interface together), and
-  stops at 150%. At 200% the header text and toolbar do not fit; they need
-  reflowing (Phase 1). A scale for the interface only needs the hard-coded
-  offsets in `main.gd` replaced by containers.
-- **Mouse input is still hard-coded** (left build, right demolish, middle pan,
-  wheel zoom). Move these to actions before adding controller support.
+- **Build and demolish use the command queue.** While the game runs they wait
+  for the start of the next simulation step; while paused they run at once.
+  Upgrades, purchases, Undo/Redo, route and fleet changes already require the
+  game to be paused, so they act directly and never wait. The queue is now
+  saved in version 17 and restored on load. Tests: `test_command_queue.gd` (27 checks),
+  `test_command_wiring.gd`, `test_mouse_tracks.gd` and
+  `test_merge_integration.gd` pass (11 Oct 2026).
+- **Paused edits are not logged.** They run immediately and are not recorded
+  anywhere a replay could read, so deterministic replay is still incomplete.
+
 - **Reduced motion has nothing to reduce yet.** The setting is stored and
   readable (`GameSettings.reduced_motion`); gate screen shake, particles and
   flashing on it as they are added.
@@ -95,10 +128,11 @@ It should print `N checks, 0 failed`. Then play and check:
 3. Pause (Space), map (M), goals (G), inspect (I), Home, Esc and WASD all work.
 4. Save, quit, load: trains, money and objectives are restored.
 5. Load a **version 14 save** (keep a copy first): it loads with an
-   "Upgraded from save version 14" notice, then saves as v15.
-6. Settings: pick 125%/150% scale; switch to Colour-blind safe and check the
+   "Upgraded from save version 14" notice, then saves as v17.
+6. Settings: pick 125%/150%/175%/200% scale; switch to Colour-blind safe and check the
    build preview, invalid cells, both trains and the map; remap a key, press
-   Apply, restart, confirm it persisted; "Restore default keys" works.
+   Apply, restart, confirm it persisted; "Restore default keys" works;
+   remap mouse buttons and confirm they work.
 7. Turn on `event_log.echo_to_output` and confirm events appear when trains
    arrive and depart, tracks are built, and logs are delivered.
 8. Let the game run for a while with a slow frame rate (drag the window) and

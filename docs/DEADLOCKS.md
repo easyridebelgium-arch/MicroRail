@@ -1,0 +1,63 @@
+# Deadlocks and physical recovery
+
+Actual stopped trains waiting on each other form a wait graph keyed by permanent
+fleet IDs. A continuous cycle lasting three simulation seconds generates one
+`DEADLOCK_DETECTED` event and **Traffic (1)**. Loading, dwell, a single wait and
+lookahead contention alone are not deadlocks. Pausing freezes confirmation time.
+
+## Reverse a train
+
+1. Click the train to open its inspector; this pauses the simulation.
+2. Click **Reverse**. A confirmed deadlock is not required. Alternatively use
+   **Traffic → Reverse selected train** for a train in a confirmed cycle.
+   Its position, path and load stay unchanged. Only its direction reverses.
+3. Close the inspector/Traffic and resume. It travels back along its existing path to the
+   station/industry from which this leg departed, obeying reservations and signals.
+   It can still wait for occupied track, a stop signal or an incomplete path.
+4. At arrival, it is held and its service disabled. Passenger riders return to
+   that departure queue without fares; freight cargo stays aboard without a
+   delivery payout. Queue overflow is retained. No recovery fee is charged.
+5. Fix the layout or operating order. Use **Resume selected train** in Traffic
+   or **Enable service** in Fleet when ready, then close the window and resume.
+
+Reversal logs `TRAIN_REVERSED` and clears any cycle broken by that train's change
+of direction; unrelated incidents remain. Physical arrival logs `TRAIN_RECOVERED`. A blocked cycle may form again and be detected again.
+Already returning trains cannot be reversed repeatedly through this control.
+There is no teleport, automatic siding selection or alternate-path search. Current
+signals are bidirectional. Future one-way signalling must add a shared preflight
+legality check that rejects wrong-way returns before changing state.
+
+## Missing track and saves
+
+Removing unoccupied track ahead between a train and its next destination freezes
+it at its current position, with its load aboard and a route-incomplete warning.
+A gap behind does not stop the current trip: the train reaches its destination
+and unloads normally. Turning or reversing checks the new direction immediately;
+it then waits if that leg crosses the gap. Later legs beyond the next stop are
+checked when they become current. The retained path stays separate from the edited
+network, including repeated tile occurrences and waypoint detours. Repair the
+affected path to continue; a different path does not redirect a train mid-trip.
+Occupied/reserved track remains protected from demolition. Stop-order changes
+require an empty train physically at the new first stop and a connected new route.
+
+Saves are **v22** and retain runtime paths, unfinished reversals, loads and holds.
+V18 saves receive runtime defaults; v19 saves receive empty waypoint directives;
+v20 services default to Shuttle. Loop recovery returns to the departure stop of
+the current leg, including the closing last-to-first leg. Reservation ownership, signal block
+authority and deadlock timers are rebuilt after load. A persistent cycle is
+rediscovered after three seconds of actual waiting.
+
+## Checks
+
+```sh
+godot --headless --path . --script res://tests/test_deadlock_monitor.gd
+godot --headless --path . --script res://tests/test_deadlock_integration.gd
+godot --headless --path . --script res://tests/test_stopped_routes.gd
+godot --headless --path . --script res://tests/test_directional_routes.gd
+```
+
+Checks cover collision safety, physical return of either train, passenger/cargo
+conservation, save/load during and after recovery, stranded saves, repair/resumption,
+matching detection and directional stops at 30/60/120 FPS and Traffic at 200% UI scale. Manual play: remove
+an unreserved tile ahead of a moving train, save/reload, repair it, then provoke a
+head-on meeting and reverse either train through Traffic.

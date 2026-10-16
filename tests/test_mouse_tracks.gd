@@ -130,7 +130,7 @@ func _run() -> void:
 	check(game.tracks == built and game.money == before_money, "Reserved grounds must reject placement without charging")
 	# Passenger must actually deliver through the curved geometry.
 	for index in range(500):
-		game._move_train(0.1)
+		_advance_passenger(game, 0.1)
 	check(game.passengers_delivered > 0, "Passenger delivery must work on the diagonal path")
 	var freight: Array[Vector2i] = [game.FOREST_SITE]
 	for point in [Vector2i(12, 24), Vector2i(18, 30), Vector2i(24, 24), game.CARGO_TERMINAL]:
@@ -144,7 +144,7 @@ func _run() -> void:
 	game.forest_stock = 50
 	game.logs_produced = 50
 	for index in range(650):
-		game.forest_stock -= game.freight_train.advance(0.1, game.forest_stock)
+		_advance_freight(game, 0.1)
 	check(game.logs_delivered > 0 and game.freight_income > 0, "Freight must deliver cargo and earn income on diagonal rails")
 	check(game.forest_stock + game.freight_train.cargo + game.logs_delivered == 50, "Freight movement must conserve cargo")
 	var all_built: Dictionary = game.tracks.duplicate()
@@ -159,18 +159,32 @@ func _run() -> void:
 	check(game.train_position.distance_to(saved_position) < 0.1, "Save must restore passenger position")
 	check(game.freight_train.position.distance_to(saved_freight_position) < 0.1, "Save must restore freight position")
 	game.paused = true
-	game.demolition_cells = {Vector2i(9, 9): true, Vector2i(10, 10): true}
-	game.demolition_last_cell = Vector2i(10, 10)
-	game._finish_demolition(Vector2i(10, 10))
-	check(not game.tracks.has(Vector2i(9, 9)) and not game.route_connected, "Drag demolition must remove diagonal pieces")
+	var removable: Array[Vector2i] = []
+	for cell in game.route_cells:
+		if game._can_demolish(cell): removable.append(cell)
+	game.demolition_cells = {removable[0]: true, removable[1]: true}
+	game.demolition_last_cell = removable[1]
+	game._finish_demolition(removable[1])
+	check(not game.tracks.has(removable[0]) and not game.route_connected, "Drag demolition must remove diagonal pieces")
 	game._undo_construction()
 	check(game.tracks == all_built and game.route_connected, "Undo demolition must restore diagonal geometry")
 	var key := InputEventKey.new()
 	key.keycode = KEY_R
 	key.pressed = true
 	game._unhandled_input(key)
-	check(game.tracks == all_built and game.draw_track_mode, "R must no longer rotate or change construction mode")
+	check(game.tracks == all_built and game.demolition_mode, "R selects Remove without rotating or changing existing track")
 	game.queue_free()
 	await process_frame
 	print("Mouse track tests: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
+
+# Movement tests use the same fixed-step reservation refresh as the game.
+func _advance_passenger(game: Node, seconds: float) -> void:
+	for step in range(roundi(seconds * 60)):
+		game._rebuild_reservations(true)
+		game._move_train(1.0 / 60.0)
+
+func _advance_freight(game: Node, seconds: float) -> void:
+	for step in range(roundi(seconds * 60)):
+		game._rebuild_reservations(true)
+		game.forest_stock -= game.freight_train.advance(1.0 / 60.0, game.forest_stock)

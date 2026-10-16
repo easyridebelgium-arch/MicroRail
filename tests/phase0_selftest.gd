@@ -162,6 +162,7 @@ func _test_migrations() -> void:
 	var result: Dictionary = SaveMigrations.migrate(old_save)
 
 	check(result["ok"], "version 14 migrates")
+	check(result["data"].get("switches") is Array and result["data"]["switches"].is_empty(), "migration adds an empty switch list")
 	check(int(result["data"]["version"]) == SaveMigrations.CURRENT_VERSION, "migrated save has the current version")
 	check(result["data"].has("sim"), "migration adds the sim block")
 	check(result["migrated"], "migration is reported")

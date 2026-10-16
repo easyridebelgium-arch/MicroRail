@@ -1,7 +1,28 @@
 extends Node2D
 
+const WorldArt = preload("res://scripts/art/world_art.gd")
+const GameSettings = preload("res://scripts/core/game_settings.gd")
+
 signal delivered(amount: int)
+signal logs_received(amount: int)
+const Factory = preload("res://scripts/core/factory.gd")
+var factory: RefCounted
+var factory_distance := -1.0
+var sawmill_cell: Vector2i = Sawmill.CELL
+var factory_cell: Vector2i = Factory.CELL
+signal timber_received(amount: int)
+const Sawmill = preload("res://scripts/core/sawmill.gd")
+var industry: RefCounted
+var chain_stage := 0
+var recovery_stop := "forest"
+var leg_origin := "forest"
+var sawmill_distance := -1.0
 signal operating_expense(amount: int)
+signal departed(stop: String, cargo: int)
+signal arrived(stop: String, cargo: int)
+const Consists = preload("res://scripts/core/consists.gd")
+var wagon_speed_limit := INF
+var consist_entry: Dictionary = {}
 const Router = preload("res://scripts/rail_router.gd")
 const Palette = preload("res://scripts/core/palette.gd")
 
@@ -30,6 +51,8 @@ var running_cost_per_second: int = OPERATING_COST_PER_SECOND
 var loading_rule: int = LoadingRule.ANY
 var home_position: Vector2 = Vector2.ZERO
 var cargo: int = 0
+var movement_guard: Callable
+var reservation_wait: String = ""
 
 var route_cells: Array[Vector2i] = []
 var route_path: Curve2D = Curve2D.new()
@@ -41,8 +64,13 @@ var operating_timer: float = 0.0
 var capacity_level: int = 0
 var speed_level: int = 0
 var service_enabled: bool = true
+var route_valid: bool = true
+var recovery_returning: bool = false
+var held: bool = false
 
 func set_route(cells: Array[Vector2i], tile_size: float) -> void:
+	if cells != route_cells and not route_cells.is_empty() and distance_along_route > 0.001:
+		return
 	if cells == route_cells:
 		return
 
@@ -53,6 +81,7 @@ func set_route(cells: Array[Vector2i], tile_size: float) -> void:
 	to_terminal = true
 	dwell = 0.0
 
+	if industry != null: configure_industry(industry, tile_size, factory)
 	# Keep onboard logs when a route changes or is disconnected.
 	_update_transform()
 
@@ -68,27 +97,74 @@ func advance(delta: float, available_logs: int) -> int:
 		return 0
 
 	var loaded: int = 0
+	var route_length: float = route_path.get_baked_length()
+	var at_forest: bool = to_terminal and distance_along_route <= 0.001
+	var at_terminal: bool = not to_terminal and absf(distance_along_route - route_length) < 0.001
 
 	# Load at the forest before departing.
-	if to_terminal and distance_along_route <= 0.001:
+	if at_forest and not recovery_returning:
 		loaded = mini(get_capacity() - cargo, available_logs)
 		cargo += loaded
 
 		if cargo < get_minimum_load():
 			return loaded
 
-	var route_length: float = route_path.get_baked_length()
-	var target: float = route_length if to_terminal else 0.0
+	var loading_at: bool = chain_enabled() and to_terminal and ((chain_stage == 1 and absf(distance_along_route - sawmill_distance) < 0.001) or (factory_enabled() and chain_stage == 2 and absf(distance_along_route - factory_distance) < 0.001))
+	if loading_at and not recovery_returning:
+		if not service_enabled and cargo == 0:
+			to_terminal = false
+		else:
+			if service_enabled: cargo += factory.take(get_capacity() - cargo) if chain_stage == 2 else industry.take(get_capacity() - cargo)
+			if service_enabled and cargo < processing_minimum_load(): return loaded
+	var target: float = target_distance()
 
+	var previous_distance := distance_along_route
 	distance_along_route = move_toward(
 		distance_along_route,
 		target,
 		get_speed() * delta
 	)
 
+	if movement_guard.is_valid():
+		distance_along_route = movement_guard.call(route_path, previous_distance, distance_along_route)
+
 	if absf(distance_along_route - target) < 0.001:
 		distance_along_route = target
+		var stop := recovery_stop if recovery_returning and chain_enabled() else ("sawmill" if chain_enabled() and to_terminal and chain_stage == 0 else "factory" if factory_enabled() and to_terminal and chain_stage == 1 else "terminal" if to_terminal else "forest")
+		if absf(previous_distance - target) > 0.001: arrived.emit(stop, cargo)
 
+		if recovery_returning:
+			recovery_returning = false
+			held = true
+			service_enabled = false
+			to_terminal = not to_terminal
+			dwell = 0.0
+			_update_transform()
+			return loaded
+		if chain_enabled() and to_terminal and chain_stage == 0:
+			var accepted: int = industry.accept(cargo)
+			cargo -= accepted
+			if accepted > 0: logs_received.emit(accepted)
+			if cargo > 0:
+				_update_transform()
+				return loaded
+			chain_stage = 1
+			leg_origin = "sawmill"
+			dwell = STATION_WAIT
+			_update_transform()
+			return loaded
+		if factory_enabled() and to_terminal and chain_stage == 1:
+			var accepted: int = factory.accept(cargo)
+			cargo -= accepted
+			if accepted > 0: timber_received.emit(accepted)
+			if cargo > 0:
+				_update_transform()
+				return loaded
+			chain_stage = 2
+			leg_origin = "factory"
+			dwell = STATION_WAIT
+			_update_transform()
+			return loaded
 		if to_terminal:
 			var delivered_amount: int = cargo
 			cargo = 0
@@ -97,13 +173,19 @@ func advance(delta: float, available_logs: int) -> int:
 				delivered.emit(delivered_amount)
 
 		to_terminal = not to_terminal
+		if chain_enabled():
+			leg_origin = "forest" if to_terminal else "terminal"
+			if to_terminal: chain_stage = 0
 		dwell = STATION_WAIT
+	elif (at_forest or at_terminal or (chain_enabled() and absf(previous_distance - sawmill_distance) < 0.001) or (factory_enabled() and absf(previous_distance - factory_distance) < 0.001)) and absf(distance_along_route - previous_distance) > 0.001:
+		departed.emit(leg_origin if chain_enabled() else "forest" if at_forest else "terminal", cargo)
 
 	_update_transform()
 	return loaded
 
 
 func _update_transform() -> void:
+	queue_redraw()
 	if route_cells.is_empty():
 		position = home_position
 		rotation = 0.0
@@ -129,20 +211,32 @@ func _update_transform() -> void:
 
 
 func _draw() -> void:
-	var body := Rect2(Vector2(-14, -8), Vector2(28, 16))
+	var offsets := Consists.offsets(consist_entry)
+	if offsets.size() > 1 and route_path.point_count >= 2:
+		for index in range(offsets.size()):
+			var pose := Consists.pose(route_path, distance_along_route + offsets[index])
+			draw_set_transform(to_local(pose.position), pose.angle - global_rotation + (0.0 if to_terminal else PI) + PI * 0.5)
+			if index == 0:
+				_draw_locomotive()
+			else:
+				WorldArt.draw_freight_wagon(self, cargo_kind(), cargo > 0, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
+			draw_set_transform(Vector2.ZERO, 0.0)
+	else:
+		draw_set_transform(Vector2.ZERO, PI * 0.5)
+		_draw_locomotive()
+		draw_set_transform(Vector2.ZERO, 0.0)
 
-	draw_rect(body, Palette.get_color(Palette.Role.TRAIN_FREIGHT))
-	draw_rect(body, Color(0.05, 0.12, 0.22), false, 1.0)
-
-	draw_rect(
-		Rect2(Vector2(6, -5), Vector2(6, 10)),
-		Color(0.75, 0.9, 1.0)
-	)
+func _draw_locomotive() -> void:
+	WorldArt.draw_vehicle(self, str(consist_entry.get("model", "freight_standard")), GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
 
 
 func status_text() -> String:
+	if not route_valid and not route_cells.is_empty(): return "Route incomplete ahead — stopped here. Repair the path to the next destination."
+	if held: return "Held by dispatcher at current position"
+	if not reservation_wait.is_empty(): return reservation_wait
+	if recovery_returning: return "Reversing to " + (recovery_stop if chain_enabled() else "terminal" if to_terminal else "forest")
 	if route_cells.is_empty():
-		return "Needs a separate connected freight route"
+		return "Needs a connected freight route"
 	if not service_enabled:
 		if service_is_active():
 			return "Withdrawing after return to forest"
@@ -152,6 +246,14 @@ func status_text() -> String:
 	if dwell > 0.0:
 		return "Stopped at loading track"
 
+	if factory_enabled() and to_terminal:
+		if chain_stage == 1 and absf(distance_along_route - factory_distance) < 0.001: return "Factory input storage full — waiting to unload timber"
+		if chain_stage == 2 and absf(distance_along_route - factory_distance) < 0.001: return "Waiting for finished goods: %d / %d required; factory output %d" % [cargo, processing_minimum_load(), factory.state.output]
+		if chain_stage == 2: return "Carrying goods to terminal"
+	if chain_enabled() and to_terminal:
+		if chain_stage == 0 and absf(distance_along_route - sawmill_distance) < 0.001 and cargo > 0: return "Sawmill input storage full — waiting to unload logs"
+		if chain_stage == 1 and absf(distance_along_route - sawmill_distance) < 0.001: return "Waiting for timber: %d / %d required; sawmill output %d" % [cargo, processing_minimum_load(), industry.state.timber]
+		if distance_along_route > 0.001: return "Carrying %s to %s" % [cargo_kind(), "sawmill" if chain_stage == 0 else "factory" if factory_enabled() else "terminal"]
 	if to_terminal:
 		if distance_along_route <= 0.001 and cargo < get_minimum_load():
 			return "Loading: %d / %d logs required" % [
@@ -174,12 +276,18 @@ func save_state() -> Dictionary:
 		"loading_rule": loading_rule,
 		"capacity_level": capacity_level,
 		"speed_level": speed_level,
-		"service_enabled": service_enabled
+		"service_enabled": service_enabled,
+		"chain_stage": chain_stage,
+		"recovery_stop": recovery_stop,
+		"leg_origin": leg_origin
 	}
 
 
 func restore_state(state: Dictionary) -> void:
 	cargo = int(state["cargo"])
+	chain_stage = int(state.get("chain_stage", 0))
+	recovery_stop = str(state.get("recovery_stop", "forest"))
+	leg_origin = str(state.get("leg_origin", "forest"))
 	distance_along_route = clampf(
 		float(state["distance"]),
 		0.0,
@@ -205,11 +313,17 @@ static func empty_state() -> Dictionary:
 		"loading_rule": LoadingRule.ANY,
 		"capacity_level": 0,
 		"speed_level": 0,
-		"service_enabled": true
+		"service_enabled": true,
+		"chain_stage": 0,
+		"recovery_stop": "forest",
+		"leg_origin": "forest"
 	}
 
 
 static func is_valid_state(state: Dictionary, route_length: float, model_capacity: int = CAPACITY) -> bool:
+	var stage: Variant = state.get("chain_stage", 0)
+	if typeof(stage) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(stage)) or float(stage) != floor(float(stage)) or stage < 0 or stage > 2: return false
+	if state.get("recovery_stop", "forest") not in ["forest", "sawmill", "factory", "terminal"] or state.get("leg_origin", "forest") not in ["forest", "sawmill", "factory", "terminal"]: return false
 	if typeof(state.get("service_enabled")) != TYPE_BOOL:
 		return false
 	if typeof(state.get("to_terminal")) != TYPE_BOOL:
@@ -293,13 +407,13 @@ func get_minimum_load() -> int:
 			return get_capacity()
 
 		_:
-			return 1
+			return Sawmill.DEFINITION.input_per_batch if chain_enabled() and chain_stage == 0 else 1
 func get_capacity() -> int:
 	return base_capacity + capacity_level * CAPACITY_PER_UPGRADE
 
 
 func get_speed() -> float:
-	return base_speed + speed_level * SPEED_PER_UPGRADE
+	return minf(base_speed + speed_level * SPEED_PER_UPGRADE, wagon_speed_limit)
 
 
 func get_capacity_upgrade_price() -> int:
@@ -309,10 +423,12 @@ func get_capacity_upgrade_price() -> int:
 func get_speed_upgrade_price() -> int:
 	return BASE_SPEED_UPGRADE_PRICE * (speed_level + 1)
 func service_is_active() -> bool:
+	if not route_valid or held:
+		return false
 	if route_cells.is_empty():
 		return false
 
-	if service_enabled:
+	if recovery_returning or service_enabled:
 		return true
 
 	var parked_at_forest: bool = (
@@ -321,3 +437,85 @@ func service_is_active() -> bool:
 	)
 
 	return not parked_at_forest
+
+func chain_enabled() -> bool:
+	return industry != null and industry.state.installed
+func factory_enabled() -> bool:
+	return chain_enabled() and factory != null and factory.state.installed
+func configure_industry(value: RefCounted, tile_size: float, processing_factory: RefCounted = null, positions: Dictionary = {}) -> void:
+	sawmill_cell = positions.get("sawmill", sawmill_cell)
+	factory_cell = positions.get("factory", factory_cell)
+	factory = processing_factory
+	factory_distance = -1.0
+	var factory_index := route_cells.find(factory_cell)
+	if factory_index >= 0: factory_distance = Router.make_path(route_cells.slice(0, factory_index + 1), tile_size).get_baked_length()
+	industry = value
+	sawmill_distance = -1.0
+	var index := route_cells.find(sawmill_cell)
+	if index >= 0: sawmill_distance = Router.make_path(route_cells.slice(0, index + 1), tile_size).get_baked_length()
+func target_distance() -> float:
+	if chain_enabled():
+		if recovery_returning:
+			if recovery_stop == "factory": return factory_distance
+			if recovery_stop == "sawmill": return sawmill_distance
+			return route_path.get_baked_length() if recovery_stop == "terminal" else 0.0
+		if to_terminal and chain_stage == 0: return sawmill_distance
+		if factory_enabled() and to_terminal and chain_stage == 1: return factory_distance
+	return route_path.get_baked_length() if to_terminal else 0.0
+func departure_distance() -> float:
+	if chain_enabled():
+		if leg_origin == "factory": return factory_distance
+		if leg_origin == "sawmill": return sawmill_distance
+		return route_path.get_baked_length() if leg_origin == "terminal" else 0.0
+	return 0.0 if to_terminal else route_path.get_baked_length()
+func cargo_kind() -> String: return "goods" if factory_enabled() and chain_stage == 2 else "timber" if chain_enabled() and chain_stage == 1 else "logs"
+func processing_minimum_load() -> int:
+	# A single shuttle cannot fetch more inputs while waiting for a full output
+	# load. Finish the finite available batch instead of creating that deadlock.
+	var remaining := 0
+	if chain_stage == 2 and factory_enabled():
+		remaining = int(factory.state.output) + int(int(factory.state.input) / float(Factory.DEFINITION.input_per_batch)) * Factory.DEFINITION.output_per_batch
+	elif chain_stage == 1 and chain_enabled():
+		remaining = int(industry.state.timber) + int(int(industry.state.logs) / float(Sawmill.DEFINITION.input_per_batch)) * Sawmill.DEFINITION.output_per_batch
+	return maxi(1, mini(get_minimum_load(), cargo + remaining))
+func ready_to_move(available_logs: int) -> bool:
+	if not service_is_active() or dwell > 0: return false
+	if recovery_returning: return true
+	if factory_enabled() and to_terminal and absf(distance_along_route - factory_distance) < 0.001:
+		if chain_stage == 1: return false
+		if not service_enabled: return true
+		return cargo + int(factory.state.output) >= processing_minimum_load()
+	if chain_enabled() and to_terminal and absf(distance_along_route - sawmill_distance) < 0.001:
+		if chain_stage == 0: return false
+		if not service_enabled: return true
+		return cargo + int(industry.state.timber) >= processing_minimum_load()
+	return not to_terminal or distance_along_route > 0.001 or cargo + available_logs >= get_minimum_load()
+
+static func valid_chain(state: Dictionary, cells: Array[Vector2i], installed: bool, returning: bool, tile_size: float, has_factory: bool = false, positions: Dictionary = {}) -> bool:
+	var saved_sawmill_cell: Vector2i = positions.get("sawmill", Sawmill.CELL)
+	var saved_factory_cell: Vector2i = positions.get("factory", Factory.CELL)
+	if not installed: return int(state.chain_stage) == 0
+	if not has_factory and int(state.chain_stage) > 1: return false
+	var index := cells.find(saved_sawmill_cell)
+	if index < 0 or cells.count(saved_sawmill_cell) != 1: return false
+	var distance := Router.make_path(cells.slice(0, index + 1), tile_size).get_baked_length()
+	var current := float(state.distance)
+	var factory_stop := -1.0
+	if has_factory:
+		var factory_index := cells.find(saved_factory_cell)
+		if factory_index <= index or cells.count(saved_factory_cell) != 1: return false
+		factory_stop = Router.make_path(cells.slice(0, factory_index + 1), tile_size).get_baked_length()
+	if returning:
+		if state.recovery_stop != state.leg_origin: return false
+		if state.recovery_stop == "factory": return has_factory and state.chain_stage == 2 and ((current <= factory_stop + 0.001) if state.to_terminal else (current >= factory_stop - 0.001))
+		if state.recovery_stop == "sawmill": return state.chain_stage == 1 and ((current <= distance + 0.001) if state.to_terminal else (current >= distance - 0.001))
+		if state.recovery_stop == "forest": return state.chain_stage == 0 and not state.to_terminal and current <= distance + 0.001
+		return state.chain_stage == (2 if has_factory else 1) and state.to_terminal and state.cargo == 0
+	if state.to_terminal:
+		if state.chain_stage == 0: return state.leg_origin == "forest" and current <= distance + 0.001
+		if state.chain_stage == 1: return state.leg_origin == "sawmill" and current >= distance - 0.001 and (not has_factory or current <= factory_stop + 0.001)
+		return has_factory and state.leg_origin == "factory" and current >= factory_stop - 0.001
+	if state.cargo != 0: return false
+	if state.leg_origin == "sawmill": return state.chain_stage == 1 and current <= distance + 0.001
+	if state.leg_origin == "factory": return has_factory and state.chain_stage == 2 and current <= factory_stop + 0.001
+	return state.leg_origin == "terminal" and state.chain_stage == (2 if has_factory else 1)

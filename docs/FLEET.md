@@ -5,22 +5,22 @@ Each train has a permanent ID, a model and its own speed/capacity upgrades.
 
 ## Update and try it
 
-1. Close Godot. In GitHub Desktop select `codex/mouse-track-building`, then click
+1. Close Godot. In GitHub Desktop select `codex/fix-main-merge`, then click
    Fetch origin and Pull origin. Reopen the existing project and run it.
-2. Start a fresh game. Save version 15 contains fleet ownership and assignments;
-   older development saves are intentionally not migrated.
+2. Start fresh or load a supported save. The merged format is version 22; route
+   version 14 and both version 15 development formats migrate when loaded.
 3. Open **Fleet**. The game pauses. You begin with one Passenger Shuttle and one
    Log Hauler already assigned to their services, included in the starting game.
 4. Choose **Fast Passenger — £650**, then click **Buy**. It appears as Stored.
 5. With the purchased train selected, enter a name and click **Rename**.
-6. Click **Assign to passenger**. At the start of a fresh game the original train
+6. Choose the passenger route and click **Replace route's train**. At the start of a fresh game the original train
    is empty at its first stop, so it moves into storage and the new train takes over.
 7. Close the window, connect the passenger route if needed, and resume. The fast
    train has fewer seats, higher speed and higher running costs.
 8. Pause and inspect a station to buy capacity and speed upgrades separately.
    These upgrades belong to the assigned train and remain with it when stored.
 9. Save through the toolbar. Reload restores owned trains, IDs, names, upgrades,
-   assignments and the two active trains' journey states.
+   assignments and all active trains' journey states.
 
 ## Available models
 
@@ -42,7 +42,7 @@ and back at the first passenger stop, or at the forest for freight.
 1. In Fleet select the assigned train and click **Withdraw service**.
 2. Close Fleet and resume. Withdrawal allows the train to complete its round trip,
    deliver its remaining load and park at its first stop.
-3. Open Fleet again, select a stored replacement and click **Assign**.
+3. Open Fleet again, select a stored replacement choose the route and click **Replace route's train**.
 4. The old train becomes Stored, and the replacement is assigned and enabled.
    Close Fleet and resume when ready.
 
@@ -53,8 +53,9 @@ place after a swap. Each train retains its own upgrade levels.
 
 ## Storage and sale
 
-- Only one train runs on each of the two current services. Buying spares does not
-  increase simultaneous train traffic. Junctions, signals and reservations come next.
+- One train runs per service. [Start additional passenger services](MULTIPLE_SERVICES.md)
+  from stored passenger trains to run them simultaneously, up to eight passenger
+  routes plus freight. Buying alone leaves a train stored.
 - Stored trains are off-map and incur no running costs. Physical depots and stabling
   tracks are future features. The fleet is limited to 100 owned trains for now.
 - Only stored trains can be sold. The button shows the refund: half the model price
@@ -72,6 +73,7 @@ Run from the project directory with Godot on PATH:
 
 ```sh
 godot --headless --path . --script res://tests/test_fleet.gd
+godot --headless --path . --script res://tests/test_multiple_services.gd
 ```
 
 The integration test writes saves. On Linux, use separate `XDG_CONFIG_HOME`,

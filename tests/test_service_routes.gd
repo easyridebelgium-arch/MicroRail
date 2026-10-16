@@ -66,9 +66,9 @@ func _run() -> void:
 	editor.service_choice.item_selected.emit(0)
 	check(editor.name_field.text == "Regional Express" and editor.draft["freight"]["name"] == "Log Runner", "Switching services must retain each draft name")
 	editor.station_choice.select(2)
-	editor.add_button.pressed.emit()
+	editor.stop_add_button.pressed.emit()
 	check(editor.draft["passenger"]["stops"] == ["a", "b", "c"], "Editor Add must append Station C")
-	editor.add_button.pressed.emit()
+	editor.stop_add_button.pressed.emit()
 	check(editor.draft["passenger"]["stops"].size() == 3, "Editor must reject duplicate stops")
 	editor.confirmed.emit()
 	check(game.services["passenger"]["name"] == "Regional Express", "Apply must trim and persist the route name")
@@ -81,7 +81,7 @@ func _run() -> void:
 	var visits: Array[int] = []
 	var last_index: int = game.passenger_stop_index
 	for step in range(350):
-		game._move_train(0.1)
+		_advance_passenger(game, 0.1)
 		if game.passenger_stop_index != last_index:
 			last_index = game.passenger_stop_index
 			visits.append(last_index)
@@ -94,7 +94,7 @@ func _run() -> void:
 	# Renaming preserves movement, while changing order returns onboard passengers.
 	game.waiting_at_a = 10
 	game.wait_remaining = 0.0
-	game._move_train(0.2)
+	_advance_passenger(game, 0.2)
 	var distance: float = game.route_distance
 	var position_before: Vector2 = game.train_position
 	var onboard: int = game.passengers_on_train
@@ -111,21 +111,25 @@ func _run() -> void:
 	# Reorder with reversal at an intermediate station (A → C → B).
 	var reordered: Dictionary = renamed.duplicate(true)
 	reordered["passenger"]["stops"] = ["a", "c", "b"]
+	check(game.apply_service_routes(reordered).contains("Finish"), "moving route edits are refused without teleporting or discarding riders")
+	game.passenger_service_enabled = false
+	for step in range(500):
+		if game._passenger_service_is_active(): _advance_passenger(game, 0.1)
+	game.passenger_service_enabled = true
 	game.apply_service_routes(reordered)
-	check(game.waiting_at_a == 10 and game.passengers_on_train == 0, "Reordering must return passengers without loss or duplication")
-	check(game.route_distance == 0.0 and game.passenger_stop_index == 0, "Reordering resets to the first stop")
+	check(game.route_distance == 0.0 and game.passenger_stop_index == 0 and game.services == reordered, "stop order can change after the empty train actually returns")
 	for step in range(150):
-		game._move_train(0.1)
+		_advance_passenger(game, 0.1)
 		if game.passenger_stop_index == 1:
 			break
 	check(game.train_position.distance_to(game._cell_center(game.STATION_C)) < 0.1, "A → C → B must pass B without stopping and stop at C first")
 	game.wait_remaining = 0.0
-	game._move_train(0.1)
+	_advance_passenger(game, 0.1)
 	check(game.train_position.x < game._cell_center(game.STATION_C).x, "Intermediate reversal must travel back toward B")
 	game._save_game()
 	var saved_index: int = game.passenger_stop_index
 	position_before = game.train_position
-	game._move_train(0.5)
+	_advance_passenger(game, 0.5)
 	game._load_game()
 	check(game.passenger_stop_index == saved_index and game.train_position.distance_to(position_before) < 0.1, "Mid-leg save after an intermediate reversal must restore exactly")
 	# Invalid saves must not partially replace live route state.
@@ -142,8 +146,8 @@ func _run() -> void:
 	game.passengers_on_train = 4
 	game.tracks.erase(Vector2i(30, 8))
 	game._check_route()
-	check(not game.route_connected and game.waiting_at_c == 11 and game.passengers_on_train == 0, "Broken later leg must stop the service and preserve passengers")
-	check("Missing track" in game._passenger_service_status(), "Disconnected route must explain the missing leg")
+	check(not game.route_connected and game.waiting_at_c == 7 and game.passengers_on_train == 4 and game.train_position == position_before, "Broken later leg must stop in place with passengers still aboard")
+	check("Route incomplete" in game._passenger_service_status(), "Disconnected route must explain the missing leg")
 	game.tracks[Vector2i(30, 8)] = false
 	game._check_route()
 	check(game.route_connected, "Repairing a later leg must restore the complete service")
@@ -152,20 +156,47 @@ func _run() -> void:
 	editor.stop_list.select(2)
 	editor.up_button.pressed.emit()
 	check(editor.draft["passenger"]["stops"] == ["a", "b", "c"], "Up must reorder the selected stop")
+	editor.move_stop_to(0, 2)
+	check(editor.draft["passenger"]["stops"] == ["b", "c", "a"] and editor.stop_list.get_selected_items() == PackedInt32Array([2]), "Dragging a stop to a new position reorders the draft")
+	editor.move_stop_to(2, 0)
+	check(editor.draft["passenger"]["stops"] == ["a", "b", "c"], "Dragging a stop back restores the order")
+	editor.move_stop_to(1, 9)
+	check(editor.draft["passenger"]["stops"] == ["a", "b", "c"], "Dropping outside the list changes nothing")
+	check(editor._stop_can_drop(Vector2.ZERO, {"stop_index": 1}) and not editor._stop_can_drop(Vector2.ZERO, "x"), "Only stop drags are accepted")
 	editor.hide()
 	check(game.services == reordered, "Closing without Apply must leave the live route unchanged")
 	# Withdrawing a service parks at its configured first station.
 	var reversed_route: Dictionary = defaults.duplicate(true)
 	reversed_route["passenger"]["stops"] = ["c", "b", "a"]
-	game.apply_service_routes(reversed_route)
+	game.passengers_on_train = 0
 	game.passenger_service_enabled = true
-	game._move_train(0.2)
+	for step in range(500):
+		if game.train_position.distance_to(game._cell_center(game.STATION_C)) < 0.1 and game.train_needs_boarding: break
+		_advance_passenger(game, 0.1)
+	game.passenger_held = true
+	game.apply_service_routes(reversed_route)
+	game.passenger_held = false
+	game.passenger_service_enabled = true
+	_advance_passenger(game, 0.2)
 	game.passenger_service_enabled = false
 	for step in range(700):
 		if game._passenger_service_is_active():
-			game._move_train(0.1)
+			_advance_passenger(game, 0.1)
 	check(not game._passenger_service_is_active() and game.train_position.distance_to(game._cell_center(game.STATION_C)) < 0.1, "Withdrawal must park at the configured first stop, not always Station A")
 	game.queue_free()
 	await process_frame
 	print("Service route tests: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
+
+# Movement tests use the same fixed-step reservation refresh as the game.
+func _advance_passenger(game: Node, seconds: float) -> void:
+	for step in range(roundi(seconds * 60)):
+		game._refresh_directional_routes()
+		game._rebuild_reservations(true)
+		game._move_train(1.0 / 60.0)
+
+func _advance_freight(game: Node, seconds: float) -> void:
+	for step in range(roundi(seconds * 60)):
+		game._refresh_directional_routes()
+		game._rebuild_reservations(true)
+		game.forest_stock -= game.freight_train.advance(1.0 / 60.0, game.forest_stock)

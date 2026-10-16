@@ -12,10 +12,11 @@ extends RefCounted
 const TICKS_PER_SECOND: int = 60
 const TICK_SECONDS: float = 1.0 / float(TICKS_PER_SECOND)
 
-## After a long stall (window drag, debugger pause) drop the backlog instead of
-## running hundreds of steps in one frame.
+## Bound real frame time after stalls, before applying acceleration. Eight
+## normal-speed ticks become at most 80 ticks at 10x; this permits actual 10x
+## operation at 30 FPS without enlarging any simulation step.
 const MAX_STEPS_PER_FRAME: int = 8
-const MAX_SPEED: float = 8.0
+const MAX_SPEED: float = 10.0
 const MAX_SAVED_TICK: int = 1_000_000_000_000
 
 ## Number of simulation steps completed so far. Use it as the game timestamp.
@@ -32,15 +33,17 @@ func advance(frame_delta: float) -> int:
 	if frame_delta <= 0.0 or speed <= 0.0:
 		return 0
 
-	_accumulator += frame_delta * clampf(speed, 0.0, MAX_SPEED)
-
-	var steps: int = int(_accumulator / TICK_SECONDS)
-
-	if steps > MAX_STEPS_PER_FRAME:
-		steps = MAX_STEPS_PER_FRAME
+	var multiplier := clampf(speed, 0.0, MAX_SPEED)
+	var real_delta := minf(frame_delta, MAX_STEPS_PER_FRAME * TICK_SECONDS)
+	_accumulator += real_delta * multiplier
+	# Tolerate rounding at exact tick boundaries, without accumulating drift.
+	var steps := int(floor((_accumulator + TICK_SECONDS * 0.0000001) / TICK_SECONDS))
+	var budget := int(ceil(MAX_STEPS_PER_FRAME * multiplier))
+	if steps > budget:
+		steps = budget
 		_accumulator = 0.0
 	else:
-		_accumulator -= float(steps) * TICK_SECONDS
+		_accumulator = maxf(0.0, _accumulator - float(steps) * TICK_SECONDS)
 
 	return steps
 

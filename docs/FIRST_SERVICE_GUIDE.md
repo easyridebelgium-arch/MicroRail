@@ -23,8 +23,19 @@ start anything automatically. **Resume and watch trains** starts the clock witho
 releasing holds, overriding signals or bypassing reservations. Click a stopped train
 for its operating inspector if it does not move.
 
-The guide suggests the closest city centres as a small starting link. This is a
-map-distance suggestion; inspect construction previews and prices before committing.
+Before the first station is built, the guide compares candidate starting pairs by
+a minimum budget: two £300 stations, one £400 shuttle and optimistic connecting
+rail length. Rivers add £40 per water tile, so a slightly farther same-bank pair
+can be cheaper. Candidate station footprints must pass placement and dry-land
+checks; suggested bridge spans exclude protected city/industry footprints.
+
+This is explicitly a **lower bound, not a route quote**. It does not find a complete
+track path, reserve a crossing or guarantee affordable approaches. Curves, protected
+buildings and detours can increase the actual price. Inspect Station and Connect
+previews before committing. Advice reflects the current balance without spending
+money or advancing the RNG. Once stations exist, the checklist uses the real live
+connection and retains the simple nearby-city reference rather than quoting a new
+company budget against partially built infrastructure.
 New stations usually cost £300 each, and the standard passenger shuttle costs £400.
 The existing £5000 city budget and all fares, costs and financing rules are unchanged.
 Unfinished construction strokes prevent opening the guide. Actions refuse an

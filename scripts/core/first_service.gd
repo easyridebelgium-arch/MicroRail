@@ -1,6 +1,7 @@
 extends RefCounted
 ## Read-only onboarding derived from the live graph and actual final deliveries.
 const Router = preload("res://scripts/rail_router.gd")
+const Advice = preload("res://scripts/core/first_connection_advice.gd")
 const FleetData = preload("res://scripts/fleet.gd")
 
 static func inspect(game: Node) -> Dictionary:
@@ -52,7 +53,10 @@ static func inspect(game: Node) -> Dictionary:
 	for index in range(rows.size()):
 		if rows[index].done: done_count += 1
 		elif next_index == rows.size(): next_index = index
-	return {"city_mode": city_mode, "rows": rows, "next": next_index, "done": done_count, "complete": next_index == rows.size(), "connection": connection, "suggestion": nearest_pair(game.world.state.settlements) if city_mode else "The tutorial train is already provided. Connect A–B and resume; no Fleet or Routes setup is needed.", "delivered": game.passengers_delivered}
+	var suggestion := "The tutorial train is already provided. Connect A–B and resume; no Fleet or Routes setup is needed."
+	if city_mode:
+		suggestion = Advice.describe(game.world.state, game.river_terrain, game.money) if stations.is_empty() else nearest_pair(game.world.state.settlements)
+	return {"city_mode": city_mode, "rows": rows, "next": next_index, "done": done_count, "complete": next_index == rows.size(), "connection": connection, "suggestion": suggestion, "delivered": game.passengers_delivered}
 
 static func nearest_pair(settlements: Array) -> String:
 	var closest := INF

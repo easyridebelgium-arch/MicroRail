@@ -92,6 +92,8 @@ const ServicePerformance = preload("res://scripts/core/service_performance.gd")
 var service_performance := ServicePerformance.new()
 var object_pins: Dictionary = {}
 var service_cards: ConfirmationDialog
+const NetworkSummary = preload("res://scripts/core/network_summary.gd")
+var network_summary: ConfirmationDialog
 
 const TrackBlueprints = preload("res://scripts/core/track_blueprints.gd")
 const BLUEPRINT_PATH := "user://track_blueprints.json"
@@ -508,7 +510,7 @@ func _ready() -> void:
 	first_service_guide.configure(self)
 	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary]:
 		window.window_input.connect(_tool_window_input.bind(window))
 
 func _process(delta: float) -> void:
@@ -648,7 +650,7 @@ func _modal_open() -> bool:
 	if first_service_guide != null and first_service_guide.dialog.visible: return true
 	if game_menu != null and game_menu.active: return true
 	if new_game_dialog != null and new_game_dialog.visible: return true
-	return (service_cards != null and service_cards.visible) or _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
+	return (network_summary != null and network_summary.visible) or (service_cards != null and service_cards.visible) or _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -2140,6 +2142,7 @@ func _load_game(save_path: String = "") -> bool:
 	object_pins = data.watchlist.duplicate(true)
 	service_performance.restore_state(data.service_performance)
 	if service_cards != null: service_cards.hide()
+	if network_summary != null: network_summary.hide()
 	corridor_pick = 0
 	corridor_cells.clear()
 	planning_mode = false
@@ -2255,7 +2258,7 @@ func _reset_track_tools(keep_right_gesture: bool = false) -> void:
 	demolition_cells.clear()
 	demolition_blocked.clear()
 	_close_station_inspector()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary]:
 		if window != null: window.hide()
 	_update_toolbar()
 	queue_redraw()
@@ -5841,7 +5844,7 @@ func problem_rows() -> Array:
 		var owned: Dictionary = Fleet.find(fleet, train.id)
 		var title := "#%d %s — %s — %s" % [train.id, str(owned.get("name", "Train")), train.name, issue]
 		var details := "%s\n%s\nMeasured traffic waiting: %.1fs continuous, %.1fs recent (~60s), %.1fs since measurement began. Station dwell, loading and dispatcher holds are excluded. Measurements restart after loading; incident history is saved." % [title, explanation, float(stats.continuous_seconds), float(stats.recent_seconds), float(stats.total_seconds)]
-		rows.append({"signature": "%d|%s|%s" % [train.id, issue.get_slice(" ", 0), explanation], "key": "train:%d" % train.id, "id": train.id, "severity": level, "title": title, "details": details, "cell": Vector2i(-1, -1)})
+		rows.append({"signature": "%d|%s|%s" % [train.id, issue.get_slice(" ", 0), explanation], "key": "train:%d" % train.id, "id": train.id, "severity": level, "cause": "deadlock" if deadlocks.contains(train.id) else "incomplete" if incomplete else "hold" if held else "wait", "wait_seconds": stats.continuous_seconds, "title": title, "details": details, "cell": Vector2i(-1, -1)})
 	if loans.overdue() > 0:
 		rows.append({"key": "company:loan", "signature": "loan:overdue", "id": -1, "severity": "Warning", "title": "Bank payment overdue — £%d" % loans.overdue(), "details": "Available future cash pays overdue interest and principal automatically. Open Bank loans to review the balance and schedule.", "cell": Vector2i(-1, -1)})
 	for row in rows: row["acknowledged"] = presentation.acknowledged.get(row.key, "") == row.signature
@@ -6159,6 +6162,9 @@ func _export_blueprint(path: String) -> bool:
 	return false
 
 func _setup_object_browser() -> void:
+	network_summary = preload("res://scripts/network_summary_dialog.gd").new()
+	$Interface.add_child(network_summary)
+	network_summary.configure(self)
 	service_cards = preload("res://scripts/service_performance_dialog.gd").new()
 	$Interface.add_child(service_cards)
 	service_cards.configure(self)
@@ -6184,6 +6190,35 @@ func saved_watchlist() -> Dictionary:
 	var available: Dictionary = {}
 	for row in object_rows(): available[row.key] = true
 	return Watchlist.clean(object_pins, available)
+
+func open_network_summary() -> void:
+	paused = true
+	is_dragging = false
+	is_panning = false
+	_update_toolbar()
+	network_summary.open_dialog()
+
+func network_summary_data() -> Dictionary:
+	var station_rows: Array = []
+	var city_rows: Array = []
+	var vehicle_rows: Array = []
+	var waiting := 0
+	var network := _passenger_network()
+	for key in station_definitions():
+		var station: Dictionary = station_definitions()[key]
+		var count: int = _waiting(key)
+		waiting += count
+		station_rows.append({"id": key, "name": station.name, "cell": station.cell, "waiting": count, "capacity": amenities.queue_limit(key), "reachable": not network.get(key, []).is_empty()})
+	var catchments: Dictionary = CityBuildTool.Construction.catchments(world.save_state())
+	for city in world.state.settlements:
+		city_rows.append({"id": city.id, "name": city.name, "cell": Vector2i(city.cell[0], city.cell[1]), "population": city_demand.state.cities[city.id].population, "served": catchments.get(city.id, "") != ""})
+	for train in fleet.trains:
+		if not services.has(str(train.service)) or train.service == "freight": continue
+		vehicle_rows.append({"id": int(train.id), "name": train.name, "service": train.service, "left": passenger_occupancy.statistics(int(train.id)).left})
+	var enabled := 0
+	for key in service_keys():
+		if service_enabled(key): enabled += 1
+	return {"problems": problem_rows(), "stations": station_rows, "cities": city_rows, "vehicles": vehicle_rows, "waiting": waiting, "enabled": enabled, "money": money, "delivered": passengers_delivered, "fares": passenger_revenue.total(), "freight": freight_income, "profit": passenger_revenue.total() + freight_income - total_operating_cost - freight_operating_cost}
 
 func open_service_cards(key: String = "") -> void:
 	paused = true

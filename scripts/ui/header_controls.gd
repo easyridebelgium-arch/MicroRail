@@ -10,6 +10,7 @@ var accounts_button: Button
 var accounts_dialog: AcceptDialog
 var accounts_text: Label
 var loans_button: Button
+var network_button: Button
 var separators: Array[TextureRect] = []
 
 func configure(owner_game: Node) -> void:
@@ -79,6 +80,10 @@ func configure(owner_game: Node) -> void:
 		loans_button.expand_icon = true
 		loans_button.add_theme_constant_override("icon_max_width", 24)
 		loans_button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	network_button = Button.new()
+	network_button.text = "Network summary"
+	network_button.pressed.connect(func() -> void: accounts_dialog.hide(); game.open_network_summary())
+	column.add_child(network_button)
 	column.add_child(loans_button)
 	accounts_text = Label.new()
 	accounts_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

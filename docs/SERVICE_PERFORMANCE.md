@@ -68,8 +68,8 @@ and have no map location. Up to 128 objects may be pinned. Unknown object keys o
 invalid pin values in a save are rejected.
 
 This batch does not add historical graphs, a composite company score or periodic
-reports. The next roadmap step is an actionable network summary, followed by
-optional progress reports.
+reports. The [actionable network summary](NETWORK_SUMMARY.md) is now available from Accounts
+or the service-card actions. Optional progress reports remain the next step.
 
 ## Validation
 

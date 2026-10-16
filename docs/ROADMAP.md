@@ -297,10 +297,15 @@ share a card; measurement periods and attribution are explicit. Stable object pi
 are saved per company/slot. Version 44 starts older route counters from a fresh
 baseline without inventing historical attribution.
 
-**Next implementation:** an actionable network summary and optional progress reports.
+**Actionable network summary implemented:** [Accounts → Network summary](NETWORK_SUMMARY.md)
+combines current operational problems, station queue evidence, recent vehicle
+capacity evidence and clearly labelled city opportunities. Stable review order,
+five-second wait threshold and direct inspector/Bank/service/city actions keep
+it explainable. It derives existing measurements without changing saves or gameplay.
 
-Next expose the results through
-an actionable network summary (not an unexplained composite score). Add optional
+**Next implementation:** optional periodic progress reports and useful historical comparisons.
+
+The actionable summary is implemented without an unexplained composite score. Add optional
 progress reports and short scenarios, then river/bridge map variety before broader
 terrain complexity. Contracts, fair dispatch priorities and full reputation follow
 stable measurements. This is a development order, not a claim that the new items
@@ -776,9 +781,9 @@ final-delivery evidence, explicit unmet demand, grace, pending-trip protection,
 bounds, readable reasons and saved growth-rate rules. More detailed reputation,
 service-frequency scoring, industry/jobs and geographic expansion remain extensions.
 
-1. **Visible operational progress (1C / 2A):** actionable network summary, optional
-   end-of-day reports and proportionate historical trends. Service cards and
-   persistent company watchlists are implemented. Distinguish company final-journey totals
+1. **Visible operational progress (1C / 2A):** optional end-of-day reports and
+   proportionate historical trends. Service cards, persistent company watchlists
+   and the actionable network summary are implemented. Distinguish company final-journey totals
    from the legs carried by individual services. Complete relevant remaining
    safety/platform/body-routing extensions when this work requires them.
 2. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,

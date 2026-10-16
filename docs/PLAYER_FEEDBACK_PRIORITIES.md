@@ -24,7 +24,7 @@ in one review. The separate v1 artwork pack has 112 proposed art entries.
 | 5 | River/bridge variety (F37/F38/F58) | Maps require different railway choices. Crossing geometry, cost and connectivity work before elevation, tunnels, traction or weather effects are layered on. |
 | 6 | Fair priorities and deeper quality (F02/F18) | Deterministic dispatch avoids starvation; richer reputation rewards documented service quality. Existing advisory arrival targets do not silently become penalties. |
 
-**Priority 1 is now implemented:** [optional guide and first-delivery feedback](FIRST_SERVICE_GUIDE.md), plus [rotating autosaves/recovery](AUTOSAVES.md). [Useful-service measurement](USEFUL_SERVICE.md) is also implemented; [bounded city response](CITY_GROWTH.md) is now implemented as an initial conservative rule. [Service cards and saved company watchlists](SERVICE_PERFORMANCE.md) are implemented. The actionable network summary and optional progress reports are next.
+**Priority 1 is now implemented:** [optional guide and first-delivery feedback](FIRST_SERVICE_GUIDE.md), plus [rotating autosaves/recovery](AUTOSAVES.md). [Useful-service measurement](USEFUL_SERVICE.md) is also implemented; [bounded city response](CITY_GROWTH.md) is now implemented as an initial conservative rule. [Service cards and saved company watchlists](SERVICE_PERFORMANCE.md) are implemented. The [actionable network summary](NETWORK_SUMMARY.md) is implemented. Optional progress reports and historical comparisons are next.
 
 ## Important design constraints
 

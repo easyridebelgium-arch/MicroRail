@@ -35,6 +35,10 @@ func configure(owner_game: Node) -> void:
 	inspect_button.text = "Inspect first assigned train"
 	inspect_button.pressed.connect(_inspect)
 	actions.add_child(inspect_button)
+	var network_button := Button.new()
+	network_button.text = "Network summary"
+	network_button.pressed.connect(func() -> void: hide(); game.open_network_summary())
+	actions.add_child(network_button)
 	confirmed.connect(_locate)
 func open_dialog(key: String = "") -> void:
 	selected = str(game.Presentation.source(game.services, key)) if game.services.has(key) else selected

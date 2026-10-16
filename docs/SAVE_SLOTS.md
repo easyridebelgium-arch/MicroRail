@@ -30,7 +30,7 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 47, including amenities, loan state, route appearance,
+schema is version 48, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
 history, gradual demand factor/carry, and original journey clocks with recent
@@ -65,6 +65,9 @@ existing final city-journey counters; no old completion is inferred from a seed.
 Version 47 adds [immutable terrain profiles and bridge validation](RIVERS_AND_BRIDGES.md).
 Version 46 migrations use flat terrain and preserve existing rails and company
 state; a new river sandbox must be explicitly selected for water crossings.
+Version 48 recognises [wide and meandering river presets](RIVER_VARIETY.md). Version
+47 migration preserves the original immutable profile and company state exactly;
+existing rivers are not widened or moved.
 Version 37 migration adds an uninstalled factory, preserving sawmill inventory,
 physical train stages, cash and historical sales. Version 38 retains factory
 processing progress and validates stock transferred between industries and goods

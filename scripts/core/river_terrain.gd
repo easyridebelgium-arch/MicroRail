@@ -1,11 +1,25 @@
 extends RefCounted
-## Immutable v1 river profile. Ordinary graph rails become complete bridge spans.
+## Immutable terrain profiles. Bridge rails always belong to the movement graph.
 const Geometry = preload("res://scripts/track_geometry.gd")
-const PROFILES := ["flat", "river_v1"]
+const PROFILES := ["flat", "river_v1", "wide_river_v1", "meander_v1"]
+const PROFILE_NAMES := ["Flat land", "River with bridge crossings", "Wide river", "Meandering river"]
 const EXTRA_COST := 40
 const EXTRA_REFUND := 20
 var profile := "flat"
-func water(cell: Vector2i) -> bool: return profile == "river_v1" and cell.x >= 0 and cell.x < 80 and cell.y in [17, 18]
+func water_rows(x: int) -> Array[int]:
+	if x < 0 or x >= 80 or profile == "flat": return []
+	if profile == "wide_river_v1": return [16, 17, 18]
+	if profile == "meander_v1":
+		var first: int = [16, 17, 18, 17][int(x / 20.0)]
+		return [first, first + 1]
+	return [17, 18]
+func span(x: int) -> Array[Vector2i]:
+	var rows := water_rows(x)
+	var result: Array[Vector2i] = []
+	if rows.is_empty(): return result
+	for y in range(rows[0] - 1, rows.back() + 2): result.append(Vector2i(x, y))
+	return result
+func water(cell: Vector2i) -> bool: return cell.y in water_rows(cell.x)
 func save_state() -> Dictionary: return {"profile": profile}
 func restore_state(value: Dictionary) -> void: profile = value.profile
 static func valid(value: Variant, cities: bool) -> bool:
@@ -14,9 +28,9 @@ func track_error(tracks: Dictionary, signals: Dictionary = {}) -> String:
 	if profile == "flat": return ""
 	for cell in tracks:
 		if not water(cell): continue
-		for y in range(16, 20):
-			var point := Vector2i(cell.x, y)
-			if not tracks.has(point) or not Geometry.same_connections(tracks[point], true): return "Bridge needs one straight north–south span across both water tiles and both dry bank tiles (rows 16–19). Extend the drag farther onto dry land on both sides. No curves or switches on the span."
+		var crossing := span(cell.x)
+		for point in crossing:
+			if not tracks.has(point) or not Geometry.same_connections(tracks[point], true): return "Bridge needs straight north–south rail from bank %d,%d to bank %d,%d. Extend onto dry land on both sides; no curves or switches on the span." % [crossing[0].x, crossing[0].y, crossing.back().x, crossing.back().y]
 	for cell in signals:
 		if water(cell): return "Place signals on the dry bank, not over water."
 	return ""
@@ -29,5 +43,29 @@ func proposed_error(live: Dictionary, changes: Dictionary, signals: Dictionary =
 func site_error(cells: Array, tracks: Dictionary = {}) -> String:
 	for cell in cells:
 		if water(cell): return "Stations and their platforms need dry land; move away from the river."
-		if profile == "river_v1" and cell.y in [16, 19] and (tracks.has(Vector2i(cell.x, 17)) or tracks.has(Vector2i(cell.x, 18))): return "Stations cannot replace a bridge bank; move clear of the crossing."
+		var crossing := span(cell.x)
+		if crossing.is_empty() or cell not in [crossing[0], crossing.back()]: continue
+		for y in water_rows(cell.x):
+			if tracks.has(Vector2i(cell.x, y)): return "Stations cannot replace a bridge bank; move clear of the crossing."
 	return ""
+## Advisory only: no track changes or authority requests. Existing curves,
+## protected land and current reservations are excluded; prices omit approaches.
+func suggest(near: Vector2i, live: Dictionary, signals: Dictionary, owners: Dictionary, protected: Callable, land_price: int = 10) -> Dictionary:
+	if profile == "flat": return {}
+	var columns: Array = range(80)
+	columns.sort_custom(func(a: int, b: int) -> bool: return absi(a - near.x) < absi(b - near.x) if absi(a - near.x) != absi(b - near.x) else a < b)
+	for x in columns:
+		var crossing := span(int(x))
+		var changes: Dictionary = {}
+		var cost := 0
+		var blocked := false
+		for cell in crossing:
+			if protected.call(cell) or owners.has(cell) or (live.has(cell) and not Geometry.same_connections(live[cell], true)) or (water(cell) and signals.has(cell)):
+				blocked = true
+				break
+			if not live.has(cell):
+				changes[cell] = true
+				cost += land_price + (EXTRA_COST if water(cell) else 0)
+		if blocked: continue
+		return {"cells": crossing, "changes": changes, "cost": cost, "text": "Suggested crossing %d,%d → %d,%d N–S. Span £%d + approach rails. Extend past both banks; recheck reservations/funds." % [x, crossing[0].y, x, crossing.back().y, cost]}
+	return {}

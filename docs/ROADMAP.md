@@ -322,8 +322,13 @@ requires straight bank-to-bank bridge rails, with actual prices, refunds and
 construction/save validation. Existing reservations and graph movement govern
 crossings. Version 47 migrates old games to flat terrain without changing rails.
 
-**Next implementation:** richer river layouts and terrain-aware construction
-suggestions, preserving safe bridge editing before broader elevation/tunnel work.
+**River variety and crossing guidance implemented:** [wide/meandering presets](RIVER_VARIETY.md)
+share terrain-mask geometry with construction, map rendering and load validation.
+Failed water strokes highlight a nearby feasible crossing; hints show bridge
+surcharges and incomplete-deck removal warnings. Version 48 preserves old profiles.
+
+**Next implementation:** terrain-aware first-service connection suggestions,
+including bridge costs and protected approaches, before broader terrain complexity.
 
 The actionable summary and initial period reports are implemented without an unexplained
 composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader

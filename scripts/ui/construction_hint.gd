@@ -28,18 +28,28 @@ func preview_text() -> String:
 	if game.demolition_mode:
 		var count: int = game.demolition_cells.size()
 		lines.append("DRAFT — remove %d" % count if draft else "PARTIAL — remove %d" % count if blocked > 0 else "REMOVE — %d pieces" % count)
-		lines.append("Refund £%d%s" % [count * game.TRACK_REFUND, " at Apply plan" if draft else ""])
+		lines.append("Refund £%d%s" % [game._demolition_quote(), " at Apply plan" if draft else ""])
 		if count == 0: lines.append("No editable track selected.")
+		var removals: Dictionary = {}
+		for cell in game.demolition_cells: removals[cell] = null
+		if not game.river_terrain.proposed_error(game.tracks, removals).is_empty(): lines.append("× INCOMPLETE SPAN — remove all water deck tiles together; keep banks until deck is gone.")
 		if blocked > 0: lines.append("%d reserved tiles %s" % [blocked, "need rechecking at Apply" if draft else "skipped; other tiles can be removed"])
 	else:
 		var error: String = str(game.build_plan.get("error", ""))
 		var cost: int = game._build_plan_cost()
 		if not error.is_empty():
 			lines.append("× CANNOT BUILD")
-			lines.append(error)
+			var suggestion: Dictionary = game.build_plan.get("bridge_suggestion", {})
+			lines.append("Bridge needs straight bank-to-bank rail." if not suggestion.is_empty() else error)
+			if not suggestion.is_empty(): lines.append(str(suggestion.text))
 		else:
 			lines.append("DRAFT — stroke £%d" % cost if draft else "× RESERVED TRACK — £%d" % cost if blocked > 0 else "× INSUFFICIENT CASH — £%d" % cost if game.money < cost else "✓ BUILD — £%d" % cost)
 			lines.append("Track %d × £%d; switches %d × £%d" % [int(game.build_plan.get("new_count", 0)), game.TRACK_BUILD_COST, int(game.build_plan.get("switch_count", 0)), game.SWITCH_COST])
+			var water_count := 0
+			var working: Dictionary = game.construction_plan.projected(game.tracks) if draft else game.tracks
+			for cell in game.build_plan.get("changes", {}):
+				if game.river_terrain.water(cell) and not working.has(cell): water_count += 1
+			if water_count > 0: lines.append("Bridge surcharge: %d × £%d = £%d (added to rail price)" % [water_count, game.RiverTerrain.EXTRA_COST, water_count * game.RiverTerrain.EXTRA_COST])
 			if not draft and game.money < cost: lines.append("Available £%d; need £%d more" % [game.money, cost - game.money])
 		if blocked > 0: lines.append("%d reserved tiles; %s" % [blocked, "recheck at Apply" if draft else "edit cannot commit now"])
 	var affected: int = game.construction_feedback.get("affected", []).size()

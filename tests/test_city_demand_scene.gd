@@ -58,7 +58,7 @@ func run() -> void:
 	var physical: Vector2 = game.passenger_services[key].position
 	check(game._save_game(1), "save populated city-demand state")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-	check(saved.version == 47 and game._is_valid_save(saved), "version 47 validates city state alongside actual actors")
+	check(saved.version == 48 and game._is_valid_save(saved), "version 48 validates city state alongside actual actors")
 	step(601)
 	var uninterrupted := snapshot()
 	check(game._load_slot(1) and game.passenger_services[key].position.distance_to(physical) < 0.001 and game.world.save_state() == geometry, "load demand without moving trains or regenerating geometry")

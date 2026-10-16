@@ -82,3 +82,8 @@ Ordinary City sandboxes can choose **Terrain: River with bridge crossings**.
 The river occupies rows 17–18; build straight north–south across rows 16–19.
 Water rails cost £50 each and require the whole span; flat remains the default.
 Existing games/scenarios stay flat. See [bridge rules](RIVERS_AND_BRIDGES.md).
+
+**Additional terrain presets:** Wide river and Meandering river now offer wider
+or locally shifted crossings. Failed water drags highlight a feasible bridge
+column and quote the span separately from its approach rails. See [terrain
+variety and guidance](RIVER_VARIETY.md).

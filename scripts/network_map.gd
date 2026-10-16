@@ -8,6 +8,7 @@ var map_cells: Vector2i = Vector2i(80, 50)
 var world_tile_size: float = 32.0
 
 var has_river := false
+var river_profile := "flat"
 var track_data: Dictionary = {}
 var facilities: Array[Dictionary] = []
 var train_kinds: Array[String] = []
@@ -79,8 +80,10 @@ func _draw() -> void:
 
 	# Tracks.
 	if has_river:
-		var river_area := _map_rect()
-		draw_rect(Rect2(river_area.position + Vector2(0, river_area.size.y * 17.0 / 50.0), Vector2(river_area.size.x, river_area.size.y * 2.0 / 50.0)), Color("#629fbf"))
+		var terrain := preload("res://scripts/core/river_terrain.gd").new()
+		terrain.profile = river_profile
+		for x in range(map_cells.x):
+			for y in terrain.water_rows(x): draw_rect(Rect2(area.position + Vector2(x, y) * cell_size, cell_size), Color("#629fbf"))
 
 	for cell in track_data:
 		if cell.x < 0 or cell.x >= map_cells.x:

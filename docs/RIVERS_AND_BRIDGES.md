@@ -74,8 +74,8 @@ Terrain profiles, station footprints, deck geometry, signals and bank integrity
 are validated before live state changes. Existing scenario presets require flat
 terrain. Normal slot/backups/autosave rules remain active.
 
-Next refinements are richer river layouts, bridge preview/selection ergonomics
-and terrain-aware construction suggestions. Elevation, tunnels, boats and weather
+[Wide/meandering presets and crossing guidance](RIVER_VARIETY.md) are now implemented.
+Terrain-aware first-service connection suggestions remain next. Elevation, tunnels, boats and weather
 physics remain later systems.
 
 ## Validation

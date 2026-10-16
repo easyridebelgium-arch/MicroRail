@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 47
+const CURRENT_VERSION: int = 48
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -65,6 +65,8 @@ static func migrate(data: Dictionary) -> Dictionary:
 
 static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 	match from_version:
+		47:
+			return data # Preserve immutable v1 terrain profiles and crossing geometry.
 		46:
 			data["terrain"] = {"profile": "flat"}
 			return data

@@ -1108,6 +1108,7 @@ func _draw() -> void:
 		var color: Color = Palette.get_color(Palette.Role.HOVER_OK if _can_build_at(hovered_cell) else Palette.Role.HOVER_BAD)
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
 		draw_string(ThemeDB.fallback_font, _cell_center(hovered_cell) + Vector2(-4, 4), "+" if _can_build_at(hovered_cell) else "×", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+	_draw_bridge_suggestion()
 	if reservation_overlay:
 		_draw_reservations()
 	_draw_waypoints()
@@ -1237,6 +1238,16 @@ func _draw_station(cell: Vector2i, station_name: String) -> void:
 		font_size -= 1
 	draw_string(ThemeDB.fallback_font, badge.position + Vector2(2, 12), station_name, HORIZONTAL_ALIGNMENT_CENTER, 88, font_size, Color.WHITE)
 
+
+func _draw_bridge_suggestion() -> void:
+	if not is_dragging or demolition_mode: return
+	var suggestion: Dictionary = build_plan.get("bridge_suggestion", {})
+	if suggestion.is_empty(): return
+	for cell in suggestion.cells:
+		var rect := Rect2(Vector2(cell) * TILE_SIZE + Vector2(3, 3), Vector2.ONE * (TILE_SIZE - 6))
+		draw_rect(rect, Color.WHITE, false, 2)
+	var first: Vector2i = suggestion.cells[0]
+	draw_string(ThemeDB.fallback_font, Vector2(first) * TILE_SIZE + Vector2(-35, -8), "Cross N–S · £%d + approaches" % suggestion.cost, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 
 func _draw_train() -> void:
 	if not services.has("passenger"): return
@@ -3776,7 +3787,7 @@ func _execute_demolish(data: Dictionary) -> void:
 
 	var river_error := river_terrain.proposed_error(tracks, after)
 	if not river_error.is_empty():
-		_show_notice(river_error)
+		_show_notice("Cannot remove part of a bridge. Drag across all water deck tiles together; keep the banks until the deck is gone, and wait for reserved tiles to clear.")
 		return
 	for cell in before:
 		tracks.erase(cell)
@@ -4016,7 +4027,8 @@ func _setup_network_map() -> void:
 
 
 func _update_network_map() -> void:
-	network_map.has_river = river_terrain.profile == "river_v1"
+	network_map.has_river = river_terrain.profile != "flat"
+	network_map.river_profile = river_terrain.profile
 	if not network_map.visible:
 		return
 
@@ -4297,7 +4309,9 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 	if not river_error.is_empty():
 		build_plan.error = river_error
 		for cell in build_plan.get("changes", {}):
-			if cell.y in [16, 17, 18, 19]: build_plan.invalid[cell] = true
+			if cell in river_terrain.span(cell.x): build_plan.invalid[cell] = true
+		var suggestion := river_terrain.suggest(target, working, track_signals, reservations.owners, _plan_protected, TRACK_BUILD_COST)
+		build_plan["bridge_suggestion"] = suggestion
 	var signs: Dictionary = construction_plan.projected_signals(track_signals) if planning_mode else track_signals
 	for cell in build_plan.get("changes", {}):
 		if signs.has(cell) and not TrackGeometry.is_straight(build_plan.changes[cell]):

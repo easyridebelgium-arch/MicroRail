@@ -73,10 +73,12 @@ uses no RNG, moves no trains and creates no events or commands. Opening it does
 not acknowledge alerts, place infrastructure, reverse trains or buy upgrades.
 Only its explicit review/locate actions change presentation and selection.
 
-There is **no save-version change**: current saves remain version 44. Summary
+The summary itself introduced **no save-version change** (version 44). The later
+[company progress reports](PROGRESS_REPORTS.md) use version 45. Summary
 rows are recomputed; each slot retains its own existing measurements and pins.
-Optional periodic progress reports and historical comparisons are the next
-roadmap step. They are not part of this current snapshot.
+Saved periodic company reports and equal-length historical comparisons are now
+available through **Progress reports**. Current summary rows still derive live
+evidence rather than historical issues.
 
 `tests/test_network_summary.gd` covers thresholds, deterministic ordering,
 unchanged input/full-save snapshots, empty starts, each review action, camera-only

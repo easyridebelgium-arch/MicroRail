@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 44
+const CURRENT_VERSION: int = 45
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -65,6 +65,14 @@ static func migrate(data: Dictionary) -> Dictionary:
 
 static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 	match from_version:
+		44:
+			var report_tick := 0
+			if data.get("sim") is Dictionary and data.sim.get("clock") is Dictionary:
+				var raw: Variant = data.sim.clock.get("tick")
+				if preload("res://scripts/core/arrival_targets.gd").whole(raw, 0, 1e12): report_tick = int(raw)
+			var reports_model = preload("res://scripts/core/progress_reports.gd")
+			data["progress_reports"] = reports_model.defaults(report_tick, reports_model.from_save(data))
+			return data
 		43:
 			data["watchlist"] = {}
 			var performance_tick := 0

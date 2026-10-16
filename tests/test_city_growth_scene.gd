@@ -9,7 +9,7 @@ func step(count: int) -> void:
 		game._simulation_step(1.0 / 60.0)
 func normalized(value: Variant) -> Variant: return JSON.parse_string(JSON.stringify(value))
 func snapshot() -> Dictionary:
-	return normalized({"performance": game.service_performance.save_state(game.services), "growth": game.city_growth.save_state(), "demand": game.city_demand.save_state(), "service": game.city_service.save_state(), "world": game.world.save_state(), "queue": game.passenger_demand.save_state({}, game.sim_clock.tick), "journeys": game._saved_journeys(), "trains": game._saved_passenger_services(), "money": game.money, "rng": game.sim_rng.save_state(), "tick": game.sim_clock.tick, "events": game.event_log.save_state(), "commands": game.command_queue.save_state()})
+	return normalized({"reports": game.progress_reports.save_state(), "performance": game.service_performance.save_state(game.services), "growth": game.city_growth.save_state(), "demand": game.city_demand.save_state(), "service": game.city_service.save_state(), "world": game.world.save_state(), "queue": game.passenger_demand.save_state({}, game.sim_clock.tick), "journeys": game._saved_journeys(), "trains": game._saved_passenger_services(), "money": game.money, "rng": game.sim_rng.save_state(), "tick": game.sim_clock.tick, "events": game.event_log.save_state(), "commands": game.command_queue.save_state()})
 func run() -> void:
 	root.size = Vector2i(1280, 720)
 	game = load("res://scenes/dev/city_preview.tscn").instantiate()
@@ -44,7 +44,7 @@ func run() -> void:
 	game.paused = true
 	check(game._save_game(1), "save physical company just before its first growth assessment")
 	var before: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-	check(before.version == 44 and game._is_valid_save(before), "version 44 validates the population rule and assessment state")
+	check(before.version == 45 and game._is_valid_save(before), "version 45 validates the population rule and assessment state")
 	var reference: Dictionary = {}
 	for fps in [30, 60, 120]:
 		check(game._load_slot(1), "restore population assessment baseline")

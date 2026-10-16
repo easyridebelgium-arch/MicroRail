@@ -69,7 +69,7 @@ invalid pin values in a save are rejected.
 
 This batch does not add historical graphs, a composite company score or periodic
 reports. The [actionable network summary](NETWORK_SUMMARY.md) is now available from Accounts
-or the service-card actions. Optional progress reports remain the next step.
+or the service-card actions. [Saved company progress reports](PROGRESS_REPORTS.md) are also available from Accounts.
 
 ## Validation
 

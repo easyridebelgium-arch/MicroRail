@@ -94,6 +94,9 @@ var object_pins: Dictionary = {}
 var service_cards: ConfirmationDialog
 const NetworkSummary = preload("res://scripts/core/network_summary.gd")
 var network_summary: ConfirmationDialog
+const ProgressReports = preload("res://scripts/core/progress_reports.gd")
+var progress_reports := ProgressReports.new()
+var progress_dialog: ConfirmationDialog
 
 const TrackBlueprints = preload("res://scripts/core/track_blueprints.gd")
 const BLUEPRINT_PATH := "user://track_blueprints.json"
@@ -474,6 +477,7 @@ func _ready() -> void:
 		train_position = _cell_center(STATION_A)
 	city_service.initialize(world.save_state())
 	city_growth.initialize(world.save_state(), city_demand.save_state(), city_service.save_state(), sim_clock.tick, startup_city_growth)
+	progress_reports.initialize(sim_clock.tick, _progress_values())
 	_update_instructions()
 	queue_redraw()
 	_setup_toolbar()
@@ -510,7 +514,7 @@ func _ready() -> void:
 	first_service_guide.configure(self)
 	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog]:
 		window.window_input.connect(_tool_window_input.bind(window))
 
 func _process(delta: float) -> void:
@@ -576,6 +580,7 @@ func _simulation_step(step_seconds: float) -> void:
 	_advance_loans()
 	_clear_resolved_acknowledgements()
 	_refresh_directional_routes()
+	_advance_progress_reports()
 	_flush_notifications()
 
 
@@ -650,7 +655,7 @@ func _modal_open() -> bool:
 	if first_service_guide != null and first_service_guide.dialog.visible: return true
 	if game_menu != null and game_menu.active: return true
 	if new_game_dialog != null and new_game_dialog.visible: return true
-	return (network_summary != null and network_summary.visible) or (service_cards != null and service_cards.visible) or _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
+	return (progress_dialog != null and progress_dialog.visible) or (network_summary != null and network_summary.visible) or (service_cards != null and service_cards.visible) or _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1281,6 +1286,8 @@ func _execute_command(command: Dictionary) -> void:
 	var data: Dictionary = command["data"]
 
 	match str(command["type"]):
+		"report_mode":
+			if data.get("mode") in ProgressReports.MODES: progress_reports.state.mode = data.mode
 		"city_growth_rate":
 			var rate: Variant = data.get("rate")
 			if rate is String and rate != city_growth.state.rate and city_growth.set_rate(rate, sim_clock.tick, city_service):
@@ -1672,6 +1679,7 @@ func _save_snapshot() -> Dictionary:
 		"city_growth": city_growth.save_state(),
 		"watchlist": saved_watchlist(),
 		"service_performance": service_performance.save_state(services),
+		"progress_reports": progress_reports.save_state(),
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
@@ -1783,6 +1791,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not CityGrowth.valid(data.get("city_growth"), data.world, data.city_demand, data.city_service, int(sim.clock.tick)): return false
 	if not Watchlist.valid(data.get("watchlist"), Watchlist.keys(data)): return false
 	if not ServicePerformance.valid(data.get("service_performance"), data, int(sim.clock.tick)): return false
+	if not ProgressReports.valid(data.get("progress_reports"), ProgressReports.from_save(data), int(sim.clock.tick)): return false
 	if not Timetable.valid_dispatch(data.get("dispatch"), data.services, int(sim.clock.tick)): return false
 	if not SimRng.is_valid_state(sim.get("rng")):
 		return false
@@ -2141,6 +2150,8 @@ func _load_game(save_path: String = "") -> bool:
 	if train_inspector != null: train_inspector.hide()
 	object_pins = data.watchlist.duplicate(true)
 	service_performance.restore_state(data.service_performance)
+	progress_reports.restore_state(data.progress_reports)
+	if progress_dialog != null: progress_dialog.hide()
 	if service_cards != null: service_cards.hide()
 	if network_summary != null: network_summary.hide()
 	corridor_pick = 0
@@ -2258,7 +2269,7 @@ func _reset_track_tools(keep_right_gesture: bool = false) -> void:
 	demolition_cells.clear()
 	demolition_blocked.clear()
 	_close_station_inspector()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog]:
 		if window != null: window.hide()
 	_update_toolbar()
 	queue_redraw()
@@ -6162,6 +6173,9 @@ func _export_blueprint(path: String) -> bool:
 	return false
 
 func _setup_object_browser() -> void:
+	progress_dialog = preload("res://scripts/progress_reports_dialog.gd").new()
+	$Interface.add_child(progress_dialog)
+	progress_dialog.configure(self)
 	network_summary = preload("res://scripts/network_summary_dialog.gd").new()
 	$Interface.add_child(network_summary)
 	network_summary.configure(self)
@@ -6190,6 +6204,29 @@ func saved_watchlist() -> Dictionary:
 	var available: Dictionary = {}
 	for row in object_rows(): available[row.key] = true
 	return Watchlist.clean(object_pins, available)
+
+func _progress_values() -> Dictionary:
+	var waiting := 0
+	for key in passenger_demand.station_ids: waiting += _waiting(key)
+	var population := 0
+	for city in city_demand.state.cities.values(): population += int(city.population)
+	return {"delivered": passengers_delivered, "fares": passenger_revenue.total(), "freight": freight_income, "running": total_operating_cost + freight_operating_cost, "waiting": waiting, "population": population, "cash": money}
+
+func _advance_progress_reports() -> void:
+	if not progress_reports.due(sim_clock.tick): return
+	if progress_reports.advance(sim_clock.tick, _progress_values()) and progress_reports.state.mode != "off":
+		_show_notice("Company progress report ready. Accounts → Progress reports.")
+		if progress_reports.state.mode == "pause": paused = true
+
+func request_report_mode(mode: String) -> void:
+	if mode in ProgressReports.MODES and mode != progress_reports.state.mode: _submit_command("report_mode", {"mode": mode})
+
+func open_progress_reports() -> void:
+	paused = true
+	is_dragging = false
+	is_panning = false
+	_update_toolbar()
+	progress_dialog.open_dialog()
 
 func open_network_summary() -> void:
 	paused = true

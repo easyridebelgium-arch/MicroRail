@@ -84,6 +84,10 @@ func configure(owner_game: Node) -> void:
 	network_button.text = "Network summary"
 	network_button.pressed.connect(func() -> void: accounts_dialog.hide(); game.open_network_summary())
 	column.add_child(network_button)
+	var reports_button := Button.new()
+	reports_button.text = "Progress reports"
+	reports_button.pressed.connect(func() -> void: accounts_dialog.hide(); game.open_progress_reports())
+	column.add_child(reports_button)
 	column.add_child(loans_button)
 	accounts_text = Label.new()
 	accounts_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

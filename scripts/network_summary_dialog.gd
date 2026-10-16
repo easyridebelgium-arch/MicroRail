@@ -24,6 +24,10 @@ func configure(owner_game: Node) -> void:
 	headline = Label.new()
 	headline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(headline)
+	var reports_button := Button.new()
+	reports_button.text = "Progress reports"
+	reports_button.pressed.connect(func() -> void: hide(); game.open_progress_reports())
+	box.add_child(reports_button)
 	var guide := Label.new()
 	guide.text = "Review order: deadlocks → broken routes/overdue loans → waits of 5s+ → unserved queues → queue pressure → measured capacity → intentional holds → expansion. Equal priority uses measured size, then stable ID."
 	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

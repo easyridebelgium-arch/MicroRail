@@ -24,6 +24,9 @@ const CitySavePolicy = preload("res://scripts/core/city_save_policy.gd")
 var city_builder: RefCounted
 @export var startup_city_seed := ""
 @export var startup_city_growth := "normal"
+@export var startup_challenge := ""
+const SeededChallenges = preload("res://scripts/core/seeded_challenges.gd")
+var seeded_challenge := SeededChallenges.new()
 @export_range(3, 8, 1) var startup_city_count := 4
 
 const TILE_SIZE: int = 32
@@ -478,6 +481,7 @@ func _ready() -> void:
 	city_service.initialize(world.save_state())
 	city_growth.initialize(world.save_state(), city_demand.save_state(), city_service.save_state(), sim_clock.tick, startup_city_growth)
 	progress_reports.initialize(sim_clock.tick, _progress_values())
+	seeded_challenge.initialize(startup_challenge if city_builder.is_city_game() else "")
 	_update_instructions()
 	queue_redraw()
 	_setup_toolbar()
@@ -621,6 +625,7 @@ func set_route_identity(key: String, label: String, colour: int) -> String:
 
 func borrow_money(amount: int) -> String:
 	if not paused: return "Pause before borrowing."
+	if seeded_challenge.no_loans(): return "Three Town Link: bank borrowing is disabled for this company."
 	if not loans.borrow(amount, sim_clock.tick): return "Repay the active loan before taking another, or select a valid bank offer."
 	money += amount
 	_record_event(EventLog.LOAN_BORROWED, "company", {"amount": amount})
@@ -1586,6 +1591,7 @@ func _start_new_game(slot: int, configuration: Dictionary = {}) -> void:
 		fresh.startup_city_seed = validated.configuration.seed
 		fresh.startup_city_count = validated.configuration.city_count
 		fresh.startup_city_growth = validated.configuration.city_growth
+		fresh.startup_challenge = validated.configuration.get("challenge", "")
 	var tree := get_tree()
 	tree.root.add_child(fresh)
 	if tree.current_scene == self: tree.current_scene = fresh
@@ -1680,6 +1686,7 @@ func _save_snapshot() -> Dictionary:
 		"watchlist": saved_watchlist(),
 		"service_performance": service_performance.save_state(services),
 		"progress_reports": progress_reports.save_state(),
+		"seeded_challenge": seeded_challenge.save_state(),
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
@@ -1792,6 +1799,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not Watchlist.valid(data.get("watchlist"), Watchlist.keys(data)): return false
 	if not ServicePerformance.valid(data.get("service_performance"), data, int(sim.clock.tick)): return false
 	if not ProgressReports.valid(data.get("progress_reports"), ProgressReports.from_save(data), int(sim.clock.tick)): return false
+	if not SeededChallenges.valid(data.get("seeded_challenge"), data, int(sim.clock.tick)): return false
 	if not Timetable.valid_dispatch(data.get("dispatch"), data.services, int(sim.clock.tick)): return false
 	if not SimRng.is_valid_state(sim.get("rng")):
 		return false
@@ -2151,6 +2159,7 @@ func _load_game(save_path: String = "") -> bool:
 	object_pins = data.watchlist.duplicate(true)
 	service_performance.restore_state(data.service_performance)
 	progress_reports.restore_state(data.progress_reports)
+	seeded_challenge.restore_state(data.seeded_challenge)
 	if progress_dialog != null: progress_dialog.hide()
 	if service_cards != null: service_cards.hide()
 	if network_summary != null: network_summary.hide()
@@ -4013,7 +4022,11 @@ func _scenario_metrics() -> Dictionary:
 
 
 func _check_scenario_objectives() -> void:
-	if city_builder.is_city_game(): return
+	if city_builder.is_city_game():
+		if seeded_challenge.advance(sim_clock.tick, city_service.state):
+			_record_event(EventLog.OBJECTIVE_COMPLETED, "player", {"challenge": seeded_challenge.state.id, "reward": 0})
+			_show_notice("Scenario complete: %s! Your final journeys met every goal. Keep playing, or start another scenario." % SeededChallenges.DEFINITIONS[seeded_challenge.state.id].name)
+		return
 	if scenario_goals.is_complete():
 		return
 
@@ -4090,7 +4103,8 @@ func _setup_objective_panel() -> void:
 	goals_button.text = "Goals"
 	goals_button.toggle_mode = true
 	goals_button.button_pressed = GameSettings.goals_visible
-	objective_panel.visible = GameSettings.goals_visible
+	objective_panel.visible = GameSettings.goals_visible or seeded_challenge.state.id != ""
+	goals_button.set_pressed_no_signal(objective_panel.visible)
 	goals_button.focus_mode = Control.FOCUS_NONE
 	goals_button.tooltip_text = "Show or hide scenario objectives — G"
 	goals_button.pressed.connect(_toggle_objective_panel)
@@ -4109,6 +4123,15 @@ func _toggle_objective_panel() -> void:
 
 
 func _update_objective_panel() -> void:
+	if seeded_challenge.state.id != "":
+		var definition: Dictionary = SeededChallenges.DEFINITIONS[seeded_challenge.state.id]
+		var measured: Dictionary = seeded_challenge.progress(city_service.state)
+		objective_heading.text = "SCENARIO COMPLETE" if int(seeded_challenge.state.completed_tick) >= 0 else definition.name.to_upper()
+		objective_description.text = "Final city journeys: %d / %d\nCities with 5+ final resident journeys: %d / %d" % [measured.delivered, definition.deliveries, measured.served, definition.served]
+		objective_details.text = "Seed %s | No deadline | %s" % [definition.seed, "No bank loans" if definition.no_loans else "Loans available"]
+		objective_progress.max_value = definition.deliveries
+		objective_progress.value = mini(measured.delivered, definition.deliveries)
+		return
 	if city_builder.is_city_game() and first_service_guide != null:
 		var guide: Dictionary = first_service_guide.snapshot
 		objective_heading.text = "FIRST SERVICE COMPLETE" if guide.complete else "FIRST SERVICE — %d / %d" % [guide.done, guide.rows.size()]

@@ -57,8 +57,8 @@ func refresh() -> void:
 		summary.text += "\nNext billing: in %d game minutes\nPrincipal instalments remaining: %d" % [minutes, state.payments_left]
 	terms.text = "Interest: 1% of outstanding principal per game hour. Ten hourly principal instalments plus interest. One game hour is 60 simulation seconds at 1×; pause stops interest and payments.\n\nPayments use available cash, paying billed interest first. Unpaid amounts remain overdue and are paid from later available income. Interest continues on unpaid principal; no interest on interest or extra late fee.\n\nInterest rounds up to a whole pound at billing or early payoff. Only one loan can be active. Early full repayment has no extra fee."
 	for amount in offers:
-		offers[amount].disabled = bank.active()
-		offers[amount].tooltip_text = "Repay the current loan before borrowing again." if bank.active() else "Principal £%d; estimated total £%d when paid on time. Initial payment is due one game hour after borrowing." % [amount, game.Loans.quote(amount).total]
+		offers[amount].disabled = bank.active() or game.seeded_challenge.no_loans()
+		offers[amount].tooltip_text = "Scenario rule: no bank borrowing." if game.seeded_challenge.no_loans() else "Repay the current loan before borrowing again." if bank.active() else "Principal £%d; estimated total £%d when paid on time. Initial payment is due one game hour after borrowing." % [amount, game.Loans.quote(amount).total]
 	repay_button.text = "Repay full balance early — £%d" % bank.payoff()
 	repay_button.disabled = not bank.active() or game.money < bank.payoff()
 	repay_button.tooltip_text = "Clears all principal and accrued interest." if not repay_button.disabled else "No active loan, or insufficient cash to pay the full balance."

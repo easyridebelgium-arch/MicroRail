@@ -5,6 +5,7 @@ const Config = preload("res://scripts/core/new_game_config.gd")
 const Slots = preload("res://scripts/core/save_slots.gd")
 var slot := 1
 var mode_choice: OptionButton
+var scenario_choice: OptionButton
 var seed_field: LineEdit
 var random_seed_button: Button
 var _seed_picker := RandomNumberGenerator.new()
@@ -33,8 +34,15 @@ func _ready() -> void:
 	mode_choice = OptionButton.new()
 	mode_choice.add_item("City sandbox")
 	mode_choice.add_item("Tutorial — three stations")
+	mode_choice.add_item("Seeded scenario")
 	mode_choice.item_selected.connect(func(_index: int) -> void: refresh())
 	box.add_child(mode_choice)
+	scenario_choice = OptionButton.new()
+	for key in Config.Challenges.DEFINITIONS:
+		scenario_choice.add_item(Config.Challenges.DEFINITIONS[key].name)
+		scenario_choice.set_item_metadata(scenario_choice.item_count - 1, key)
+	scenario_choice.item_selected.connect(func(_index: int) -> void: refresh())
+	box.add_child(scenario_choice)
 	city_controls = VBoxContainer.new()
 	box.add_child(city_controls)
 	var seed_label := Label.new()
@@ -85,8 +93,16 @@ func open_dialog(target_slot: int) -> void:
 	popup_centered_clamped(Vector2i(620, 480), 0.85)
 
 func refresh() -> void:
+	scenario_choice.visible = mode_choice.selected == 2
 	city_controls.visible = mode_choice.selected == 0
-	validation = Config.validate({"mode": "cities", "seed": seed_field.text, "city_count": city_count.value, "city_growth": Config.Growth.RATES[maxi(0, growth_choice.selected)]} if mode_choice.selected == 0 else {"mode": "tutorial"})
+	var config: Dictionary = {"mode": "tutorial"}
+	if mode_choice.selected == 0:
+		config = {"mode": "cities", "seed": seed_field.text, "city_count": city_count.value, "city_growth": Config.Growth.RATES[maxi(0, growth_choice.selected)]}
+	elif mode_choice.selected == 2:
+		var key: String = str(scenario_choice.get_item_metadata(scenario_choice.selected))
+		var definition: Dictionary = Config.Challenges.DEFINITIONS[key]
+		config = {"mode": "cities", "seed": definition.seed, "city_count": definition.cities, "city_growth": "normal", "challenge": key}
+	validation = Config.validate(config)
 	explanation.text = validation.message + "\n\nStarting replaces the current game in memory. Existing manual saves change only when you Save; autosaves keep separate recovery copies. Cancel keeps the current game."
 	get_ok_button().disabled = not validation.ok
 

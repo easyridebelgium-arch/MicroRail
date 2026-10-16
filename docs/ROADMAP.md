@@ -310,11 +310,17 @@ Reminders default to off, with optional notice or notice-and-pause per company.
 Version 45 starts older saves from their current clock/totals without invented history.
 Broader route graphs and richer dashboard history remain later refinements.
 
-**Next implementation:** focused seeded scenarios with clear, feasible objectives
-and restrictions, building on the existing validated starts and tutorial goals.
+**First seeded scenarios implemented:** [First Connection / Three Town Link](SEEDED_SCENARIOS.md)
+use fixed generated starts, final resident-journey goals, multi-city service
+requirements and one explicit no-borrowing rule. No deadlines or bonus cash are
+introduced. Version 46 saves identity/completion while progress derives existing
+city measurements; older companies remain ordinary sandbox/tutorial games.
+
+**Next major implementation:** river/bridge map variety, starting with terrain
+connectivity and construction rules before visual elevation or weather effects.
 
 The actionable summary and initial period reports are implemented without an unexplained
-composite score. Add short scenarios, then river/bridge map variety before broader
+composite score. Initial short scenarios are implemented; add river/bridge map variety before broader
 terrain complexity. Contracts, fair dispatch priorities and full reputation follow
 stable measurements. This is a development order, not a claim that the new items
 are implemented. Rationale and acceptance points: [player feedback priorities](PLAYER_FEEDBACK_PRIORITIES.md).
@@ -794,8 +800,9 @@ service-frequency scoring, industry/jobs and geographic expansion remain extensi
    are implemented. Broader route graphs and dashboard history remain refinements. Distinguish company final-journey totals
    from the legs carried by individual services. Complete relevant remaining
    safety/platform/body-routing extensions when this work requires them.
-2. **Focused goals (2B / 2C):** a few short feasible scenarios, explicit objectives,
-   difficulty modifiers and locally comparable seed results. Contracts follow clear
+2. **Focused goals (2B / 2C):** initial fixed-seed passenger scenarios, explicit
+   final-journey/multi-city goals and a no-borrowing rule are implemented. Timed
+   goals, richer modifiers, cargo scenarios and comparable scores remain extensions. Contracts follow clear
    scoring, failure/recovery and measured delivery accounting.
 3. **Map variety:** rivers and bridges first, then additional terrain/elevation,
    tunnels and map settings. Art alone never adds crossing permissions or geometry.

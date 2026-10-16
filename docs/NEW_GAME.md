@@ -67,3 +67,11 @@ new-game suite passes 54 headless functional checks covering Random seed selecti
 title launch, in-game acceptance/cancel, invalid configuration, save/backup
 protection, startup construction and 200% UI scaling. A local visual review remains
 useful for appearance and input feel.
+
+## Seeded scenarios
+
+Choose **Seeded scenario** for fixed presets with saved goals. First Connection
+requires 40 final journeys from at least two resident origins; Three Town Link
+requires 75 from all three origins and disables borrowing. Each origin needs at
+least five completions. Both start with £5000 and have no deadline or bonus award.
+See [full rules and scope](SEEDED_SCENARIOS.md).

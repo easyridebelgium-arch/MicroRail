@@ -151,6 +151,7 @@ func _finish(scene: PackedScene) -> void:
 		game.startup_city_seed = pending_configuration.seed
 		game.startup_city_count = pending_configuration.city_count
 		game.startup_city_growth = pending_configuration.city_growth
+		game.startup_challenge = pending_configuration.get("challenge", "")
 	game.paused = true
 	game.set_process(false)
 	get_tree().root.add_child(game)

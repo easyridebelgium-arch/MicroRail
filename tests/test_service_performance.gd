@@ -59,7 +59,7 @@ func run() -> void:
 	check(game._save_game(1), "save company and mixed-type watchlist")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
 	var saved_metrics: Dictionary = game.service_performance.save_state(game.services)
-	check(saved.version == 45 and Pins.valid(saved.watchlist, Pins.keys(saved)), "version 45 validates pins against saved entities")
+	check(saved.version == 46 and Pins.valid(saved.watchlist, Pins.keys(saved)), "version 46 validates pins against saved entities")
 	game.object_pins = {"industry:forest": true}
 	game.service_performance.record("passenger", "cost", 1)
 	check(game._load_slot(1) and game.object_pins == saved.watchlist and game.service_performance.save_state(game.services) == saved_metrics, "load restores exact counters and this company's pins")

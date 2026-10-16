@@ -316,11 +316,17 @@ requirements and one explicit no-borrowing rule. No deadlines or bonus cash are
 introduced. Version 46 saves identity/completion while progress derives existing
 city measurements; older companies remain ordinary sandbox/tutorial games.
 
-**Next major implementation:** river/bridge map variety, starting with terrain
-connectivity and construction rules before visual elevation or weather effects.
+**First river/bridge slice implemented:** [river terrain and complete-span crossings](RIVERS_AND_BRIDGES.md)
+are selectable for ordinary city sandboxes. The immutable two-row river profile
+requires straight bank-to-bank bridge rails, with actual prices, refunds and
+construction/save validation. Existing reservations and graph movement govern
+crossings. Version 47 migrates old games to flat terrain without changing rails.
+
+**Next implementation:** richer river layouts and terrain-aware construction
+suggestions, preserving safe bridge editing before broader elevation/tunnel work.
 
 The actionable summary and initial period reports are implemented without an unexplained
-composite score. Initial short scenarios are implemented; add river/bridge map variety before broader
+composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader
 terrain complexity. Contracts, fair dispatch priorities and full reputation follow
 stable measurements. This is a development order, not a claim that the new items
 are implemented. Rationale and acceptance points: [player feedback priorities](PLAYER_FEEDBACK_PRIORITIES.md).

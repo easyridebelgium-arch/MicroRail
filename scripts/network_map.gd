@@ -7,6 +7,7 @@ signal navigation_requested(world_position: Vector2)
 var map_cells: Vector2i = Vector2i(80, 50)
 var world_tile_size: float = 32.0
 
+var has_river := false
 var track_data: Dictionary = {}
 var facilities: Array[Dictionary] = []
 var train_kinds: Array[String] = []
@@ -77,6 +78,10 @@ func _draw() -> void:
 	draw_rect(area, Color("#172C27"))
 
 	# Tracks.
+	if has_river:
+		var river_area := _map_rect()
+		draw_rect(Rect2(river_area.position + Vector2(0, river_area.size.y * 17.0 / 50.0), Vector2(river_area.size.x, river_area.size.y * 2.0 / 50.0)), Color("#629fbf"))
+
 	for cell in track_data:
 		if cell.x < 0 or cell.x >= map_cells.x:
 			continue

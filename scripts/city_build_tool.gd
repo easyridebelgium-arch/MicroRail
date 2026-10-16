@@ -76,12 +76,19 @@ func claims() -> Dictionary:
 
 func preview(cell: Vector2i) -> Dictionary:
 	var result := Construction.preview(game.world.save_state(), cell, game.tracks, game.track_signals, claims(), game.money)
+	var terrain_error: String = game.river_terrain.site_error(Construction.building_cells(cell) + Construction.platform_cells(cell), game.tracks)
+	if not terrain_error.is_empty():
+		result.ok = false
+		result.message = terrain_error
 	if not result.settlement_id.is_empty() and game.city_demand.state.cities.has(result.settlement_id):
 		result.message += " Population served: %d. A connected service is needed to queue trips." % int(game.city_demand.state.cities[result.settlement_id].population)
 	return result
 
 func submit(cell: Vector2i) -> void:
 	game._rebuild_reservations()
+	if not game.river_terrain.site_error(Construction.building_cells(cell) + Construction.platform_cells(cell), game.tracks).is_empty():
+		game._show_notice("Stations need dry land.")
+		return
 	var draft := Construction.draft(game.world.save_state(), cell, game.tracks, game.track_signals, claims(), game.money)
 	if not draft.ok:
 		game._show_notice(draft.message)
@@ -93,6 +100,10 @@ func execute(data: Dictionary) -> void:
 	var draft := Command.decode(data)
 	if draft.is_empty():
 		game._show_notice("Invalid station command. Preview the station again.")
+		return
+	var command_cell := Vector2i(int(data.get("x", -1)), int(data.get("y", -1)))
+	if not game.river_terrain.site_error(Construction.building_cells(command_cell) + Construction.platform_cells(command_cell), game.tracks).is_empty():
+		game._show_notice("Stations need dry land.")
 		return
 	game._rebuild_reservations()
 	for field in MODEL_FIELDS: boot.set(MODEL_FIELDS[field], game.get(field))

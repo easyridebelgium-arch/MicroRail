@@ -1,5 +1,6 @@
 extends RefCounted
 ## Validated startup choices; previews never consume the live simulation RNG.
+const Terrain = preload("res://scripts/core/river_terrain.gd")
 const Challenges = preload("res://scripts/core/seeded_challenges.gd")
 const Growth = preload("res://scripts/core/city_growth.gd")
 const Generator = preload("res://scripts/core/world_generator.gd")
@@ -12,9 +13,12 @@ static func validate(value: Variant) -> Dictionary:
 		return {"ok": false, "message": "Choose Tutorial or City sandbox."}
 	if value.mode == "tutorial":
 		return {"ok": true, "configuration": {"mode": "tutorial"}, "message": "Tutorial: £1000, three stations and the original trains. Follow the introductory goals."}
+	var terrain: Variant = value.get("terrain", "flat")
+	if terrain not in Terrain.PROFILES: return {"ok": false, "message": "Choose Flat land or River."}
 	var challenge: Variant = value.get("challenge", "")
 	if not challenge is String or (challenge != "" and not Challenges.DEFINITIONS.has(challenge)): return {"ok": false, "message": "Choose a listed scenario."}
 	if challenge != "":
+		if terrain != "flat": return {"ok": false, "message": "Scenario presets use flat land."}
 		var definition: Dictionary = Challenges.DEFINITIONS[challenge]
 		if value.get("seed") != definition.seed or value.get("city_count") != definition.cities: return {"ok": false, "message": "Scenario seed and city count must match its preset."}
 	var count: Variant = value.get("city_count")
@@ -30,5 +34,5 @@ static func validate(value: Variant) -> Dictionary:
 	var locomotive: int = Fleet.MODELS.passenger_standard.price
 	if challenge != "":
 		var stations: int = int(Challenges.DEFINITIONS[challenge].served) * (Construction.STATION_PRICE + 5 * Construction.TRACK_PRICE)
-		return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge}, "message": Challenges.description(challenge) + "\n\nNo stations, track or trains are prebuilt. The required stations cost £%d and a passenger shuttle costs £%d, leaving £%d for track and operations. Growth can be adjusted in Settings." % [stations, locomotive, Start.STARTING_BALANCE - stations - locomotive]}
-	return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge}, "message": "City sandbox: %d cities, four industry sites, £%d.\nNo stations, track or trains are prebuilt. Two new stations cost £%d and a passenger shuttle costs £%d, leaving £%d for connecting track and operations.\nPopulation drives city trip requests. City growth is bounded, with a day of protection against decline; adjust its rate in Settings; introductory tutorial rewards do not apply. Same seed and city count reproduce this starting layout." % [int(count), Start.STARTING_BALANCE, two_stations, locomotive, Start.STARTING_BALANCE - two_stations - locomotive]}
+		return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge, "terrain": terrain}, "message": Challenges.description(challenge) + "\n\nNo stations, track or trains are prebuilt. The required stations cost £%d and a passenger shuttle costs £%d, leaving £%d for track and operations. Growth can be adjusted in Settings." % [stations, locomotive, Start.STARTING_BALANCE - stations - locomotive]}
+	return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge, "terrain": terrain}, "message": ("River: water rows 17–18. Drag a straight north–south crossing including both banks (rows 16–19). Water tiles cost £50 each, refunded £25; bank track costs £10. No stations, switches or signals over water.\n\n" if terrain == "river_v1" else "") + "City sandbox: %d cities, four industry sites, £%d.\nNo stations, track or trains are prebuilt. Two new stations cost £%d and a passenger shuttle costs £%d, leaving £%d for connecting track and operations.\nPopulation drives city trip requests. City growth is bounded, with a day of protection against decline; adjust its rate in Settings; introductory tutorial rewards do not apply. Same seed and city count reproduce this starting layout." % [int(count), Start.STARTING_BALANCE, two_stations, locomotive, Start.STARTING_BALANCE - two_stations - locomotive]}

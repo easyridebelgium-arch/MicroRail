@@ -2,6 +2,7 @@ extends RefCounted
 ## An ephemeral edit transaction. Original values detect stale drafts.
 const Geometry = preload("res://scripts/track_geometry.gd")
 var prices: Dictionary
+var terrain: RefCounted
 
 func _init(costs: Dictionary = {"track": 10, "refund": 5, "switch": 100}) -> void:
 	prices = costs.duplicate()
@@ -61,8 +62,12 @@ func quote() -> Dictionary:
 	for cell in changes:
 		var old: Variant = before[cell]
 		var next: Variant = changes[cell]
-		if old == null and next != null: cost += int(prices.track)
-		if old != null and next == null: refund += int(prices.refund)
+		if old == null and next != null:
+			cost += int(prices.track)
+			if terrain != null and terrain.water(cell): cost += terrain.EXTRA_COST
+		if old != null and next == null:
+			refund += int(prices.refund)
+			if terrain != null and terrain.water(cell): refund += terrain.EXTRA_REFUND
 		if next != null and Geometry.is_switch(next) and not Geometry.is_switch(old): cost += int(prices.switch)
 		if old != null and next != null and Geometry.is_switch(old) and not Geometry.is_switch(next): refund += int(prices.switch)
 	return {"cost": cost, "refund": refund, "net": cost - refund}
@@ -78,6 +83,9 @@ func validate(live: Dictionary, owners: Dictionary, signals: Dictionary, size: V
 		if changes[cell] != null and Geometry.connections(changes[cell]).size() < 2: return "Invalid track geometry."
 		if proposed_signals.has(cell) and changes[cell] != null and not Geometry.is_straight(changes[cell]): return "Remove the signal before changing its track geometry."
 	var proposed := projected(live)
+	if terrain != null:
+		var river_error: String = terrain.track_error(proposed, proposed_signals)
+		if not river_error.is_empty(): return river_error
 	for cell in signal_changes:
 		if cell.x < 0 or cell.y < 0 or cell.x >= size.x or cell.y >= size.y or protected.call(cell): return "Signals cannot be placed outside the map or on platforms/grounds."
 		if not _same(live.get(cell), signal_track_before[cell]): return "Signal track changed at %d,%d since drafting." % [cell.x, cell.y]

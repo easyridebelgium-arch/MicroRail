@@ -75,3 +75,10 @@ requires 40 final journeys from at least two resident origins; Three Town Link
 requires 75 from all three origins and disables borrowing. Each origin needs at
 least five completions. Both start with £5000 and have no deadline or bonus award.
 See [full rules and scope](SEEDED_SCENARIOS.md).
+
+## River terrain
+
+Ordinary City sandboxes can choose **Terrain: River with bridge crossings**.
+The river occupies rows 17–18; build straight north–south across rows 16–19.
+Water rails cost £50 each and require the whole span; flat remains the default.
+Existing games/scenarios stay flat. See [bridge rules](RIVERS_AND_BRIDGES.md).

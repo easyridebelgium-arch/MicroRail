@@ -25,6 +25,9 @@ var city_builder: RefCounted
 @export var startup_city_seed := ""
 @export var startup_city_growth := "normal"
 @export var startup_challenge := ""
+@export var startup_terrain := "flat"
+const RiverTerrain = preload("res://scripts/core/river_terrain.gd")
+var river_terrain := RiverTerrain.new()
 const SeededChallenges = preload("res://scripts/core/seeded_challenges.gd")
 var seeded_challenge := SeededChallenges.new()
 @export_range(3, 8, 1) var startup_city_count := 4
@@ -480,6 +483,8 @@ func _ready() -> void:
 		train_position = _cell_center(STATION_A)
 	city_service.initialize(world.save_state())
 	city_growth.initialize(world.save_state(), city_demand.save_state(), city_service.save_state(), sim_clock.tick, startup_city_growth)
+	river_terrain.profile = startup_terrain if city_builder.is_city_game() and startup_terrain in RiverTerrain.PROFILES else "flat"
+	construction_plan.terrain = river_terrain
 	progress_reports.initialize(sim_clock.tick, _progress_values())
 	seeded_challenge.initialize(startup_challenge if city_builder.is_city_game() else "")
 	_update_instructions()
@@ -953,7 +958,7 @@ func _update_instructions() -> void:
 	elif signal_tool_mode:
 		direction = "Signals: click straight track — automatic / stop / remove"
 	elif is_dragging and demolition_mode:
-		direction = "Remove %d tracks — refund £%d" % [demolition_cells.size(), demolition_cells.size() * TRACK_REFUND]
+		direction = "Remove %d tracks — refund £%d" % [demolition_cells.size(), _demolition_quote()]
 	elif is_dragging and not build_plan.get("error", "").is_empty():
 		direction = "Blocked: " + str(build_plan["error"])
 
@@ -1137,6 +1142,7 @@ func _draw_grid() -> void:
 
 	var style := TerrainArt.effective_style(GameSettings.terrain_style, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
 	TerrainArt.draw_ground(self, map_size, style)
+	preload("res://scripts/art/river_art.gd").draw(self, river_terrain, tracks, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST)
 	if GameSettings.show_grid or GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST:
 		var grid_color := TerrainArt.grid_color(style)
 		for column in range(MAP_WIDTH + 1):
@@ -1159,7 +1165,7 @@ func _draw_track(cell: Vector2i, track_type: Variant, preview: bool) -> void:
 	if geometry.is_empty():
 		return
 	draw_set_transform(Vector2(cell) * TILE_SIZE)
-	if not preview and TerrainArt.effective_style(GameSettings.terrain_style, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST) != "plain":
+	if not preview and not river_terrain.water(cell) and TerrainArt.effective_style(GameSettings.terrain_style, GameSettings.palette_mode == GameSettings.PaletteMode.HIGH_CONTRAST) != "plain":
 		TerrainArt.draw_track_bed(self, geometry)
 	var rail_color: Color = Palette.get_color(Palette.Role.PREVIEW) if preview else RAIL_COLOR
 	var sleeper_color: Color = SLEEPER_COLOR
@@ -1344,6 +1350,10 @@ func _execute_set_tile(data: Dictionary) -> void:
 	if not _can_demolish(cell) or not _is_valid_track_type(new_tile):
 		return
 
+	var river_error := river_terrain.proposed_error(tracks, {cell: new_tile}, track_signals)
+	if not river_error.is_empty():
+		_show_notice(river_error)
+		return
 	var old_tile: Variant = tracks[cell]
 	var old_base: Variant = TrackGeometry.switch_base(old_tile)
 	var new_base: Variant = TrackGeometry.switch_base(new_tile)
@@ -1394,6 +1404,7 @@ func _execute_build(data: Dictionary) -> void:
 			_show_notice("Track changed before this stroke was applied. Redraw it.")
 			return
 	var transaction = ConstructionPlan.new({"track": TRACK_BUILD_COST, "refund": TRACK_REFUND, "switch": SWITCH_COST})
+	transaction.terrain = river_terrain
 	transaction.stage(changes, tracks)
 	var loading_error := _loading_edits_error(changes)
 	if not loading_error.is_empty():
@@ -1552,7 +1563,11 @@ func _get_preview_cost() -> int:
 
 
 func _build_plan_cost() -> int:
-	return int(build_plan.get("new_count", 0)) * TRACK_BUILD_COST + int(build_plan.get("switch_count", 0)) * SWITCH_COST
+	var working: Dictionary = construction_plan.projected(tracks) if planning_mode else tracks
+	var cost := int(build_plan.get("new_count", 0)) * TRACK_BUILD_COST + int(build_plan.get("switch_count", 0)) * SWITCH_COST
+	for cell in build_plan.get("changes", {}):
+		if river_terrain.water(cell) and not working.has(cell): cost += RiverTerrain.EXTRA_COST
+	return cost
 
 
 func _open_save_slots(operation: String) -> void:
@@ -1592,6 +1607,7 @@ func _start_new_game(slot: int, configuration: Dictionary = {}) -> void:
 		fresh.startup_city_count = validated.configuration.city_count
 		fresh.startup_city_growth = validated.configuration.city_growth
 		fresh.startup_challenge = validated.configuration.get("challenge", "")
+		fresh.startup_terrain = validated.configuration.get("terrain", "flat")
 	var tree := get_tree()
 	tree.root.add_child(fresh)
 	if tree.current_scene == self: tree.current_scene = fresh
@@ -1687,6 +1703,7 @@ func _save_snapshot() -> Dictionary:
 		"service_performance": service_performance.save_state(services),
 		"progress_reports": progress_reports.save_state(),
 		"seeded_challenge": seeded_challenge.save_state(),
+		"terrain": river_terrain.save_state(),
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
@@ -1800,6 +1817,8 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not ServicePerformance.valid(data.get("service_performance"), data, int(sim.clock.tick)): return false
 	if not ProgressReports.valid(data.get("progress_reports"), ProgressReports.from_save(data), int(sim.clock.tick)): return false
 	if not SeededChallenges.valid(data.get("seeded_challenge"), data, int(sim.clock.tick)): return false
+	if not RiverTerrain.valid(data.get("terrain"), city_save): return false
+	if data.seeded_challenge.id != "" and data.terrain.profile != "flat": return false
 	if not Timetable.valid_dispatch(data.get("dispatch"), data.services, int(sim.clock.tick)): return false
 	if not SimRng.is_valid_state(sim.get("rng")):
 		return false
@@ -1966,6 +1985,15 @@ func _is_valid_save(data: Dictionary) -> bool:
 		checked_tracks[cell] = entry[2]
 
 	if not _is_valid_signal_list(data["signals"], checked_tracks, 1 if data.sawmill.installed else 0, 1 if data.factory.installed else 0, saved_catalog): return false
+	var saved_river := RiverTerrain.new()
+	saved_river.restore_state(data.terrain)
+	var river_signals: Dictionary = {}
+	for sign in data.signals:
+		if not sign is Array or sign.size() != 3: return false
+		river_signals[Vector2i(int(sign[0]), int(sign[1]))] = sign[2]
+	if not saved_river.track_error(checked_tracks, river_signals).is_empty(): return false
+	for station in saved_catalog.stations().values():
+		if not saved_river.site_error(CityBuildTool.Construction.building_cells(station.cell) + CityBuildTool.Construction.platform_cells(station.cell), checked_tracks).is_empty(): return false
 	if not _is_valid_switch_list(data.get("switches"), checked_tracks):
 		return false
 
@@ -2160,6 +2188,7 @@ func _load_game(save_path: String = "") -> bool:
 	service_performance.restore_state(data.service_performance)
 	progress_reports.restore_state(data.progress_reports)
 	seeded_challenge.restore_state(data.seeded_challenge)
+	river_terrain.restore_state(data.terrain)
 	if progress_dialog != null: progress_dialog.hide()
 	if service_cards != null: service_cards.hide()
 	if network_summary != null: network_summary.hide()
@@ -3380,6 +3409,9 @@ func _clear_construction_history() -> void:
 	construction_redo.clear()
 
 func _remove_track_with_history(cell: Vector2i) -> void:
+	if river_terrain.profile != "flat":
+		_execute_demolish({"cells": [[cell.x, cell.y]]})
+		return
 	if not tracks.has(cell):
 		return
 
@@ -3483,6 +3515,10 @@ func _apply_construction_history(
 			_show_notice("Cannot undo or redo reserved track; wait until the train clears.")
 			return false
 
+	var river_error := river_terrain.proposed_error(tracks, target)
+	if not river_error.is_empty():
+		_show_notice(river_error)
+		return false
 	var signal_target: Dictionary = change.get("signals_before" if undo else "signals_after", {})
 	var signal_expected: Dictionary = change.get("signals_after" if undo else "signals_before", {})
 	for cell in signal_target:
@@ -3716,6 +3752,12 @@ func _finish_demolition(target: Vector2i) -> void:
 	_submit_command("demolish", {"cells": cells})
 
 
+func _demolition_quote() -> int:
+	var refund := demolition_cells.size() * TRACK_REFUND
+	for cell in demolition_cells:
+		if river_terrain.water(cell): refund += RiverTerrain.EXTRA_REFUND
+	return refund
+
 func _execute_demolish(data: Dictionary) -> void:
 	_rebuild_reservations()
 	var before: Dictionary = {}
@@ -3732,10 +3774,16 @@ func _execute_demolish(data: Dictionary) -> void:
 		queue_redraw()
 		return
 
+	var river_error := river_terrain.proposed_error(tracks, after)
+	if not river_error.is_empty():
+		_show_notice(river_error)
+		return
 	for cell in before:
 		tracks.erase(cell)
 
 	var refund: int = before.size() * TRACK_REFUND
+	for cell in before:
+		if river_terrain.water(cell): refund += RiverTerrain.EXTRA_REFUND
 	money += refund
 
 	_record_construction_change(
@@ -3968,6 +4016,7 @@ func _setup_network_map() -> void:
 
 
 func _update_network_map() -> void:
+	network_map.has_river = river_terrain.profile == "river_v1"
 	if not network_map.visible:
 		return
 
@@ -4244,6 +4293,11 @@ func _refresh_build_plan(target: Vector2i, force: bool = false) -> void:
 				single_direction = direction
 				break
 	build_plan = TrackBuilder.plan(cells, working, Vector2i(MAP_WIDTH, MAP_HEIGHT), _is_station_space, fixed, single_direction)
+	var river_error := river_terrain.proposed_error(working, build_plan.get("changes", {}))
+	if not river_error.is_empty():
+		build_plan.error = river_error
+		for cell in build_plan.get("changes", {}):
+			if cell.y in [16, 17, 18, 19]: build_plan.invalid[cell] = true
 	var signs: Dictionary = construction_plan.projected_signals(track_signals) if planning_mode else track_signals
 	for cell in build_plan.get("changes", {}):
 		if signs.has(cell) and not TrackGeometry.is_straight(build_plan.changes[cell]):
@@ -5369,6 +5423,9 @@ func _execute_set_signal(data: Dictionary) -> void:
 	if not RuntimeRoutes.valid_cells([[data.get("x"), data.get("y")]]) or not data.get("mode") is String: return
 	var cell := Vector2i(int(data["x"]), int(data["y"]))
 	var mode: String = str(data["mode"])
+	if river_terrain.water(cell):
+		_show_notice("Place signals on the dry bank, not over water.")
+		return
 	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in facility_cells() or mode not in ["", "auto", "stop"]: return
 	if mode.is_empty(): track_signals.erase(cell)
 	else: track_signals[cell] = mode

@@ -11,6 +11,7 @@ var random_seed_button: Button
 var _seed_picker := RandomNumberGenerator.new()
 var city_count: SpinBox
 var growth_choice: OptionButton
+var terrain_choice: OptionButton
 var city_controls: VBoxContainer
 var explanation: Label
 var validation: Dictionary = {}
@@ -78,6 +79,11 @@ func _ready() -> void:
 	growth_choice.tooltip_text = "Saved with this game. Normal: small changes every six game hours. Slower: quarter rates. Frozen keeps population fixed. All modes protect unfinished journeys and existing infrastructure."
 	growth_choice.item_selected.connect(func(_index: int) -> void: refresh())
 	city_controls.add_child(growth_choice)
+	terrain_choice = OptionButton.new()
+	terrain_choice.add_item("Terrain: Flat land")
+	terrain_choice.add_item("Terrain: River with bridge crossings")
+	terrain_choice.item_selected.connect(func(_index: int) -> void: refresh())
+	city_controls.add_child(terrain_choice)
 	explanation = Label.new()
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(explanation)
@@ -97,7 +103,7 @@ func refresh() -> void:
 	city_controls.visible = mode_choice.selected == 0
 	var config: Dictionary = {"mode": "tutorial"}
 	if mode_choice.selected == 0:
-		config = {"mode": "cities", "seed": seed_field.text, "city_count": city_count.value, "city_growth": Config.Growth.RATES[maxi(0, growth_choice.selected)]}
+		config = {"mode": "cities", "seed": seed_field.text, "city_count": city_count.value, "city_growth": Config.Growth.RATES[maxi(0, growth_choice.selected)], "terrain": Config.Terrain.PROFILES[maxi(0, terrain_choice.selected)]}
 	elif mode_choice.selected == 2:
 		var key: String = str(scenario_choice.get_item_metadata(scenario_choice.selected))
 		var definition: Dictionary = Config.Challenges.DEFINITIONS[key]

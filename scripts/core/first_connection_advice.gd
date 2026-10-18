@@ -1,43 +1,30 @@
 extends RefCounted
-## Cheap, read-only starting budget comparison. Never a movement route or quote.
-const Stations = preload("res://scripts/core/station_construction.gd")
-const Generator = preload("res://scripts/core/world_generator.gd")
+## Derived starting guidance. Cache only the latest geometry, never save it.
+const Path = preload("res://scripts/core/first_connection_path.gd")
+const Fleet = preload("res://scripts/fleet.gd")
+static var cached_input: Array = []
+static var cached_result: Dictionary = {}
 
-static func describe(world: Dictionary, terrain: RefCounted, money: int) -> String:
-	var sites: Array[Dictionary] = []
-	for town in world.settlements:
-		var cell := Vector2i(int(town.cell[0]), int(town.cell[1]) + 4)
-		var preview := Stations.preview(world, cell, {}, {}, {}, 1000000)
-		if preview.ok and terrain.site_error(preview.platform_cells + preview.building_cells).is_empty():
-			sites.append({"cell": cell, "name": town.name})
-	var protected: Dictionary = {}
-	for town in world.settlements:
-		for cell in Generator.tiles(Generator.town_bounds(Vector2i(town.cell[0], town.cell[1]))): protected[cell] = true
-	for site in world.facilities:
-		var center := Vector2i(site.cell[0], site.cell[1])
-		for cell in Stations.building_cells(center) + Stations.platform_cells(center): protected[cell] = true
+static func recommend(world: Dictionary, terrain: RefCounted, live: Dictionary = {}, signs: Dictionary = {}, owners: Dictionary = {}) -> Dictionary:
+	var input: Array = [world, terrain.profile, live, signs, owners]
+	if input == cached_input: return cached_result.duplicate(true)
 	var best: Dictionary = {}
-	for first in range(sites.size()):
-		for second in range(first + 1, sites.size()):
-			var a: Dictionary = sites[first]
-			var b: Dictionary = sites[second]
-			var extra := 0
-			var crossing := ""
-			# Generated cities occupy two dry bands. A cross-band journey must
-			# cross the river; avoid promising a complete buildable approach.
-			if terrain.profile != "flat" and (a.cell.y < 16) != (b.cell.y < 16):
-				var advice: Dictionary = terrain.suggest(a.cell, {}, {}, {}, func(cell: Vector2i) -> bool: return protected.has(cell))
-				if advice.is_empty(): continue
-				var column: int = advice.cells[0].x
-				extra = terrain.water_rows(column).size() * terrain.EXTRA_COST
-				crossing = " Bridge surcharge at least £%d; inspect a north–south crossing near column %d and keep both banks clear." % [extra, column]
-			var delta: Vector2i = a.cell - b.cell
-			# Optimistic empty-land budget, allowing four platform tiles to
-			# serve as approaches. Bends and detours can only increase it.
-			var rails: int = maxi(0, absi(delta.x) + absi(delta.y) - 5)
-			var budget := 1000 + rails * Stations.TRACK_PRICE + extra
+	for first in range(world.settlements.size()):
+		for second in range(first + 1, world.settlements.size()):
+			var a: Dictionary = world.settlements[first]
+			var b: Dictionary = world.settlements[second]
+			var path := Path.find(world, terrain, Vector2i(a.cell[0], int(a.cell[1]) + 4), Vector2i(b.cell[0], int(b.cell[1]) + 4), live, signs, owners)
+			if path.is_empty(): continue
+			var budget: int = path.station_cost + path.track_cost + int(Fleet.MODELS.passenger_standard.price)
 			if best.is_empty() or budget < int(best.budget):
-				best = {"budget": budget, "a": a, "b": b, "crossing": crossing}
-	if best.is_empty(): return "No clear suggested station pair. Use Station previews to find dry sites and inspect protected approaches."
-	var funds := "Current balance covers this minimum only." if money >= int(best.budget) else "Current balance is below this minimum."
-	return "Starting budget comparison: %s and %s. At least £%d for two £300 stations, a £400 shuttle and connecting rails.%s %s This is a lower bound, not a route quote: curves, protected buildings, bank approaches and detours may cost more. Check Station and Connect previews before purchasing." % [best.a.name, best.b.name, best.budget, best.crossing, funds]
+				best = path
+				best.merge({"budget": budget, "first": a.name, "second": b.name})
+	cached_input = input.duplicate(true)
+	cached_result = best.duplicate(true)
+	return best
+
+static func describe(world: Dictionary, terrain: RefCounted, money: int, live: Dictionary = {}, signs: Dictionary = {}, owners: Dictionary = {}) -> String:
+	var best := recommend(world, terrain, live, signs, owners)
+	if best.is_empty(): return "No validated simple connection found. This bounded search is not proof that no route exists. Use Station and Connect previews to explore other sites or detours."
+	var funds := "Current balance covers this layout." if money >= int(best.budget) else "Current balance is below this layout's cost."
+	return "Suggested connection: %s and %s. Validated layout £%d: stations/platforms £%d + connecting rails/bridges £%d + shuttle £%d. Suggested station centres %d,%d and %d,%d; leave platforms horizontally and turn via column %d. %s This checks a simple construction witness, not the globally cheapest route. Recheck live previews before buying; different curves or detours change the price. No track is placed or reserved." % [best.first, best.second, best.budget, best.station_cost, best.track_cost, Fleet.MODELS.passenger_standard.price, best.a.x, best.a.y, best.b.x, best.b.y, best.column, funds]

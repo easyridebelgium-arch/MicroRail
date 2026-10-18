@@ -327,15 +327,16 @@ share terrain-mask geometry with construction, map rendering and load validation
 Failed water strokes highlight a nearby feasible crossing; hints show bridge
 surcharges and incomplete-deck removal warnings. Version 48 preserves old profiles.
 
-**Terrain-aware first-service budgets implemented:** the [Guide](FIRST_SERVICE_GUIDE.md)
-compares minimum startup budgets including water surcharges, checks dry station
-footprints and excludes protected land from suggested bridge spans. This is
-explicitly a lower bound, not a fully validated approach/path quote. It makes no
-purchases, authority requests or save changes.
+**Terrain-aware first-service construction witnesses implemented:** the
+[Guide](FIRST_SERVICE_GUIDE.md) validates complete simple approaches through the
+station purchase rules, track builder, construction transaction and route graph.
+It reports actual station/rail/bridge/shuttle costs and coordinates, with explicit
+bounded-search limits. Geometry is cached; current cash is checked separately.
+No purchases, authority requests, RNG consumption or save changes occur.
 
-**Next implementation:** complete-route construction witnesses for first-service
-suggestions, including protected approaches and actual curve/bridge prices, before
-broader terrain complexity.
+**Next implementation:** show the suggested first connection on the map as an
+optional planning overlay, so coordinate guidance can be inspected before purchase.
+Broader terrain/elevation remains a later refinement.
 
 The actionable summary and initial period reports are implemented without an unexplained
 composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader

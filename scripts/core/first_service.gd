@@ -55,7 +55,7 @@ static func inspect(game: Node) -> Dictionary:
 		elif next_index == rows.size(): next_index = index
 	var suggestion := "The tutorial train is already provided. Connect A–B and resume; no Fleet or Routes setup is needed."
 	if city_mode:
-		suggestion = Advice.describe(game.world.state, game.river_terrain, game.money) if stations.is_empty() else nearest_pair(game.world.state.settlements)
+		suggestion = Advice.describe(game.world.state, game.river_terrain, game.money, game.tracks, game.track_signals, game.reservations.owners) if stations.is_empty() else nearest_pair(game.world.state.settlements)
 	return {"city_mode": city_mode, "rows": rows, "next": next_index, "done": done_count, "complete": next_index == rows.size(), "connection": connection, "suggestion": suggestion, "delivered": game.passengers_delivered}
 
 static func nearest_pair(settlements: Array) -> String:

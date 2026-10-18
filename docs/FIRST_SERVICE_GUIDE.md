@@ -23,19 +23,27 @@ start anything automatically. **Resume and watch trains** starts the clock witho
 releasing holds, overriding signals or bypassing reservations. Click a stopped train
 for its operating inspector if it does not move.
 
-Before the first station is built, the guide compares candidate starting pairs by
-a minimum budget: two £300 stations, one £400 shuttle and optimistic connecting
-rail length. Rivers add £40 per water tile, so a slightly farther same-bank pair
-can be cheaper. Candidate station footprints must pass placement and dry-land
-checks; suggested bridge spans exclude protected city/industry footprints.
+Before the first station is built, the guide now tests complete simple connection
+layouts, rather than comparing optimistic distance budgets. It quotes two new
+stations/platforms, a passenger shuttle and the actual connecting track/bridge
+transaction, reusing compatible existing rail. Proposed stations pass the normal
+purchase checks; approaches avoid city/industry buildings and preserve horizontal
+platform ports. The track builder, construction-plan validator, river rules and
+movement graph must all accept the result.
 
-This is explicitly a **lower bound, not a route quote**. It does not find a complete
-track path, reserve a crossing or guarantee affordable approaches. Curves, protected
-buildings and detours can increase the actual price. Inspect Station and Connect
-previews before committing. Advice reflects the current balance without spending
-money or advancing the RNG. Once stations exist, the checklist uses the real live
-connection and retains the simple nearby-city reference rather than quoting a new
-company budget against partially built infrastructure.
+The guide lists station centre coordinates and the column for the vertical leg.
+Follow horizontal approaches out of each platform; where both stations share a row,
+the suggestion is a straight connection. The search tests horizontal–vertical–horizontal
+layouts and returns a validated witness; it does **not** promise the globally cheapest
+route or prove that an unrepresented detour is impossible. Prices apply to that
+layout, and other curves or detours change them. Recheck live previews before buying.
+No purchases, reservations, commands or RNG calls occur. The latest geometry result
+is cached and invalidates on changes to the world, terrain, rails, signals or claims;
+balance warnings refresh without rerunning construction searches.
+
+Once a station exists, the live checklist and nearby-city reference remain in use,
+rather than suggesting that the player buy the same stations twice. Save format and
+simulation rules are unchanged.
 New stations usually cost £300 each, and the standard passenger shuttle costs £400.
 The existing £5000 city budget and all fares, costs and financing rules are unchanged.
 Unfinished construction strokes prevent opening the guide. Actions refuse an

@@ -27,7 +27,7 @@ func run() -> void:
 	game.first_service_guide.open_guide()
 	check(game._modal_open() and game.first_service_guide.dialog.visible, "Guide opens a modal checklist")
 	check(JSON.stringify(game._save_snapshot(), "", true, true) == before, "opening and reading guide preserves money, RNG, commands, pause and simulation state")
-	check(facts().suggestion.contains("lower bound") and facts().suggestion.contains("£400 shuttle"), "guide compares starting budgets without guaranteeing track layout")
+	check(facts().suggestion.contains("Validated layout") and facts().suggestion.contains("shuttle £400"), "guide compares starting budgets without guaranteeing track layout")
 	game.first_service_guide._perform()
 	check(game.paused and game.city_builder.active and not game.first_service_guide.dialog.visible, "station action selects existing tool without purchasing")
 	check(game.money == 5000 and game.world.stations().is_empty(), "guide never spends startup budget")

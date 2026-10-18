@@ -49,7 +49,9 @@ func preview_text() -> String:
 			var working: Dictionary = game.construction_plan.projected(game.tracks) if draft else game.tracks
 			for cell in game.build_plan.get("changes", {}):
 				if game.river_terrain.water(cell) and not working.has(cell): water_count += 1
-			if water_count > 0: lines.append("Bridge surcharge: %d × £%d = £%d (added to rail price)" % [water_count, game.RiverTerrain.EXTRA_COST, water_count * game.RiverTerrain.EXTRA_COST])
+			if water_count > 0:
+				lines.append("Bridge surcharge: %d × £%d = £%d (added to rail price)" % [water_count, game.RiverTerrain.EXTRA_COST, water_count * game.RiverTerrain.EXTRA_COST])
+				lines.append("Water rail subtotal £%d; dry banks/approaches are separate. Inspect a span for bank coordinates." % [water_count * (game.TRACK_BUILD_COST + game.RiverTerrain.EXTRA_COST)])
 			if not draft and game.money < cost: lines.append("Available £%d; need £%d more" % [game.money, cost - game.money])
 		if blocked > 0: lines.append("%d reserved tiles; %s" % [blocked, "recheck at Apply" if draft else "edit cannot commit now"])
 	var affected: int = game.construction_feedback.get("affected", []).size()

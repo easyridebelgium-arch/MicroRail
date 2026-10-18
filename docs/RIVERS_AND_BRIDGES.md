@@ -1,8 +1,8 @@
 # First river maps and bridge crossings
 
 Choose **New Game → City sandbox → Terrain: River with bridge crossings**.
-Flat land remains the default. Tutorial and the existing seeded scenarios remain
-flat. Terrain is a saved company choice; changing cosmetic grass/autumn/snow does
+Flat land remains the default. Tutorial and the original two seeded scenarios
+remain flat; Across the River selects its river preset automatically. Terrain is a saved company choice; changing cosmetic grass/autumn/snow does
 not change water or construction permissions.
 
 This first immutable profile, `river_v1`, has a two-tile-wide east–west river
@@ -71,11 +71,11 @@ create a usable crossing.
 Version 46 migration uses **flat** terrain: it adds no water, deletes no existing
 track and changes no positions, passengers, finances, RNG, goals or commands.
 Terrain profiles, station footprints, deck geometry, signals and bank integrity
-are validated before live state changes. Existing scenario presets require flat
-terrain. Normal slot/backups/autosave rules remain active.
+are validated before live state changes. Scenario presets validate their required terrain; the original two require flat
+land and Across the River requires its original river profile. Normal slot/backups/autosave rules remain active.
 
 [Wide/meandering presets and crossing guidance](RIVER_VARIETY.md) are now implemented.
-Terrain-aware first-service connection suggestions remain next. Elevation, tunnels, boats and weather
+Terrain-aware first-service connection suggestions and their optional map preview are implemented. Elevation, tunnels, boats and weather
 physics remain later systems.
 
 ## Validation
@@ -88,3 +88,27 @@ saves/loads the resulting service. Existing construction, planning, blueprint,
 mouse, city, scenario, report and game-menu suites remain active.
 
 ![River and bridge in the running game](images/river_bridge.png)
+
+## Inspect a crossing and its costs
+
+Choose **Inspect** (default **I**) and click a bridge tile, either bank, or water
+where you might build a crossing. Trains and station information retain priority
+when clicking their existing footprints. The bridge dialog highlights the span
+with outlines and diagonal marks, pauses the game and reports:
+
+- Required bank coordinates and water/bank tile counts.
+- Full new-span rail price and bridge surcharge separately.
+- Missing tile coordinates and their material cost, plus incompatible existing rails.
+- Existing water-deck refund value; dry bank rails have a separate £5 value each.
+- Current tile-reservation train IDs, without calling these physical occupancy or
+  block authority.
+
+These are read-only values for the span, not an editing permission or a guaranteed
+refund. Approach rails are extra. Construction rechecks funds, signals, protected
+land and current claims. All water tiles must be removed together and supporting
+banks retained until the deck is gone. Close/Escape restores the previous pause
+choice. Loading clears the old inspection instead of retaining stale facts.
+
+The construction hint also shows the water-rail subtotal (£50 each) alongside
+its £40-per-tile surcharge, so that base rails are not mistaken for an extra
+unquoted charge. Nothing in this feature changes prices, safety rules or saves.

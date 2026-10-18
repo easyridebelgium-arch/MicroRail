@@ -427,6 +427,8 @@ var goals_button: Button
 @onready var backup_button: Button = $Interface/HeaderBox/Toolbar/BackupButton
 @onready var inspect_button: Button = $Interface/HeaderBox/Toolbar/InspectButton
 
+const BridgeInspector = preload("res://scripts/ui/bridge_inspector.gd")
+var bridge_inspector: RefCounted
 const FirstServiceGuide = preload("res://scripts/ui/first_service_guide.gd")
 var first_service_guide: RefCounted
 var first_delivery_notice: String = ""
@@ -521,6 +523,8 @@ func _ready() -> void:
 	_setup_game_menu()
 	first_service_guide = FirstServiceGuide.new()
 	first_service_guide.configure(self)
+	bridge_inspector = BridgeInspector.new()
+	bridge_inspector.configure(self)
 	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
 	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog]:
@@ -662,6 +666,7 @@ func _record_event(type: String, subject: String, data: Dictionary = {}) -> void
 
 # True while a dialog owns the keyboard, so game shortcuts stay quiet.
 func _modal_open() -> bool:
+	if bridge_inspector != null and bridge_inspector.dialog.visible: return true
 	if first_service_guide != null and first_service_guide.dialog.visible: return true
 	if game_menu != null and game_menu.active: return true
 	if new_game_dialog != null and new_game_dialog.visible: return true
@@ -758,7 +763,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 			if inspect_mode:
-				if not _inspect_train_at(cell): _inspect_station_at(cell)
+				if not _inspect_train_at(cell):
+					_inspect_station_at(cell)
+					if not station_panel.visible: bridge_inspector.open_at(cell)
 				return
 
 			if waypoint_tool_mode:
@@ -952,7 +959,7 @@ func _update_instructions() -> void:
 	if city_builder != null and city_builder.active:
 		direction = "Station: " + str(city_builder.preview(hovered_cell).message)
 	elif inspect_mode:
-		direction = "Inspect: click a train, station or industry"
+		direction = "Inspect: click a train, station, industry, bridge or river"
 	elif waypoint_tool_mode:
 		direction = "Waypoints: click track, then choose service/leg in Routes"
 	elif signal_tool_mode:
@@ -1110,6 +1117,7 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2(hovered_cell) * TILE_SIZE, Vector2.ONE * TILE_SIZE), color, false, 2.0)
 		draw_string(ThemeDB.fallback_font, _cell_center(hovered_cell) + Vector2(-4, 4), "+" if _can_build_at(hovered_cell) else "×", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 	_draw_bridge_suggestion()
+	if bridge_inspector != null: bridge_inspector.draw_span()
 	if reservation_overlay:
 		_draw_reservations()
 	_draw_waypoints()
@@ -2219,6 +2227,7 @@ func _load_game(save_path: String = "") -> bool:
 	city_builder.restore_context()
 	_reset_autosave_schedule()
 	first_delivery_notice = ""
+	if bridge_inspector != null: bridge_inspector.close(false)
 	if first_service_guide != null:
 		first_service_guide.clear_preview()
 		first_service_guide.close_guide(false)

@@ -20,6 +20,25 @@ func span(x: int) -> Array[Vector2i]:
 	for y in range(rows[0] - 1, rows.back() + 2): result.append(Vector2i(x, y))
 	return result
 func water(cell: Vector2i) -> bool: return cell.y in water_rows(cell.x)
+## Read-only span facts. Prices are rail values, not permission to edit.
+func inspect_span(cell: Vector2i, tracks: Dictionary, owners: Dictionary = {}) -> Dictionary:
+	var cells := span(cell.x)
+	if cell not in cells: return {}
+	var missing: Array[Vector2i] = []
+	var incompatible: Array[Vector2i] = []
+	var holders: Array[int] = []
+	var water_count := water_rows(cell.x).size()
+	var missing_cost := 0
+	var deck_refund := 0
+	for point in cells:
+		if not tracks.has(point):
+			missing.append(point)
+			missing_cost += 10 + (EXTRA_COST if water(point) else 0)
+		elif not Geometry.same_connections(tracks[point], true): incompatible.append(point)
+		if tracks.has(point) and water(point): deck_refund += 5 + EXTRA_REFUND
+		if owners.has(point) and not holders.has(int(owners[point])): holders.append(int(owners[point]))
+	holders.sort()
+	return {"cells": cells, "water_count": water_count, "missing": missing, "incompatible": incompatible, "holders": holders, "complete": missing.is_empty() and incompatible.is_empty(), "rail_cost": cells.size() * 10, "surcharge": water_count * EXTRA_COST, "full_cost": cells.size() * 10 + water_count * EXTRA_COST, "missing_cost": missing_cost, "deck_refund": deck_refund}
 func save_state() -> Dictionary: return {"profile": profile}
 func restore_state(value: Dictionary) -> void: profile = value.profile
 static func valid(value: Variant, cities: bool) -> bool:

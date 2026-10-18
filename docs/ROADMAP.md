@@ -345,9 +345,15 @@ and requires 40 matched final journeys by the unique north-bank city’s residen
 plus useful service from another city. Physical journey completion, terrain/geometry
 validation and save/load are tested; existing scenarios and save schema remain unchanged.
 
-**Next implementation:** broaden terrain planning feedback with bridge/span
-inspection and clear construction cost information. Elevation and tunnels remain
-later refinements.
+**Bridge/span inspection implemented:** Inspect mode opens a paused, read-only
+span report with required banks, missing/incompatible rails, base/surcharge prices,
+refund values and tile-reservation holders. Shape-marked highlighting and water-rail
+subtotals make the construction rules explicit; close restores the prior pause
+choice and load clears stale inspection. No save or safety-rule changes.
+
+**Next implementation:** deterministic dispatch fairness and starvation diagnostics,
+preserving existing reservation safety. The current flat/river map-variety slice
+is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained
 composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader

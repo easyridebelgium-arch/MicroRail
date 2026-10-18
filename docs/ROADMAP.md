@@ -351,9 +351,16 @@ refund values and tile-reservation holders. Shape-marked highlighting and water-
 subtotals make the construction rules explicit; close restores the prior pause
 choice and load clears stale inspection. No save or safety-rule changes.
 
-**Next implementation:** deterministic dispatch fairness and starvation diagnostics,
-preserving existing reservation safety. The current flat/river map-variety slice
-is complete; elevation and tunnels remain later refinements.
+**Initial dispatch fairness implemented:** [fixed-tick round robin](DISPATCH_FAIRNESS.md)
+rotates first choice every ten simulation seconds across active train IDs, shared
+by tile/switch and block requests. Occupancy still wins first. Train inspection
+shows dispatch position and explains prolonged waits without promising liveness
+or confusing manual stops/deadlocks with proven starvation. No hidden queue or
+save change; rendering FPS and simulation speed do not affect the order.
+
+**Next implementation:** player-selected service priorities with bounded fairness,
+clear inspector explanations and tests against starvation. The current flat/river
+map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained
 composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader

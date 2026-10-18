@@ -427,6 +427,8 @@ var goals_button: Button
 @onready var backup_button: Button = $Interface/HeaderBox/Toolbar/BackupButton
 @onready var inspect_button: Button = $Interface/HeaderBox/Toolbar/InspectButton
 
+const DispatchOrder = preload("res://scripts/core/dispatch_order.gd")
+var dispatch_ranks: Dictionary = {}
 const BridgeInspector = preload("res://scripts/ui/bridge_inspector.gd")
 var bridge_inspector: RefCounted
 const FirstServiceGuide = preload("res://scripts/ui/first_service_guide.gd")
@@ -4815,9 +4817,10 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0 and not section_held.has(int(Fleet.assigned(fleet, key).id)) and not _scheduled_departure_hold(key)})
 	reservation_trains.clear()
 	for train in trains: reservation_trains[int(train.id)] = train
-	reservations.rebuild(trains, tracks, float(TILE_SIZE))
+	dispatch_ranks = DispatchOrder.ranks(trains, sim_clock.tick)
+	reservations.rebuild(trains, tracks, float(TILE_SIZE), {}, dispatch_ranks)
 	block_signals.configure(tracks, track_signals)
-	block_signals.update(trains, reservations.occupied_owners, float(TILE_SIZE))
+	block_signals.update(trains, reservations.occupied_owners, float(TILE_SIZE), dispatch_ranks)
 	if not track_signals.is_empty():
 		# Never lock a switch beyond a red signal: doing so can prevent the
 		# departing train from clearing the very block we are waiting to enter.
@@ -4827,7 +4830,7 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 			var direction := 1.0 if train.forward else -1.0
 			var end := clampf(train.distance + direction * TILE_SIZE * Reservations.LOOKAHEAD_TILES, 0, train.path.get_baked_length())
 			request_ends[int(train.id)] = block_signals.limit(train, end, float(TILE_SIZE)).distance
-		reservations.rebuild(trains, tracks, float(TILE_SIZE), request_ends)
+		reservations.rebuild(trains, tracks, float(TILE_SIZE), request_ends, dispatch_ranks)
 	switch_states.merge(reservations.switches, true)
 
 # Whole-train length is derived from validated fleet composition.

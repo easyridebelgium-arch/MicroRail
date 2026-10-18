@@ -28,15 +28,15 @@ in construction Undo/Redo. Holds apply while paused; opening Traffic pauses for 
 ## Operating rules and limits
 
 Each fixed tick seeds block ownership from actual train bodies (including held and
-dwelling trains), then grants upcoming blocks in ascending permanent train ID order.
+dwelling trains), then grants upcoming blocks in the same fixed-tick rotating order used by tile
+and switch requests. Occupied blocks always take precedence over request order.
 Authority is rebuilt every tick, so vacated blocks are released. Tile/switch
 reservations remain the final safety check, including when new signals divide a
 block containing multiple trains. Missing track ahead on the current leg freezes trains; a gap behind permits
 delivery before the return-leg check.
 
-Both signal modes apply in both directions. This version has no one-way signals,
-priority classes, route/platform signals, automatic passing-loop selection or
-fairness policy. Signals alone cannot resolve a poor single-track layout; a cycle
+Both signal modes share the rotating dispatch request policy. Priority classes,
+route/platform signals and automatic passing-loop selection remain extensions. Signals alone cannot resolve a poor single-track layout; a cycle
 may require [physical reversal](DEADLOCKS.md). Connected branches can make a block
 larger than expected: add boundaries on each approach/exit. There is one assigned
 running train per service. Use [waypoint directives](WAYPOINTS.md) to choose pass-through tracks.
@@ -51,8 +51,10 @@ godot --headless --path . --script res://tests/test_block_signals.gd
 godot --headless --path . --script res://tests/test_signal_integration.gd
 ```
 
-Unit checks cover competing entrances, stable ID order, occupied/empty blocks,
+Unit checks cover competing entrances, deterministic request order, occupied/empty blocks,
 release, manual stops in either direction, and clearing a signal changed under a
 train. Integration checks exercise the tool cycle, real train stopping/resumption,
 actual Hold/Resume buttons, persistence/invalid saves, v18 migration and equal
 positions, money and events at 30/60/120 FPS. Also run reservation/deadlock suites.
+
+[Dispatch fairness](DISPATCH_FAIRNESS.md) explains rotating first choice and prolonged-wait diagnostics.

@@ -1,6 +1,7 @@
 extends RefCounted
 ## Transient ownership rebuilt before each fixed tick. Occupancy comes first,
-## then requests in permanent fleet-ID order. Movement consumes these grants.
+## then requests in the supplied deterministic dispatch order. Movement consumes these grants.
+const Dispatch = preload("res://scripts/core/dispatch_order.gd")
 const RouteBody = preload("res://scripts/core/route_body.gd")
 const Geometry = preload("res://scripts/track_geometry.gd")
 const LOOKAHEAD_TILES := 3.0
@@ -54,7 +55,7 @@ func _vehicle_cells(path: Curve2D, distance: float, offset: float, tile_size: fl
 static func train_length(train: Dictionary) -> float:
 	return maxf(VEHICLE_LENGTH, float(train.get("length", VEHICLE_LENGTH)))
 
-func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: Dictionary = {}) -> void:
+func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: Dictionary = {}, dispatch_order: Dictionary = {}) -> void:
 	requested.clear()
 	owners.clear()
 	occupied_owners.clear()
@@ -79,6 +80,7 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 				_overlapping[owners[cell]] = true
 			else: owners[cell] = train.id
 	occupied_owners = owners.duplicate()
+	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return Dispatch.before(a, b, dispatch_order))
 	for train in ordered:
 		requested[int(train.id)] = []
 		var length: float = train.path.get_baked_length()

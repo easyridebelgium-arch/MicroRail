@@ -8,7 +8,10 @@ shortest port-valid path through any assigned waypoints; passenger tiles and pla
 - `scripts/core/track_reservations.gd` owns `{cell: permanent fleet train ID}`.
   Every fixed simulation tick first protects the body of **every** assigned
   train, including dwelling, loading and withdrawn trains. Then it grants track
-  ahead in ascending ID order, independently of the order trains are moved.
+  ahead in a fixed-tick rotating request order, independently of the order trains
+  are moved. Every ten simulation seconds the next sorted active train ID leads;
+  both tile/switch and signal-block requests use this same order. Occupancy is
+  seeded in permanent-ID order before request ranking is applied.
 - Moving trains request up to three tile lengths ahead. Requests stop at a
   conflict. Movement samples the path at at most one-pixel intervals and permits
   only positions whose whole sprite bounding box is owned. Curves and diagonals
@@ -47,9 +50,9 @@ Opposing trains on a single track can wait indefinitely without player action.
 mutual waits and let the player clear them. [Automatic block signals and manual holds](SIGNALS.md) are available. Automatic
 rerouting remains subsequent work. A passing loop helps only when the
 planned services actually use separate paths; [waypoint directives](WAYPOINTS.md)
-can choose those paths. This version does not automatically reroute a held train into an alternate loop. Lower IDs win simultaneous requests;
-priority classes and fairness policies come later. There is still one running
-train per service. Longer consists will need updated body occupancy.
+can choose those paths. This version does not automatically reroute a held train into an alternate loop. First choice rotates for simultaneous future requests;
+priority classes remain later. There is still one running
+train per service. Whole-body occupancy and tail-clearance protection apply to longer consists.
 
 ## Verification
 
@@ -84,3 +87,5 @@ Player-accessible passenger coaches and log wagons now set reservation length
 from fleet composition. Startup checks real straight, signal-free stopping
 clearance, and load-time overlap checks include the full body for every service.
 See [consists and manual checks](CONSISTS.md).
+
+See [dispatch fairness](DISPATCH_FAIRNESS.md) for rotation, diagnostics and limits.

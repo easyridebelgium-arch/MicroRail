@@ -1,6 +1,7 @@
 extends RefCounted
 ## Signal tiles cut the network into conservative connected blocks. Authority
-## is seeded from real body occupancy, then requested in permanent ID order.
+## is seeded from real body occupancy, then requested in the supplied deterministic dispatch order.
+const Dispatch = preload("res://scripts/core/dispatch_order.gd")
 const RouteBody = preload("res://scripts/core/route_body.gd")
 const Geometry = preload("res://scripts/track_geometry.gd")
 const Reservations = preload("res://scripts/core/track_reservations.gd")
@@ -36,7 +37,7 @@ func configure(tracks: Dictionary, signals: Dictionary) -> void:
 				pending.append(next)
 		id += 1
 
-func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
+func update(trains: Array, occupied: Dictionary, tile_size: float, dispatch_order: Dictionary = {}) -> void:
 	requested_blocks.clear()
 	block_owners.clear()
 	_spans.clear()
@@ -47,7 +48,7 @@ func update(trains: Array, occupied: Dictionary, tile_size: float) -> void:
 		if not block_owners.has(block): block_owners[block] = {}
 		block_owners[block][int(occupied[cell])] = true
 	var ordered := trains.duplicate()
-	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.id) < int(b.id))
+	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return Dispatch.before(a, b, dispatch_order))
 	for train in ordered:
 		requested_blocks[int(train.id)] = []
 		var closed := RouteBody.is_closed(train.path)

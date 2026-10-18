@@ -4,13 +4,15 @@ var game: Node
 var details: Dictionary = {}
 var offers: Dictionary = {}
 var feedback: Label
+var scroll: ScrollContainer
+var selected_order := ""
 func configure(owner_game: Node) -> void:
 	game = owner_game
 	title = "Freight delivery contracts"
 	ok_button_text = "Close"
 	exclusive = true
 	theme = game.header_box.theme
-	var scroll := ScrollContainer.new()
+	scroll = ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
 	var box := VBoxContainer.new()
@@ -34,12 +36,17 @@ func configure(owner_game: Node) -> void:
 	feedback = Label.new()
 	feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(feedback)
-func open_dialog() -> void:
+func open_dialog(kind: String = "") -> void:
 	game.paused = true
 	feedback.text = ""
 	refresh()
 	popup_centered_clamped(Vector2i(640, 560), 0.85)
 	game._update_toolbar()
+	selected_order = kind if details.has(kind) else game.freight_contracts.active()
+	if selected_order != "": _reveal_order(selected_order)
+func _reveal_order(kind: String) -> void:
+	await get_tree().process_frame
+	if visible and selected_order == kind: scroll.ensure_control_visible(details[kind])
 func _accept(kind: String) -> void:
 	feedback.text = game.accept_freight_contract(kind)
 	refresh()
@@ -48,7 +55,7 @@ func refresh() -> void:
 		var definition: Dictionary = game.FreightContracts.DEFINITIONS[kind]
 		var row: Dictionary = game.freight_contracts.state[kind]
 		var text := "%s — %d units to Terminal within %d game hours; bonus £%d.\nStatus: %s | Delivered since acceptance: %d / %d" % [str(kind).capitalize(), definition.target, definition.hours, definition.bonus, row.status, row.delivered, definition.target]
-		if row.status == "active": text += "\nDeadline: %s. Time remaining: %.1f game hours." % [Timetable.clock_text(Timetable.absolute_minute(int(row.deadline))), maxf(0.0, float(row.deadline - game.sim_clock.tick)) / 3600.0]
+		if row.status == "active": text += "\nDeadline: %s. Time remaining: %s." % [Timetable.clock_text(Timetable.absolute_minute(int(row.deadline))), game.FreightContracts.time_left(int(row.deadline) - game.sim_clock.tick)]
 		if kind == "timber": text += "\nRequires a working sawmill chain; goods deliveries cannot substitute."
 		if kind == "goods": text += "\nRequires a working sawmill and factory chain."
 		details[kind].text = text

@@ -1,8 +1,22 @@
 extends RefCounted
 ## Read-only prioritisation, never dispatch authority or a composite company score.
+const Contracts = preload("res://scripts/core/freight_contracts.gd")
 const WAIT_SECONDS := 5.0
+const Timetable = preload("res://scripts/core/timetable.gd")
 static func build(data: Dictionary) -> Array:
 	var rows: Array = []
+	var contract: Dictionary = data.get("contract", {})
+	if not contract.is_empty():
+		var nearing: bool = int(contract.remaining) * 4 <= int(contract.duration)
+		var issue: String = str(contract.get("issue", ""))
+		var warning := nearing or not issue.is_empty()
+		var timing := "Deadline reached" if int(contract.remaining) == 0 else "Deadline approaching" if nearing else "In progress"
+		var title := "%s contract — %d / %d delivered — %s" % [str(contract.kind).capitalize(), contract.progress, contract.target, issue if not issue.is_empty() else timing]
+		var explanation := "%s\nDeadline: %s. Remaining: %s. Completion bonus £%d, separate from freight income.\nOnly matching physical terminal deliveries after acceptance count. Existing cargo totals, intermediate industry receipts and stockpiles do not count." % [title, Timetable.clock_text(Timetable.absolute_minute(int(contract.deadline))), Contracts.time_left(int(contract.remaining)), contract.bonus]
+		if nearing: explanation += "\nDeadline warning: at most 25% of the original time window remains. This is a time threshold, not an arrival forecast or proof that the order will fail."
+		if not issue.is_empty(): explanation += "\nCurrent freight condition: " + issue + ". Review the order and freight controls; the summary never repairs a route or releases a hold."
+		explanation += "\nExpiry has no extra fine. Locate points to the Cargo Terminal; Review opens this order."
+		rows.append({"key": "contract:" + contract.kind, "id": -1, "rank": 1 if warning else 6, "weight": 0.0, "severity": "Warning" if warning else "Info", "title": title, "details": explanation, "cell": contract.get("cell", Vector2i(-1, -1)), "action": "contract", "contract_kind": contract.kind, "action_text": "Review active freight contract"})
 	for problem in data.problems:
 		var cause: String = str(problem.get("cause", "loan" if problem.key == "company:loan" else ""))
 		if cause == "wait" and float(problem.get("wait_seconds", 0)) < WAIT_SECONDS: continue

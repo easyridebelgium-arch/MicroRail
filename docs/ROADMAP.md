@@ -371,8 +371,14 @@ terminal deliveries after acceptance count; industry receipts and old deliveries
 do not. Offers explain chain requirements. Version 50 persists validated state
 and baselines; old companies receive unused offers without retroactive credit.
 
-**Next implementation:** contract visibility in the actionable company summary,
-including deadline risk and direct access to the active order. The current flat/river
+**Active contract summary implemented:** the company headline and review list
+show progress/time remaining. Final-quarter deadline warnings and observed cargo,
+train, path or hold issues are explained without ETA/failure predictions. Review
+opens the active order and Locate points to the terminal. Current snapshots are
+read-only, clear after completion/expiry, and add no save state.
+
+**Next implementation:** opt-in contract deadline notifications through existing
+alert preferences. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

@@ -41,6 +41,17 @@ func earned() -> int:
 	for kind in state:
 		if state[kind].status == "completed": result += int(DEFINITIONS[kind].bonus)
 	return result
+func summary(tick: int) -> Dictionary:
+	var kind := active()
+	if kind == "": return {}
+	var row: Dictionary = state[kind]
+	var definition: Dictionary = DEFINITIONS[kind]
+	return {"kind": kind, "target": int(definition.target), "progress": int(row.delivered), "bonus": int(definition.bonus), "deadline": int(row.deadline), "remaining": maxi(0, int(row.deadline) - tick), "duration": int(definition.hours) * 3600}
+static func time_left(ticks: int) -> String:
+	if ticks <= 0: return "no time"
+	if ticks < 60: return "less than one game minute"
+	if ticks < 3600: return "%.1f game minutes" % [float(ticks) / 60.0]
+	return "%.1f game hours" % [float(ticks) / 3600.0]
 func save_state() -> Dictionary: return state.duplicate(true)
 func restore_state(value: Dictionary) -> void:
 	state = value.duplicate(true)

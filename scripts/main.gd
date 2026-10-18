@@ -536,7 +536,7 @@ func _ready() -> void:
 	bridge_inspector.configure(self)
 	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog, contracts_dialog]:
 		window.window_input.connect(_tool_window_input.bind(window))
 
 func _process(delta: float) -> void:
@@ -2345,7 +2345,7 @@ func _reset_track_tools(keep_right_gesture: bool = false) -> void:
 	demolition_cells.clear()
 	demolition_blocked.clear()
 	_close_station_inspector()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog, contracts_dialog]:
 		if window != null: window.hide()
 	_update_toolbar()
 	queue_redraw()
@@ -6413,7 +6413,18 @@ func network_summary_data() -> Dictionary:
 	var enabled := 0
 	for key in service_keys():
 		if service_enabled(key): enabled += 1
-	return {"problems": problem_rows(), "stations": station_rows, "cities": city_rows, "vehicles": vehicle_rows, "waiting": waiting, "enabled": enabled, "money": money, "delivered": passengers_delivered, "fares": passenger_revenue.total(), "freight": freight_income, "profit": passenger_revenue.total() + freight_income - total_operating_cost - freight_operating_cost}
+	var contract := freight_contracts.summary(sim_clock.tick)
+	if not contract.is_empty():
+		contract["cell"] = CARGO_TERMINAL
+		var terminal_cargo := "goods" if factory.state.installed else "timber" if sawmill.state.installed else "logs"
+		var issue := ""
+		if terminal_cargo != contract.kind: issue = "Terminal cargo changed to " + terminal_cargo
+		elif Fleet.assigned(fleet, "freight").is_empty(): issue = "No assigned freight train"
+		elif not freight_train.route_valid or freight_train.route_cells.size() < 2 or freight_train.route_path.point_count < 2: issue = "Freight route incomplete"
+		elif freight_train.held: issue = "Freight intentionally held"
+		elif not freight_train.service_enabled: issue = "Freight withdrawal requested"
+		contract["issue"] = issue
+	return {"contract": contract, "problems": problem_rows(), "stations": station_rows, "cities": city_rows, "vehicles": vehicle_rows, "waiting": waiting, "enabled": enabled, "money": money, "delivered": passengers_delivered, "fares": passenger_revenue.total(), "freight": freight_income, "profit": passenger_revenue.total() + freight_income - total_operating_cost - freight_operating_cost}
 
 func open_service_cards(key: String = "") -> void:
 	paused = true

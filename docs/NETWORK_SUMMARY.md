@@ -17,14 +17,15 @@ definitions. They start collapsed to keep the review list visible at large UI sc
 ## Review order
 
 1. Confirmed deadlocks.
-2. Incomplete routes and overdue loan payments.
+2. Incomplete routes, overdue loan payments and active contract warnings.
 3. Continuous measured traffic waits of at least **five simulation seconds**.
    Longer waits lead within this category. Dwell and deliberate holds are excluded.
 4. Accepted passengers waiting at a station with no outward connection in the
    current enabled, unheld, physically complete passenger service graph.
 5. Connected stations at **80% or more** of waiting capacity, ordered by fill.
 6. Recent measured left-behind boarding opportunities, ordered by count.
-7. Intentional dispatcher holds, explicitly labelled as information.
+7. Intentional dispatcher holds and active contracts without current warnings,
+   explicitly labelled as information.
 8. Cities without a station, explicitly labelled as expansion opportunities,
    ordered by current population.
 
@@ -87,3 +88,31 @@ notifications, service-card, object-search, stage UI and game-menu suites remain
 active.
 
 ![Network summary in a running city game](images/network_summary.png)
+
+## Active freight orders
+
+The headline always shows an active freight contract, its terminal delivery progress
+and remaining game time. A matching list row offers **Review active freight contract**;
+it opens and scrolls to that order in the contract dialog. **Locate selected item**
+points to the real Cargo Terminal, rather than inventing a blocking train. The
+summary also has a **Freight contracts** button for reviewing unused/finished offers.
+
+A healthy order is routine information alongside intentional holds. Its row rises
+to Warning priority when **at most 25% of its original time window remains**, or
+when the current freight setup has an observed obstacle: no assigned train, missing
+or incomplete route, held/withdrawal-requested service, or changed terminal cargo.
+Confirmed deadlocks stay first. The details explain the exact condition; this is
+not an arrival forecast, predicted failure or automatic dispatch instruction.
+Ordinary dwelling/loading is not labelled an obstacle.
+
+Only the existing post-acceptance terminal delivery counter is shown; viewing the
+summary never advances or completes an order, changes a deadline, releases a hold,
+accepts another offer or consumes RNG. Completed/expired orders disappear from the
+current-action list and remain in the contract window/event history. No active
+order means no added startup warning. Opening either window pauses; resume manually.
+Remaining time switches to game minutes near the deadline, avoiding a misleading
+zero-hour display while time is still left. This adds **no save-format change**.
+
+`test_contract_summary.gd` checks the threshold boundary, warning ordering, observed
+obstacles, timer formatting, unchanged snapshots, modal handoff to the active order,
+terminal-only camera navigation, tool reset, load reconstruction and 200% UI scale.

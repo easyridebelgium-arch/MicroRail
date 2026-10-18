@@ -28,8 +28,12 @@ func configure(owner_game: Node) -> void:
 	reports_button.text = "Progress reports"
 	reports_button.pressed.connect(func() -> void: hide(); game.open_progress_reports())
 	box.add_child(reports_button)
+	var contracts_button := Button.new()
+	contracts_button.text = "Freight contracts"
+	contracts_button.pressed.connect(func() -> void: hide(); game.contracts_dialog.open_dialog())
+	box.add_child(contracts_button)
 	var guide := Label.new()
-	guide.text = "Review order: deadlocks → broken routes/overdue loans → waits of 5s+ → unserved queues → queue pressure → measured capacity → intentional holds → expansion. Equal priority uses measured size, then stable ID."
+	guide.text = "Review order: deadlocks → broken routes/overdue loans/contract warnings → waits of 5s+ → unserved queues → queue pressure → measured capacity → intentional holds/other active contracts → expansion. Contract warnings mean a current obstacle or at most 25% of its original time window left; they are not forecasts. Equal priority uses measured size, then stable ID."
 	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	guide.text += "\nOperating contribution excludes capital purchases, rewards, loan flows and interest. Enabled services can still be dwelling, held or waiting."
 	var rules_button := CheckButton.new()
@@ -53,6 +57,8 @@ func open_dialog() -> void:
 	var data: Dictionary = game.network_summary_data()
 	rows = game.NetworkSummary.build(data)
 	headline.text = "%s · £%d balance · £%d operating contribution\nCompany lifetime: %d final passenger journeys · £%d fares · £%d freight receipts\nNow: %d queued passengers · %d enabled services · %d items below" % [game.game_clock_text(), data.money, data.profit, data.delivered, data.fares, data.freight, data.waiting, data.enabled, rows.size()]
+	var contract: Dictionary = data.get("contract", {})
+	if not contract.is_empty(): headline.text += "\nActive freight order: %s %d/%d · %s remaining" % [str(contract.kind).capitalize(), contract.progress, contract.target, game.FreightContracts.time_left(int(contract.remaining))]
 	headline.tooltip_text = "Operating contribution excludes capital purchases, rewards, loan flows and interest."
 	items.clear()
 	for row in rows:
@@ -80,6 +86,7 @@ func act() -> void:
 	match row.action:
 		"inspect": game.inspect_train(int(row.id))
 		"bank": game.loans_dialog.open_dialog()
+		"contract": game.contracts_dialog.open_dialog(str(row.contract_kind))
 		"service": game.open_service_cards(str(row.service))
 		"station":
 			game.locate_problem(row)

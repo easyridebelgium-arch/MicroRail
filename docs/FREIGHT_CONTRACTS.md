@@ -4,7 +4,7 @@ Open **Accounts → Freight contracts**. Opening pauses the game. Read the offer
 then accept when the railway is ready; close and resume manually. The timer starts
 at acceptance and uses simulation time, so 2×/5×/10× also speed up deadlines.
 Paused time does not count. The dialog shows the deadline on the game clock and
-remaining game hours.
+remaining game time (minutes near the deadline).
 
 | Order | Terminal deliveries after acceptance | Time allowed | Additional bonus |
 | --- | --- | --- | --- |
@@ -56,3 +56,5 @@ save regression suites remain active.
 
 Renewable/generated offers, negotiated prices, rival bidding, reputation penalties,
 contract objectives in scenarios and optional deadline difficulty remain future work.
+
+The [Network summary](NETWORK_SUMMARY.md) now shows the active order in its headline and review list. Deadline warnings use the final 25% of the time window or an observed freight obstacle, without predicting arrival. Review opens the active order; Locate points to Terminal.

@@ -44,7 +44,7 @@ func run() -> void:
 	game.paused = true
 	check(game._save_game(1), "save physical company just before its first growth assessment")
 	var before: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-	check(before.version == 48 and game._is_valid_save(before), "version 48 validates the population rule and assessment state")
+	check(before.version == 49 and game._is_valid_save(before), "version 49 validates the population rule and assessment state")
 	var reference: Dictionary = {}
 	for fps in [30, 60, 120]:
 		check(game._load_slot(1), "restore population assessment baseline")

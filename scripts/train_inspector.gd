@@ -92,10 +92,10 @@ func open_train(id: int) -> void:
 	if not data.cycle.is_empty(): lines.append("Deadlock cycle: " + _names(data.cycle))
 	if int(data.blocker) > 0: lines.append("Blocking train: " + _names([data.blocker]))
 	lines.append("Waiting measurements reset on load; saved incidents are history. Authority is the last allocation, not a traffic forecast.")
-	lines.append(game.DispatchOrder.describe(id, game.dispatch_ranks, game.authority_tick, float(data.wait_seconds)))
+	lines.append(game.DispatchOrder.describe(id, game.dispatch_ranks, game.authority_tick, float(data.wait_seconds), game.reservation_trains.values()))
 	authority.text = "\n".join(lines)
 	recommendation.text = "Suggested action\n" + str(data.advice)
-	if float(data.wait_seconds) >= maxf(20.0, game.dispatch_ranks.size() * 10.0):
+	if float(data.wait_seconds) >= maxf(20.0, float(game.DispatchOrder.cycle_ticks(game.reservation_trains.values())) / 60.0):
 		recommendation.text += "\nProlonged traffic wait across a dispatch cycle. Rotation cannot clear occupied space; inspect the current blocker. This is not proof of starvation."
 	var reverse_reason: String = game.reverse_train_reason(id)
 	buttons.reverse.disabled = not reverse_reason.is_empty()

@@ -358,8 +358,14 @@ shows dispatch position and explains prolonged waits without promising liveness
 or confusing manual stops/deadlocks with proven starvation. No hidden queue or
 save change; rendering FPS and simulation speed do not affect the order.
 
-**Next implementation:** player-selected service priorities with bounded fairness,
-clear inspector explanations and tests against starvation. The current flat/river
+**Player-selected service priorities implemented:** Routes offers Low/Normal/High
+weights with 1/2/3 leading turns in mixed fleets. Every assigned train retains a
+turn, equal weights preserve round robin, linked services keep their own priority,
+and inspector cycle diagnostics reflect the weights. Apply preserves mid-route
+position and passengers. Version 49 saves priorities; older companies default Normal.
+
+**Next implementation:** an initial freight delivery-contract slice with explicit
+amounts, deadlines and delivered-only accounting. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained
@@ -594,7 +600,7 @@ Maintain these guarantees while expanding the supported train/platform combinati
 | Block signals and track reservations | Prevent collisions and introduce dispatching decisions. | Basic tile reservations, switch/selected-port locking, safe waiting events and a hatched ownership overlay are implemented. Shared passenger/freight routing is enabled. Basic deadlock detection, physical reversal, bidirectional automatic block signals and manual holds are implemented; reservations do not select alternate passing-loop paths. |
 | Signal control modes | Automatic signals/reservations by default, with optional one-way, route, platform and manual dispatch controls. | Bidirectional automatic blocks, manual stop signals and Traffic Hold/Resume are implemented; one-way, route and platform modes remain planned. One-way implementation must validate manual reversal direction before any state change. All modes use reservations and explain blocked movements. See [signals and dispatch](SIGNALS.md). |
 | Deadlock detection and emergency recovery | Detect circular waits, identify involved trains/blocks and offer safe hold, turn-back, reroute or recovery actions. | Continuous actual wait cycles are detected after three simulation seconds. The train inspector offers Reverse before a confirmed deadlock; Traffic also reverses a selected deadlocked train in place, retaining its path and load until it physically returns to its departure stop, then holds it. Manual Hold/Resume is also available. Automatic turn-back, alternate routing and full reversal-location rules remain later work. See [deadlock recovery](DEADLOCKS.md). Full shunting and yard operations arrive later. |
-| Priority and pathfinding rules | Offer simple dispatch priorities, initially express > local passenger > freight, so players can influence junction behaviour without configuring complex signalling. | Priorities choose between safe movements; they never override reservations. Allow player overrides, explain why a train is waiting, and prevent low-priority services from waiting indefinitely. Respect waypoint directives when choosing paths. |
+| Priority and pathfinding rules | Offer simple dispatch priorities, initially express > local passenger > freight, so players can influence junction behaviour without configuring complex signalling. | Implemented initial slice: player-selected Low/Normal/High service weights receive 1/2/3 leading turns per cycle, retaining opportunities for Low. All services default Normal; automatic Express/Local/freight class defaults remain later. Priorities never override occupancy, signals or section holds and do not guarantee liveness on an unsuitable layout. Weighted cycle diagnostics and save/load are tested. Respect existing waypoint paths; no automatic rerouting. |
 
 ### Phase 1B — Service operations
 

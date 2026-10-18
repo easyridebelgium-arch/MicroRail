@@ -1,10 +1,20 @@
 # Deterministic dispatch fairness
 
-Permanent train IDs no longer give one train first choice forever. At tick zero,
-requests start in ascending ID order. Every **600 fixed ticks (ten simulation
-seconds)**, that sorted order rotates by one position. Each assigned on-map train
-therefore gets first choice once per cycle; stored off-map trains do not participate.
-Parked, dwelling and held trains still protect their bodies but do not request ahead.
+Choose a service in **Routes → Dispatch priority: Low / Normal / High**, then
+**Apply**. The choice stays in the route draft until Apply; Cancel/reopen discards
+it. It changes dispatch opportunities, not speed, fares, running costs or passenger
+classes. Every service defaults to Normal, including existing companies. Linked
+services keep an independent priority; copying route instructions preserves the
+target priority.
+
+Requests use **600-tick (ten simulation-second)** turns. In a mixed-priority fleet,
+Low gets one leading turn per cycle, Normal two and High three. For example, IDs
+1 Low, 2 Normal and 3 High lead in the order **1, 2, 3, 2, 3, 3**, then repeat.
+Within a turn, the other IDs follow in cyclic sorted order. Every assigned on-map
+train retains a leading opportunity; stored off-map trains do not participate.
+A cycle has at most three times the active train count in turns. Equal-priority
+fleets use ordinary round robin, exactly as before. Parked, dwelling and held trains
+protect their bodies but do not request ahead.
 
 The same ranking feeds tile reservations, switch locks, signal-block requests and
 the final signal-limited reservation rebuild. Physical occupancy is always seeded
@@ -24,7 +34,7 @@ incomplete route or deadlock. Waiting measurements reset on load as before.
 Rotation provides opportunities to win an otherwise free contested resource; it
 cannot guarantee passage through occupied track, an unsuitable single-track layout
 or a manual stop. It does not choose passing loops, reserve an entire journey,
-resolve deadlocks or give Express services a priority class. Existing single-track
+resolve deadlocks or automatically label Express trains High. All priorities are player-selected. Existing single-track
 section holds and departure rules still apply; this does not replace them with a
 global journey dispatcher. A preference change
 may change future unoccupied grants; existing occupancy and movement checks still
@@ -32,9 +42,11 @@ prevent overlaps. Adding/removing assigned trains changes the cycle deterministi
 
 ## Persistence and verification
 
-The ranking is a pure function of saved simulation tick and sorted active fleet
-IDs. There is no extra random stream, hidden queue, wall-clock timer or new save
-field. Loading reconstructs the same order for the same tick and active trains;
+The ranking is a pure function of saved simulation tick, active fleet IDs and
+service priority. There is no extra random stream, hidden queue or wall-clock timer.
+Save version **49** records the optional service priority; absent means Normal.
+Version 48 migration preserves physical state, RNG, finances and route instructions
+without inventing preferences. Unsupported or non-integral priorities are rejected. Loading reconstructs the same order for the same tick, priorities and active trains;
 pause does not advance the cycle. Simulation speed changes elapsed real time,
 not how many simulation ticks each train receives first choice for.
 
@@ -44,3 +56,9 @@ prolonged-wait wording, and crossing trains through a rotation boundary without
 body overlap. Per-tick movement/grant histories match at 30/60/120 FPS at both 1×
 and 10×. Existing reservation, signal, siding, long-consist, deadlock and inspector
 regressions remain part of validation.
+
+`test_service_priority.gd` verifies the 1:2:3 allocation, a turn for Low, bounded
+cycle diagnostics, validation, independent linked priorities, draft cancellation,
+Apply without teleporting a loaded mid-route train, actual main-scene dispatch,
+invalid edit refusal, and version 49 save/load and version 48 migration. The moving
+crossing FPS/speed test also uses mixed Low/High priorities.

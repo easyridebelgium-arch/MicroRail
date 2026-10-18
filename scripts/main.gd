@@ -4541,6 +4541,8 @@ func apply_service_routes(configuration: Dictionary) -> String:
 	return result
 
 func _apply_resolved_routes(configuration: Dictionary) -> String:
+	for service in configuration.values():
+		if service is Dictionary and not ServiceRoutes.valid_priority(service): return "Choose Low, Normal or High dispatch priority."
 	if not ServiceRoutes.is_valid(configuration, station_definitions(), world.industry_positions(), not city_builder.is_city_game()):
 		return "Use a name of 1–40 characters and at least two different passenger stops."
 	if not paused:
@@ -4816,7 +4818,10 @@ func _rebuild_reservations(allow_movement: bool = false) -> void:
 		var running = passenger_services[key]
 		trains.append({"id": int(Fleet.assigned(fleet, key).id), "length": _fleet_length(Fleet.assigned(fleet, key)), "cells": running.cells, "path": running.path, "distance": running.distance, "forward": running.forward, "moving": (allow_movement or not paused) and running.active() and running.dwell <= 0 and not section_held.has(int(Fleet.assigned(fleet, key).id)) and not _scheduled_departure_hold(key)})
 	reservation_trains.clear()
-	for train in trains: reservation_trains[int(train.id)] = train
+	for train in trains:
+		var assignment: String = str(Fleet.find(fleet, int(train.id)).get("service", ""))
+		train["priority"] = int(services.get(assignment, {}).get("priority", 1))
+		reservation_trains[int(train.id)] = train
 	dispatch_ranks = DispatchOrder.ranks(trains, sim_clock.tick)
 	reservations.rebuild(trains, tracks, float(TILE_SIZE), {}, dispatch_ranks)
 	block_signals.configure(tracks, track_signals)

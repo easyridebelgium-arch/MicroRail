@@ -34,7 +34,7 @@ func _run() -> void:
 	check(snapshot.advice.contains("manual stop") and not snapshot.advice.contains("passing loop"), "manual stop recommendation must match the cause")
 	check(snapshot.blocker == -1 and snapshot.cell == Vector2i(10, 8), "manual stop must locate the signal without inventing a blocking train")
 	game.inspect_train(1)
-	check(game.train_inspector.authority.text.contains("Dispatch request position") and game.train_inspector.authority.text.contains("First choice rotates"), "inspector exposes the actual dispatch order alongside authority")
+	check(game.train_inspector.authority.text.contains("Dispatch request position") and game.train_inspector.authority.text.contains("First choice uses weighted turns"), "inspector exposes the actual dispatch order alongside authority")
 	game.route_distance = 160.3
 	game._update_train_transform()
 	tick(game)

@@ -5,6 +5,7 @@ const Timetable = preload("res://scripts/core/timetable.gd")
 var game: Node
 var draft: Dictionary
 var service_choice: OptionButton
+var priority_choice: OptionButton
 var route_mode: OptionButton
 var heading: Label
 var style_label: LineEdit
@@ -115,6 +116,12 @@ func configure(owner_game: Node) -> void:
 	apply_style.pressed.connect(func() -> void: status.text = game.set_route_identity(_key(), style_label.text, style_colour.selected))
 	appearance.add_child(apply_style)
 
+	priority_choice = OptionButton.new()
+	for label in ["Dispatch priority: Low", "Dispatch priority: Normal", "Dispatch priority: High"]: priority_choice.add_item(label)
+	priority_choice.tooltip_text = "This service only, including linked trains. Mixed priorities receive 1/2/3 first-choice turns per cycle. Every service gets a turn. Occupancy, signals and section holds still apply. Apply to commit; Cancel keeps the current priority."
+	priority_choice.item_selected.connect(func(index: int) -> void:
+		if draft.has(_key()): draft[_key()]["priority"] = index)
+	box.add_child(priority_choice)
 	route_mode = OptionButton.new()
 	route_mode.add_item("Shuttle — return through stops in reverse")
 	route_mode.add_item("Loop — last stop returns directly to first")
@@ -383,6 +390,7 @@ func _unlink() -> void:
 
 func _show_service() -> void:
 	draft = Services.propagate(draft)
+	priority_choice.select(int(draft[_key()].get("priority", 1)))
 	var linked: bool = draft[_key()].has("link") and Services.is_passenger_key(_key())
 	link_controls.visible = linked
 	var has_headway: bool = Services.is_passenger_key(_key()) and not linked

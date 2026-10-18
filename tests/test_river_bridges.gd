@@ -57,7 +57,7 @@ func run() -> void:
 	game._undo_construction()
 	check(game._save_game(1), "river company saves")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-	check(saved.version == 48 and game._is_valid_save(saved), "version 48 validates bridge topology")
+	check(saved.version == 49 and game._is_valid_save(saved), "version 49 validates bridge topology")
 	check(game._load_slot(1) and game.river_terrain.profile == "river_v1" and game.tracks.size() == 4, "load restores terrain and exact bridge graph")
 	var bad: Dictionary = saved.duplicate(true)
 	bad.tracks = bad.tracks.filter(func(row: Array) -> bool: return not (row[0] == 10 and row[1] == 17))

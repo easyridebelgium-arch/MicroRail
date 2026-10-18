@@ -44,6 +44,11 @@ static func valid_auto(service: Dictionary, station_catalog: Dictionary = STATIO
 		if not key is String or not service.stops.has(key) or not station_catalog.has(key) or marks[key] != true: return false
 	return true
 
+## Per-service dispatch weight; linked services retain independent preferences.
+static func valid_priority(service: Dictionary) -> bool:
+	var value: Variant = service.get("priority", 1)
+	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) == floor(float(value)) and value >= 0 and value <= 2
+
 ## Target seconds between departures from the first stop (0 = off); kept on
 ## the source service of a linked group.
 static func valid_headway(service: Dictionary) -> bool:
@@ -161,7 +166,7 @@ static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS, pos
 			for stop in stops:
 				if not stop is String or not station_catalog.has(stop) or seen.has(stop): return false
 				seen[stop] = true
-		if not valid_waypoints(service, station_catalog, positions) or not valid_platforms(service, station_catalog) or not valid_auto(service, station_catalog) or not valid_link(value, key) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
+		if not valid_waypoints(service, station_catalog, positions) or not valid_platforms(service, station_catalog) or not valid_auto(service, station_catalog) or not valid_link(value, key) or not valid_priority(service) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
 	return true
 
 static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}, station_catalog: Dictionary = STATIONS) -> Dictionary:
@@ -251,6 +256,8 @@ static func from_save(value: Dictionary) -> Dictionary:
 			if not normalized.is_empty(): later[leg] = normalized
 		if later.is_empty(): result[service].erase("stop_timetables")
 		else: result[service]["stop_timetables"] = later
+		if int(result[service].get("priority", 1)) == 1: result[service].erase("priority")
+		else: result[service]["priority"] = int(result[service]["priority"])
 		if int(result[service].get("headway", 0)) <= 0: result[service].erase("headway")
 		else: result[service]["headway"] = int(result[service]["headway"])
 		var targets: Dictionary = {}

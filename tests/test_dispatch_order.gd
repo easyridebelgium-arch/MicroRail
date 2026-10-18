@@ -83,6 +83,8 @@ func simulate(fps: int, speed: float) -> Array:
 		v.append(Vector2i(5, i))
 	var a := train(1, h, 64)
 	var b := train(2, v, 64)
+	a.priority = 0
+	b.priority = 2
 	var table := Reservations.new()
 	var overlap := false
 	var history: Array = []

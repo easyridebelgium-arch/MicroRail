@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 49
+const CURRENT_VERSION: int = 50
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -65,6 +65,9 @@ static func migrate(data: Dictionary) -> Dictionary:
 
 static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 	match from_version:
+		49:
+			data["freight_contracts"] = preload("res://scripts/core/freight_contracts.gd").defaults()
+			return data
 		48:
 			return data # Absent service priority defaults to Normal; preserve all live state.
 		47:

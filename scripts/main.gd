@@ -427,6 +427,10 @@ var goals_button: Button
 @onready var backup_button: Button = $Interface/HeaderBox/Toolbar/BackupButton
 @onready var inspect_button: Button = $Interface/HeaderBox/Toolbar/InspectButton
 
+const FreightContracts = preload("res://scripts/core/freight_contracts.gd")
+var freight_contracts := FreightContracts.new()
+const ContractsDialog = preload("res://scripts/ui/contracts_dialog.gd")
+var contracts_dialog: AcceptDialog
 const DispatchOrder = preload("res://scripts/core/dispatch_order.gd")
 var dispatch_ranks: Dictionary = {}
 const BridgeInspector = preload("res://scripts/ui/bridge_inspector.gd")
@@ -518,6 +522,9 @@ func _ready() -> void:
 	_rebuild_reservations()
 	_setup_modern_ui_theme()
 	_setup_toolbar_icons()
+	contracts_dialog = ContractsDialog.new()
+	contracts_dialog.configure(self)
+	$Interface.add_child(contracts_dialog)
 	loans_dialog = LoansDialog.new()
 	loans_dialog.configure(self)
 	$Interface.add_child(loans_dialog)
@@ -593,6 +600,10 @@ func _simulation_step(step_seconds: float) -> void:
 	_sample_passenger_occupancy()
 	_check_scenario_objectives()
 	_advance_loans()
+	var expired_contract := freight_contracts.advance(sim_clock.tick)
+	if expired_contract != "":
+		_record_event(EventLog.CONTRACT_EXPIRED, "player", {"cargo": expired_contract})
+		_show_notice("%s contract expired. No extra fine; ordinary freight payments continue." % expired_contract.capitalize())
 	_clear_resolved_acknowledgements()
 	_refresh_directional_routes()
 	_advance_progress_reports()
@@ -1729,6 +1740,7 @@ func _save_snapshot() -> Dictionary:
 		"runtime": _saved_runtime_routes(),
 		"amenities": amenities.to_save(),
 		"loans": loans.save_state(),
+		"freight_contracts": freight_contracts.save_state(),
 		"satisfaction": satisfaction.save_state(),
 		"demand_response": demand_response.save_state(),
 		"journeys": _saved_journeys(),
@@ -2034,6 +2046,7 @@ func _is_valid_save(data: Dictionary) -> bool:
 
 	if saved_stage < 0.0 or saved_stage > ScenarioGoals.OBJECTIVES.size() or (city_save and saved_stage != 0.0):
 		return false
+	if not FreightContracts.valid(data.get("freight_contracts"), int(sim.clock.tick), {"logs": data.get("state", {}).get("logs_delivered", 0), "timber": data.sawmill.sold, "goods": data.factory.sold}): return false
 	return ArrivalTargets.valid_save(data.get("arrivals"), data, int(sim.clock.tick), saved_catalog.stations().keys()) and PassengerRevenue.valid_save(data.get("passenger_revenue"), state.passengers_delivered) and Sawmill.valid_game(data, saved_catalog.industry_positions()) and Factory.valid_game(data, saved_catalog.industry_positions())
 	
 func _load_game(save_path: String = "") -> bool:
@@ -2208,6 +2221,8 @@ func _load_game(save_path: String = "") -> bool:
 	object_pins = data.watchlist.duplicate(true)
 	service_performance.restore_state(data.service_performance)
 	progress_reports.restore_state(data.progress_reports)
+	freight_contracts.restore_state(data.freight_contracts)
+	if contracts_dialog != null: contracts_dialog.hide()
 	seeded_challenge.restore_state(data.seeded_challenge)
 	river_terrain.restore_state(data.terrain)
 	if progress_dialog != null: progress_dialog.hide()
@@ -3314,9 +3329,36 @@ func _refresh_switch_states(_passenger_cells: Array[Vector2i]) -> void:
 	switch_states = updated
 
 
+func freight_terminal_totals() -> Dictionary:
+	return {"logs": logs_delivered, "timber": sawmill.state.sold, "goods": factory.state.sold}
+
+func freight_contract_reason(kind: String) -> String:
+	if not paused: return "Pause before accepting a contract."
+	if not FreightContracts.DEFINITIONS.has(kind): return "Choose a listed cargo order."
+	if freight_contracts.state[kind].status != "available": return "This one-off offer has already been used."
+	if freight_contracts.active() != "": return "Finish the active order or let it expire before accepting another."
+	var current_kind := "goods" if factory.state.installed else "timber" if sawmill.state.installed else "logs"
+	if kind != current_kind: return "Terminal currently receives %s. Contracts must match the installed industry chain; finish an order before upgrading to the next cargo." % current_kind
+	return ""
+
+func accept_freight_contract(kind: String) -> String:
+	var reason := freight_contract_reason(kind)
+	if reason != "": return reason
+	if not freight_contracts.accept(kind, sim_clock.tick, freight_terminal_totals()): return "Choose an unused offer with no other active contract."
+	_record_event(EventLog.CONTRACT_ACCEPTED, "player", {"cargo": kind})
+	return "Contract accepted. Only future %s deliveries at Terminal count. Close and resume when ready." % kind
+
+func _credit_freight_contract(kind: String, amount: int) -> void:
+	var bonus := freight_contracts.deliver(kind, amount, sim_clock.tick)
+	if bonus <= 0: return
+	money += bonus
+	_record_event(EventLog.CONTRACT_COMPLETED, "player", {"cargo": kind, "bonus": bonus})
+	_show_notice("%s contract completed — bonus £%d. Ordinary freight income is recorded separately." % [kind.capitalize(), bonus])
+
 func _on_logs_delivered(amount: int) -> void:
 	if factory.state.installed:
 		factory.state.sold += amount
+		_credit_freight_contract("goods", amount)
 		var goods_payment: int = amount * Factory.GOODS.terminal_price
 		freight_income += goods_payment
 		money += goods_payment
@@ -3324,6 +3366,7 @@ func _on_logs_delivered(amount: int) -> void:
 		return
 	if sawmill.state.installed:
 		sawmill.state.sold += amount
+		_credit_freight_contract("timber", amount)
 		var timber_payment: int = amount * Sawmill.TIMBER.terminal_price
 		freight_income += timber_payment
 		money += timber_payment
@@ -3332,6 +3375,7 @@ func _on_logs_delivered(amount: int) -> void:
 	var payment: int = amount * Sawmill.LOGS.terminal_price
 
 	logs_delivered += amount
+	_credit_freight_contract("logs", amount)
 	freight_income += payment
 	money += payment
 	_record_event(EventLog.CARGO_DELIVERED, "freight", {"logs": amount, "payment": payment})
@@ -4603,7 +4647,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	return "Routes applied. Close and resume when ready; use Save to keep your changes." if route_connected or not services.has("passenger") else "Routes applied. " + passenger_route_error
 
 func _management_window_is_open() -> bool:
-	return (loans_dialog != null and loans_dialog.visible) or (header_controls != null and header_controls.accounts_dialog.visible) or (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
+	return (contracts_dialog != null and contracts_dialog.visible) or (loans_dialog != null and loans_dialog.visible) or (header_controls != null and header_controls.accounts_dialog.visible) or (save_slots_dialog != null and save_slots_dialog.visible) or (train_inspector != null and train_inspector.visible) or (object_browser != null and object_browser.visible) or (problems_dialog != null and problems_dialog.visible) or (route_editor != null and route_editor.visible) or (fleet_editor != null and fleet_editor.visible) or (traffic_dialog != null and traffic_dialog.visible)
 
 func _setup_fleet_editor() -> void:
 	fleet_editor = FleetEditor.new()

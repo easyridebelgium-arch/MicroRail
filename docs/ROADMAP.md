@@ -364,14 +364,21 @@ turn, equal weights preserve round robin, linked services keep their own priorit
 and inspector cycle diagnostics reflect the weights. Apply preserves mid-route
 position and passengers. Version 49 saves priorities; older companies default Normal.
 
-**Next implementation:** an initial freight delivery-contract slice with explicit
-amounts, deadlines and delivered-only accounting. The current flat/river
+**Initial freight delivery contracts implemented:** [Accounts → Freight contracts](FREIGHT_CONTRACTS.md)
+offers one-off logs/timber/goods targets with explicit game-time deadlines, one
+active order, no expiry fine and separate bonus accounting. Only matching physical
+terminal deliveries after acceptance count; industry receipts and old deliveries
+do not. Offers explain chain requirements. Version 50 persists validated state
+and baselines; old companies receive unused offers without retroactive credit.
+
+**Next implementation:** contract visibility in the actionable company summary,
+including deadline risk and direct access to the active order. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained
 composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader
-terrain complexity. Contracts, fair dispatch priorities and full reputation follow
-stable measurements. This is a development order, not a claim that the new items
+terrain complexity. Initial contracts and fair dispatch priorities are implemented; richer contracts
+and full reputation follow stable measurements. This is a development order, not a claim that the new items
 are implemented. Rationale and acceptance points: [player feedback priorities](PLAYER_FEEDBACK_PRIORITIES.md).
 
 **Artwork preparation:** an AI-generated source pack now contains seven sheets

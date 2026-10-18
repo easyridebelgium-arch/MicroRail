@@ -89,6 +89,10 @@ func configure(owner_game: Node) -> void:
 	reports_button.pressed.connect(func() -> void: accounts_dialog.hide(); game.open_progress_reports())
 	column.add_child(reports_button)
 	column.add_child(loans_button)
+	var contracts_button := Button.new()
+	contracts_button.text = "Freight contracts"
+	contracts_button.pressed.connect(func() -> void: accounts_dialog.hide(); game.contracts_dialog.open_dialog())
+	column.add_child(contracts_button)
 	accounts_text = Label.new()
 	accounts_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	accounts_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -124,8 +128,9 @@ func refresh() -> void:
 	var waiting_lines: PackedStringArray = []
 	for station in game.passenger_demand.station_ids:
 		waiting_lines.append("%s %d" % [game.station_definitions()[station].name, game.passenger_demand.waiting(station)])
-	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: %s\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes financing interest, capital purchases, construction refunds, starting cash and objective rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), " / ".join(waiting_lines), game.passengers_delivered, game.logs_delivered]
+	accounts_text.text = "Balance: £%d\n\nPassenger fares: £%d\nFreight income: £%d\nTrain running costs: £%d\nOperating profit: £%d\n\nRecorded construction spend: £%d\nFleet purchases/upgrades less sale refunds: £%d\nInstalled amenities (current list value): £%d\nObjective rewards: £%d\n\nPassengers waiting: %s\nPassengers delivered: %d\nLogs delivered: %d\n\nOperating profit excludes financing interest, capital purchases, construction refunds, starting cash and objective/contract rewards. These are session totals, not daily figures." % [game.money, fares, game.freight_income, running, operating, game.total_construction_cost, game.total_vehicle_cost, amenity_value, game.scenario_goals.earned_rewards(), " / ".join(waiting_lines), game.passengers_delivered, game.logs_delivered]
 
+	accounts_text.text += "\n\nFreight contract bonuses: £%d (excluded from operating profit)" % game.freight_contracts.earned()
 	accounts_text.text += "\n\n" + game.passenger_revenue.summary()
 	if game.sawmill.state.installed: accounts_text.text += "\n\n" + game.sawmill.summary(game.factory.state.installed)
 	if game.factory.state.installed: accounts_text.text += "\n\n" + game.factory.summary()

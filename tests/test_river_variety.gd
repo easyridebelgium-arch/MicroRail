@@ -94,7 +94,7 @@ func run() -> void:
 	old.terrain.profile = "river_v1"
 	old.tracks = []
 	var migrated: Dictionary = game.SaveMigrations.migrate(old).data
-	check(migrated.version == 49 and migrated.terrain == old.terrain and migrated.sim == old.sim, "v47 migration preserves old profile and simulation exactly")
+	check(migrated.version == 50 and migrated.terrain == old.terrain and migrated.sim == old.sim, "v47 migration preserves old profile and simulation exactly")
 	game.is_dragging = true
 	game.demolition_mode = true
 	game.demolition_cells = {quote.cells[1]: true}

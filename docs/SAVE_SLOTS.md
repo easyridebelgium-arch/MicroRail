@@ -30,7 +30,7 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 49, including amenities, loan state, route appearance,
+schema is version 50, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
 history, gradual demand factor/carry, and original journey clocks with recent
@@ -128,3 +128,5 @@ than applying any state. Preview success is not full validation. No live simulat
 is created for these thumbnails, and no image files are added to your save folder.
 
 Version 49 adds saved Low/Normal/High service dispatch priorities. Version 48 companies migrate with absent priorities treated as Normal; no physical state, route, passenger, RNG or finance changes are made. See [dispatch priorities](DISPATCH_FAIRNESS.md).
+
+Version 50 adds [one-off freight contracts](FREIGHT_CONTRACTS.md), acceptance baselines and deadlines. Version 49 migration creates unused offers without crediting earlier deliveries or changing money, inventory, RNG or train positions.

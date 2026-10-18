@@ -9,6 +9,10 @@ extends RefCounted
 
 signal event_recorded(event: Dictionary)
 
+const CONTRACT_ACCEPTED := "contract_accepted"
+const CONTRACT_COMPLETED := "contract_completed"
+const CONTRACT_EXPIRED := "contract_expired"
+
 # Event types. Add new ones here so names stay consistent.
 const LOAN_BORROWED: String = "loan_borrowed"
 const LOAN_PAYMENT: String = "loan_payment"
@@ -162,6 +166,12 @@ static func summary(event: Dictionary) -> String:
 			return "Switch %s" % str(data.get("change", "changed"))
 		ROUTE_CHANGED:
 			return "Passenger route updated"
+		CONTRACT_ACCEPTED:
+			return "%s delivery contract accepted" % str(data.get("cargo", "Freight"))
+		CONTRACT_COMPLETED:
+			return "%s contract completed: bonus £%d" % [str(data.get("cargo", "Freight")), int(data.get("bonus", 0))]
+		CONTRACT_EXPIRED:
+			return "%s contract expired (no extra fine)" % str(data.get("cargo", "Freight"))
 		OBJECTIVE_COMPLETED:
 			return "Objective completed"
 		UPGRADE_BOUGHT:

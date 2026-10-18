@@ -4,15 +4,15 @@ const Events = preload("res://scripts/core/event_log.gd")
 const OFF := 0
 const NOTICE := 1
 const PAUSE := 2
-const ORDER: Array[String] = ["waiting", "deadlocks", "recovery"]
-const LABELS := {"waiting": "Signal / reservation waits", "deadlocks": "Confirmed deadlocks", "recovery": "Reversal / recovery / cleared deadlocks"}
+const ORDER: Array[String] = ["waiting", "deadlocks", "recovery", "contract_deadlines"]
+const LABELS := {"waiting": "Signal / reservation waits", "deadlocks": "Confirmed deadlocks", "recovery": "Reversal / recovery / cleared deadlocks", "contract_deadlines": "Freight contract deadlines (new warnings only)"}
 const MAX_PENDING := 32
 var _pause_requested := false
 var _last_id := 0
 var _pending: Array[Dictionary] = []
 
 static func defaults() -> Dictionary:
-	return {"waiting": OFF, "deadlocks": NOTICE, "recovery": OFF}
+	return {"waiting": OFF, "deadlocks": NOTICE, "recovery": OFF, "contract_deadlines": OFF}
 
 static func normalize(value: Variant) -> Dictionary:
 	var rules := defaults()
@@ -24,6 +24,7 @@ static func normalize(value: Variant) -> Dictionary:
 
 static func category(type: String) -> String:
 	match type:
+		Events.CONTRACT_DEADLINE: return "contract_deadlines"
 		Events.TRAIN_WAITING: return "waiting"
 		Events.DEADLOCK_DETECTED: return "deadlocks"
 		Events.DEADLOCK_CLEARED, Events.TRAIN_REVERSED, Events.TRAIN_RECOVERED: return "recovery"
@@ -43,8 +44,8 @@ func consume(event: Dictionary, rules: Dictionary) -> void:
 	var mode: int = normalize(rules)[key]
 	if mode == OFF: return
 	_pause_requested = _pause_requested or mode == PAUSE
-	var priority := 2 if key == "deadlocks" else 1 if key == "waiting" else 0
-	var item := {"signature": str(event.type) + "|" + str(event.subject) + "|" + str(event.data.get("reason", "")) + "|" + str(event.data.get("trains", [])), "text": Events.summary(event), "pause": mode == PAUSE, "priority": priority}
+	var priority := 2 if key == "deadlocks" else 1 if key in ["waiting", "contract_deadlines"] else 0
+	var item := {"signature": str(event.type) + "|" + str(event.subject) + "|" + str(event.data.get("reason", "")) + "|" + str(event.data.get("trains", [])) + "|" + str(event.data.get("cargo", "")), "text": Events.summary(event), "pause": mode == PAUSE, "priority": priority}
 	for pending in _pending:
 		if pending.signature == item.signature:
 			pending.pause = bool(pending.pause) or bool(item.pause)

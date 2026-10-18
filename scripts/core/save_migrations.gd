@@ -11,7 +11,7 @@ extends RefCounted
 ## before migrations existed); older formats cannot be reconstructed.
 
 const Fleet = preload("res://scripts/fleet.gd")
-const CURRENT_VERSION: int = 50
+const CURRENT_VERSION: int = 51
 const OLDEST_SUPPORTED_VERSION: int = 14
 
 
@@ -65,6 +65,11 @@ static func migrate(data: Dictionary) -> Dictionary:
 
 static func _upgrade_one(from_version: int, data: Dictionary) -> Dictionary:
 	match from_version:
+		50:
+			if data.get("freight_contracts") is Dictionary:
+				for row in data.freight_contracts.values():
+					if row is Dictionary: row["warned_tick"] = -1
+			return data
 		49:
 			data["freight_contracts"] = preload("res://scripts/core/freight_contracts.gd").defaults()
 			return data

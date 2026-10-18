@@ -10,7 +10,7 @@ const DEFINITIONS := {
 var state: Dictionary = defaults()
 static func defaults() -> Dictionary:
 	var result: Dictionary = {}
-	for kind in DEFINITIONS: result[kind] = {"status": "available", "accepted": -1, "deadline": -1, "finished": -1, "delivered": 0, "baseline": 0}
+	for kind in DEFINITIONS: result[kind] = {"status": "available", "accepted": -1, "deadline": -1, "finished": -1, "delivered": 0, "baseline": 0, "warned_tick": -1}
 	return result
 func active() -> String:
 	for kind in state:
@@ -20,13 +20,20 @@ func accept(kind: String, tick: int, totals: Dictionary) -> bool:
 	if not DEFINITIONS.has(kind) or state[kind].status != "available" or active() != "": return false
 	var deadline: int = tick + int(DEFINITIONS[kind].hours) * 3600
 	if tick < 0 or deadline > MAX_TICK: return false
-	state[kind] = {"status": "active", "accepted": tick, "deadline": deadline, "finished": -1, "delivered": 0, "baseline": int(totals.get(kind, 0))}
+	state[kind] = {"status": "active", "accepted": tick, "deadline": deadline, "finished": -1, "delivered": 0, "baseline": int(totals.get(kind, 0)), "warned_tick": -1}
 	return true
 func advance(tick: int) -> String:
 	var kind := active()
 	if kind == "" or tick <= int(state[kind].deadline): return ""
 	state[kind].status = "expired"
 	state[kind].finished = tick
+	return kind
+func deadline_warning(tick: int) -> String:
+	var kind := active()
+	if kind == "" or int(state[kind].warned_tick) >= 0: return ""
+	var remaining := int(state[kind].deadline) - tick
+	if remaining < 0 or remaining * 4 > int(DEFINITIONS[kind].hours) * 3600: return ""
+	state[kind].warned_tick = tick
 	return kind
 func deliver(kind: String, amount: int, tick: int) -> int:
 	if not DEFINITIONS.has(kind) or amount <= 0 or state[kind].status != "active" or tick < int(state[kind].accepted) or tick > int(state[kind].deadline): return 0
@@ -56,20 +63,23 @@ func save_state() -> Dictionary: return state.duplicate(true)
 func restore_state(value: Dictionary) -> void:
 	state = value.duplicate(true)
 	for row in state.values():
-		for field in ["accepted", "deadline", "finished", "delivered", "baseline"]: row[field] = int(row[field])
+		for field in ["accepted", "deadline", "finished", "delivered", "baseline", "warned_tick"]: row[field] = int(row[field])
 static func valid(value: Variant, tick: int, totals: Dictionary) -> bool:
 	if not value is Dictionary or value.size() != DEFINITIONS.size(): return false
 	var active_count := 0
 	for kind in DEFINITIONS:
 		var row: Variant = value.get(kind)
-		if not row is Dictionary or row.size() != 6 or row.get("status") not in ["available", "active", "completed", "expired"]: return false
-		for field in ["accepted", "deadline", "finished", "delivered", "baseline"]:
-			if not Numbers.whole(row.get(field), -1 if field in ["accepted", "deadline", "finished"] else 0, MAX_TICK): return false
+		if not row is Dictionary or row.size() != 7 or row.get("status") not in ["available", "active", "completed", "expired"]: return false
+		for field in ["accepted", "deadline", "finished", "delivered", "baseline", "warned_tick"]:
+			if not Numbers.whole(row.get(field), -1 if field in ["accepted", "deadline", "finished", "warned_tick"] else 0, MAX_TICK): return false
 		if row.status == "available":
-			if row.accepted != -1 or row.deadline != -1 or row.finished != -1 or row.delivered != 0 or row.baseline != 0: return false
+			if row.accepted != -1 or row.deadline != -1 or row.finished != -1 or row.delivered != 0 or row.baseline != 0 or row.warned_tick != -1: return false
 			continue
 		if row.accepted < 0 or row.accepted > tick or int(row.deadline) != int(row.accepted) + int(DEFINITIONS[kind].hours) * 3600: return false
 		if int(row.baseline) + int(row.delivered) > int(totals.get(kind, 0)) or row.delivered > DEFINITIONS[kind].target: return false
+		if row.warned_tick >= 0:
+			if row.warned_tick < int(row.deadline) - int(DEFINITIONS[kind].hours) * 900 or row.warned_tick > mini(tick, int(row.deadline)): return false
+			if row.status == "completed" and row.warned_tick > row.finished: return false
 		if row.status == "active":
 			active_count += 1
 			if row.finished != -1 or tick > row.deadline or row.delivered >= DEFINITIONS[kind].target: return false

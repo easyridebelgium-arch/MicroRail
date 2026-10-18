@@ -85,7 +85,7 @@ leave and enter platforms horizontally. Bank loans remain available; there is no
 deadline or completion bonus. Growth rules remain adjustable.
 
 The preset uses the existing scenario identity, completion tick and city resident
-measurements, with no new saved counters or save-format change (current version 50, which also retains priorities and optional freight contracts).
+measurements, with no new saved counters or save-format change (current version 51, which also retains priorities, optional freight contracts and reminder markers).
 Older companies and the original two scenarios retain their goals. An older build
 that does not know this new scenario identity will reject its saves as incompatible.
 Loading checks the required river profile and original city geometry as well as

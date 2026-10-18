@@ -377,8 +377,14 @@ train, path or hold issues are explained without ETA/failure predictions. Review
 opens the active order and Locate points to the terminal. Current snapshots are
 read-only, clear after completion/expiry, and add no save state.
 
-**Next implementation:** opt-in contract deadline notifications through existing
-alert preferences. The current flat/river
+**Optional deadline reminders implemented:** [Settings alert preferences](NOTIFICATIONS.md)
+offer Off (default), Notice or Notice + pause for the first final-quarter warning.
+Muted events remain in history, enabling later does not replay them, and version 51
+persists one-time warning ticks across loads/history pruning. Auto-pause at 10× is
+FPS-independent; simultaneous autosaves preserve the alert explanation.
+
+**Next implementation:** a freight-focused seeded scenario reusing the existing
+production chain and contract goals. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

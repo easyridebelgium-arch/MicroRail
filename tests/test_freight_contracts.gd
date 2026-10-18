@@ -31,8 +31,8 @@ func run() -> void:
 	check(model.advance(deadline + 2) == "" and not model.accept("timber", deadline + 2, {}), "expired order cannot be reset or repeatedly expire")
 	check(Contracts.valid(model.save_state(), deadline + 2, {"logs": 120}), "completed and expired orders remain valid saved states")
 	var simultaneous := Contracts.defaults()
-	simultaneous.logs = {"status": "active", "accepted": 0, "deadline": 43200, "finished": -1, "delivered": 0, "baseline": 0}
-	simultaneous.timber = {"status": "active", "accepted": 0, "deadline": 64800, "finished": -1, "delivered": 0, "baseline": 0}
+	simultaneous.logs = {"status": "active", "accepted": 0, "deadline": 43200, "finished": -1, "delivered": 0, "baseline": 0, "warned_tick": -1}
+	simultaneous.timber = {"status": "active", "accepted": 0, "deadline": 64800, "finished": -1, "delivered": 0, "baseline": 0, "warned_tick": -1}
 	check(not Contracts.valid(simultaneous, 0, {}), "save cannot bypass one-active-order rule")
 	var malformed := model.save_state()
 	malformed.goods.status = "active"
@@ -67,7 +67,7 @@ func run() -> void:
 	check(game.money == cash, "completed contract hook cannot pay twice")
 	check(game._save_game(2), "completed contract saves")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(2)))
-	check(saved.version == 50 and game._is_valid_save(saved) and game._load_slot(2) and game.freight_contracts.earned() == 200, "version 50 validates and restores completed order")
+	check(saved.version == 51 and game._is_valid_save(saved) and game._load_slot(2) and game.freight_contracts.earned() == 200, "version 51 validates and restores completed order")
 	var bad := saved.duplicate(true)
 	bad.freight_contracts.logs.baseline = game.logs_delivered
 	check(not game._is_valid_save(bad), "save validator rejects retroactive delivery credit")
@@ -75,7 +75,7 @@ func run() -> void:
 	old.version = 49
 	old.erase("freight_contracts")
 	var migrated: Dictionary = Migrations.migrate(old).data
-	check(migrated.version == 50 and migrated.freight_contracts == Contracts.defaults() and migrated.state == old.state and migrated.sim == old.sim, "v49 migration adds unused offers without retroactive rewards or physical changes")
+	check(migrated.version == 51 and migrated.freight_contracts == Contracts.defaults() and migrated.state == old.state and migrated.sim == old.sim, "v49 migration adds unused offers without retroactive rewards or physical changes")
 	game.header_controls.open_accounts()
 	game.header_controls.refresh()
 	check(game.header_controls.accounts_text.text.contains("contract bonuses: £200"), "Accounts reports bonuses separately")

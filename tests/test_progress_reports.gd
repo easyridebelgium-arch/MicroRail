@@ -60,7 +60,7 @@ func run() -> void:
 	game.sim_clock.restore_state({"tick": Reports.PERIOD - 120})
 	check(game._save_game(1), "save live company before first report")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-	check(saved.version == 50 and game._is_valid_save(saved), "version 50 validates report baseline with live finances")
+	check(saved.version == 51 and game._is_valid_save(saved), "version 51 validates report baseline with live finances")
 	var reference: Dictionary = {}
 	for fps in [30, 60, 120]:
 		check(game._load_slot(1), "restore report boundary company")

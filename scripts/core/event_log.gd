@@ -9,6 +9,7 @@ extends RefCounted
 
 signal event_recorded(event: Dictionary)
 
+const CONTRACT_DEADLINE := "contract_deadline"
 const CONTRACT_ACCEPTED := "contract_accepted"
 const CONTRACT_COMPLETED := "contract_completed"
 const CONTRACT_EXPIRED := "contract_expired"
@@ -166,6 +167,8 @@ static func summary(event: Dictionary) -> String:
 			return "Switch %s" % str(data.get("change", "changed"))
 		ROUTE_CHANGED:
 			return "Passenger route updated"
+		CONTRACT_DEADLINE:
+			return "%s contract deadline approaching — review Accounts → Freight contracts" % str(data.get("cargo", "Freight")).capitalize()
 		CONTRACT_ACCEPTED:
 			return "%s delivery contract accepted" % str(data.get("cargo", "Freight"))
 		CONTRACT_COMPLETED:

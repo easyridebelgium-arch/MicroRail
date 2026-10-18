@@ -49,7 +49,7 @@ func _initialize() -> void:
 	alert = policy.take()
 	check(alert.pause and not alert.text.contains("other alerts"), "coalesced conditions retain pause without duplicate chatter")
 	var cleaned := Policy.normalize({"waiting": true, "deadlocks": -1, "recovery": 2, "unknown": 2})
-	check(cleaned == {"waiting": Policy.OFF, "deadlocks": Policy.NOTICE, "recovery": Policy.PAUSE}, "invalid preferences must safely use known defaults")
+	check(cleaned == {"waiting": Policy.OFF, "deadlocks": Policy.NOTICE, "recovery": Policy.PAUSE, "contract_deadlines": Policy.OFF}, "invalid preferences must safely use known defaults")
 	check(Policy.normalize("invalid") == Policy.defaults(), "malformed settings section must fall back to defaults")
 	print("Notification policy: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)

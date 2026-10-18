@@ -5,14 +5,15 @@ Open **Settings**, scroll to **Operational alerts**, and choose a mode for:
 - Signal / reservation waits.
 - Confirmed deadlocks.
 - Reversal / recovery / cleared deadlocks.
+- Freight contract deadlines (new warnings only).
 
 Each category offers **Off**, **Notice**, or **Notice + pause**. Press **Apply** to
 keep the changes; Cancel leaves the applied preferences unchanged. Preferences
 are stored with the player's display/control settings in `user://settings.cfg`,
-so they apply to new and loaded games. They do not change the game save format.
+so they apply to new and loaded games. Preferences are separate from company saves; the contract one-time warning marker is saved with the company.
 
 The defaults show a notice for confirmed deadlocks and leave routine waits and
-recovery notices off. Construction feedback, objective messages and other direct
+recovery and contract deadline notices off. Construction feedback, objective messages and other direct
 command feedback keep their existing behavior.
 
 A notice appears in the header with text explaining the incident. **Notice + pause**
@@ -62,3 +63,34 @@ Tests cover all modes, deduplication, bounded queues, severe-message selection,
 pause-permission handling, quiet history restore, config persistence, unapplied
 settings edits, 200% UI scaling and identical automatic-pause ticks at 30/60/120 FPS
 at 10× speed. Existing signal, deadlock and save suites remain part of regression testing.
+
+## Contract deadline reminders
+
+Set **Settings → Operational alerts → Freight contract deadlines** to **Notice**
+or **Notice + pause**, then Apply. The default is **Off**. An active order generates
+one warning when it first reaches **25% or less of its original time window**,
+provided it has not completed or expired. This is the same time threshold used by
+Network summary, not an ETA or a prediction that the order will fail.
+
+Off suppresses the header notice and pause, but the canonical warning is still
+recorded in **Problems → History**. Enabling reminders later does not replay an
+already-issued warning; use Accounts → Network summary or Freight contracts for
+current progress. Completion, expiry and ordinary command feedback retain their
+existing behaviour. Reminders never change contract terms, release trains or pay
+bonuses.
+
+Version **51** retains a per-contract warning tick. Loading does not rearm a
+warning, even if older events have been pruned. Version 50 migration adds an unset
+marker without changing deadlines, progress, cash or physical state. An active
+older contract already in its final quarter can issue its first new reminder on
+the next simulation tick, according to the current player preference.
+
+At 10×, auto-pause still finishes exactly the warning tick. Resuming does not
+immediately pause again. Successful autosaves no longer replace an active notice;
+if a save fails, its error appears alongside the existing message. Existing alert
+priority/batching still favours confirmed deadlocks and honours any requested pause.
+
+`test_contract_notifications.gd` covers the exact threshold, Off/Notice/Pause,
+quiet defaults, history retention, duplicate suppression after load with pruned
+history, settings Apply/Cancel/persistence, version 50 migration, simultaneous
+autosaving, and identical 10× warning snapshots at 30/60/120 FPS.

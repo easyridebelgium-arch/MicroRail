@@ -457,8 +457,8 @@ func _check_autosave() -> void:
 	# A failed write is retried at the next interval, never once per rendered frame.
 	autosave_next_tick = sim_clock.tick + autosave_interval
 	if result.is_empty():
-		_show_notice("Autosave failed. Previous saves are safe; try a manual save.")
-	else:
+		_show_notice((notice + "\n" if notice_remaining > 0.0 else "") + "Autosave failed. Previous saves are safe; try a manual save.")
+	elif notice_remaining <= 0.0:
 		_show_notice("Autosaved — slot %d (Load → Recover autosave)." % active_save_slot)
 
 func _load_autosave(slot: int, filename: String) -> bool:
@@ -600,10 +600,7 @@ func _simulation_step(step_seconds: float) -> void:
 	_sample_passenger_occupancy()
 	_check_scenario_objectives()
 	_advance_loans()
-	var expired_contract := freight_contracts.advance(sim_clock.tick)
-	if expired_contract != "":
-		_record_event(EventLog.CONTRACT_EXPIRED, "player", {"cargo": expired_contract})
-		_show_notice("%s contract expired. No extra fine; ordinary freight payments continue." % expired_contract.capitalize())
+	_advance_freight_contracts()
 	_clear_resolved_acknowledgements()
 	_refresh_directional_routes()
 	_advance_progress_reports()
@@ -3329,6 +3326,15 @@ func _refresh_switch_states(_passenger_cells: Array[Vector2i]) -> void:
 	switch_states = updated
 
 
+func _advance_freight_contracts() -> void:
+	var expired_contract := freight_contracts.advance(sim_clock.tick)
+	if expired_contract != "":
+		_record_event(EventLog.CONTRACT_EXPIRED, "player", {"cargo": expired_contract})
+		_show_notice("%s contract expired. No extra fine; ordinary freight payments continue." % expired_contract.capitalize())
+	var warning := freight_contracts.deadline_warning(sim_clock.tick)
+	if warning != "":
+		_record_event(EventLog.CONTRACT_DEADLINE, "player", {"cargo": warning, "deadline": int(freight_contracts.state[warning].deadline)})
+
 func freight_terminal_totals() -> Dictionary:
 	return {"logs": logs_delivered, "timber": sawmill.state.sold, "goods": factory.state.sold}
 
@@ -6043,7 +6049,7 @@ func incident_rows() -> Array:
 	var events: Array = event_log.recent(200)
 	events.reverse()
 	for event in events:
-		if event.type not in [EventLog.TRAIN_WAITING, EventLog.DEADLOCK_DETECTED, EventLog.DEADLOCK_CLEARED, EventLog.DISPATCH_CHANGED, EventLog.TRAIN_REVERSED, EventLog.TRAIN_RECOVERED]: continue
+		if event.type not in [EventLog.TRAIN_WAITING, EventLog.DEADLOCK_DETECTED, EventLog.DEADLOCK_CLEARED, EventLog.DISPATCH_CHANGED, EventLog.TRAIN_REVERSED, EventLog.TRAIN_RECOVERED, EventLog.CONTRACT_DEADLINE]: continue
 		var severity := "Warning" if event.type == EventLog.TRAIN_WAITING else "Info"
 		if event.type == EventLog.DEADLOCK_DETECTED: severity = "Urgent"
 		var id := int(event.subject) if str(event.subject).is_valid_int() else -1

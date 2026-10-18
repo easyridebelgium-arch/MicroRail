@@ -113,7 +113,7 @@ func configure(in_game: bool = false, game: Node = null) -> void:
 		box.add_child(menu_button)
 
 	var explanation := Label.new()
-	explanation.text = "Choose notices or automatic pause for new incidents. All incidents stay in Problems history. Build and objective feedback keep their existing controls."
+	explanation.text = "Choose notices or automatic pause for new incidents. All incidents stay in Problems history. Contract deadline reminders are Off by default and fire once per order, in its final quarter. Muted reminders stay in history; enabling later does not replay them. Build, objective and contract completion feedback keep their existing controls."
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(explanation)
 	for category in Settings.NotificationPolicy.ORDER:

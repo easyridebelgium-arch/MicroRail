@@ -5850,7 +5850,7 @@ func _setup_inspection() -> void:
 		_show_notice("Click the map to choose blueprint corner %d." % which))
 	inspection_panel.place_passing_loop.connect(func() -> void:
 		corridor_pick = 6
-		_show_notice("Click the left switch tile for a 9×4 passing-loop draft: horizontal main line, loop below. Escape cancels."))
+		_show_notice("Click the first switch tile (leftmost horizontal / topmost vertical) for the selected passing-loop draft. Escape cancels."))
 	inspection_panel.save_blueprint.connect(_save_blueprint)
 	inspection_panel.import_blueprints.connect(_open_blueprint_file.bind(false))
 	inspection_panel.export_blueprint.connect(_open_blueprint_file.bind(true))
@@ -6301,14 +6301,21 @@ func _place_blueprint(anchor: Vector2i) -> bool:
 func _draft_passing_loop(anchor: Vector2i) -> bool:
 	if not planning_mode: return false
 	var template = preload("res://scripts/core/passing_loop_template.gd")
-	var proposal: Dictionary = TrackBlueprints.place(template.design(), anchor, construction_plan.projected(tracks), construction_plan.projected_signals(track_signals), Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected)
+	var length: int = int(inspection_panel.loop_length.value)
+	var orientation: int = inspection_panel.loop_orientation.selected
+	var design: Dictionary = template.design(length, orientation)
+	if design.is_empty():
+		_show_notice("Choose a loop length from 9 to 31 tiles and a listed orientation.")
+		return false
+	var proposal: Dictionary = TrackBlueprints.place(design, anchor + template.footprint_offset(orientation), construction_plan.projected(tracks), construction_plan.projected_signals(track_signals), Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected)
 	if not proposal.error.is_empty():
 		_show_notice(proposal.error)
 		return false
 	construction_plan.stage(proposal.tracks, tracks)
 	construction_plan.stage_signals(proposal.signals, track_signals, tracks)
-	inspection_panel.blueprint_status.text = template.instructions(anchor)
-	_show_notice("Passing loop drafted. Review cost in Overlays before Apply; use loop waypoint %d,%d in Routes. Nothing purchased yet." % [anchor.x + 4, anchor.y + 3])
+	inspection_panel.blueprint_status.text = template.instructions(anchor, length, orientation)
+	var via: Vector2i = template.waypoint(anchor, length, orientation)
+	_show_notice("Passing loop drafted. Review cost in Overlays before Apply; use loop waypoint %d,%d in Routes. Nothing purchased yet." % [via.x, via.y])
 	queue_redraw()
 	return true
 

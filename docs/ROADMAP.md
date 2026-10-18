@@ -391,13 +391,19 @@ then 20 timber must reach Terminal within 18 game hours. Completion persists wit
 no extra payout; expiry is explicit and normal company play can continue.
 
 **Guided passing-loop previews implemented:** Overlays draft tools offer a built-in
-9×4 horizontal layout with two switches and four automatic signals. Placement
+layout with two switches and four automatic signals (default 9×4 horizontal). Placement
 reuses matching track and reports the waypoint needed in Routes, with explicit
 whole-train fit and routing limitations. Normal atomic draft pricing, protected
 track/reservation checks and Undo/Redo apply; the local blueprint library is untouched.
 
-**Next implementation:** configurable passing-loop length and orientation, retaining
-explicit route assignment and train-fit guidance before automatic branch selection. The current flat/river
+**Configurable passing loops implemented:** choose 9–31 tiles including switches,
+horizontal above/below or vertical left/right. Geometry, switch ports and signal
+boundaries transform together; the clicked point remains the first switch. Price
+and exact waypoint guidance follow the selected shape, and normal bounds/protection
+checks reject clipped footprints. Options affect the next draft, not existing track.
+
+**Next implementation:** measured train-fit diagnostics for passing-loop drafts,
+before automatic branch selection or service changes. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

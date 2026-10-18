@@ -11,6 +11,8 @@ signal import_blueprints
 signal export_blueprint
 signal place_passing_loop
 signal place_blueprint
+var loop_length: SpinBox
+var loop_orientation: OptionButton
 var blueprint_name: LineEdit
 var blueprint_search: LineEdit
 var blueprint_choice: OptionButton
@@ -106,9 +108,22 @@ func _ready() -> void:
 	loop_title.text = "Guided passing loop"
 	plan_controls.add_child(loop_title)
 	var loop_hint := Label.new()
-	loop_hint.text = "9×4 tiles, horizontal main line, loop below. Two switches + four automatic signals. Click the left switch tile; review the draft before Apply. Assign a loop waypoint in Routes. Check train length; branches are not chosen automatically."
+	loop_hint.text = "Choose total length including both switches and which side the loop occupies. Click the first switch: leftmost for horizontal, topmost for vertical. Review the draft before Apply; assign its waypoint in Routes. Options affect the next preview; discard an old draft before replacing it. Check whole-train fit; branches are not chosen automatically."
 	loop_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	plan_controls.add_child(loop_hint)
+	var length_label := Label.new()
+	length_label.text = "Loop length (tiles including switches)"
+	plan_controls.add_child(length_label)
+	loop_length = SpinBox.new()
+	loop_length.min_value = preload("res://scripts/core/passing_loop_template.gd").WIDTH
+	loop_length.max_value = preload("res://scripts/core/passing_loop_template.gd").MAX_LENGTH
+	loop_length.step = 1
+	loop_length.value = 9
+	plan_controls.add_child(loop_length)
+	loop_orientation = OptionButton.new()
+	loop_orientation.fit_to_longest_item = false
+	for text in preload("res://scripts/core/passing_loop_template.gd").ORIENTATIONS: loop_orientation.add_item(text)
+	plan_controls.add_child(loop_orientation)
 	var loop_button := Button.new()
 	loop_button.text = "Preview passing loop"
 	loop_button.tooltip_text = "Nothing is purchased until Apply plan. Matching rails are reused; incompatible track refuses placement."

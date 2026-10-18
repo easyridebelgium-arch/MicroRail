@@ -48,8 +48,11 @@ atomic import/export.
 ## Guided passing-loop preview
 
 Open **Overlays → Draft construction → Preview passing loop**, then click the
-left switch tile. The built-in template is nine tiles wide and four high: a
-horizontal main line, loop below, two switches and four automatic block signals.
+first switch tile. Choose a total length of **9–31 tiles including switches**,
+and **Horizontal — loop below/above** or **Vertical — loop right/left**. Click
+the leftmost switch for a horizontal main line, or the topmost switch for a
+vertical one. The default is nine tiles wide and four high, loop below. Every
+layout has two switches and four automatic block signals.
 It does not use or overwrite your saved blueprint library. Escape or short right
 click cancels picking; Discard plan removes a staged preview.
 
@@ -62,14 +65,20 @@ apply. Failed placement preserves the existing draft. Application is atomic and
 one Undo/Redo covers the whole plan.
 
 Connect the outer ends of both switches to your line. The instructions below the
-blueprint controls give the loop waypoint coordinates (four tiles right and three
-down from the clicked switch). In Routes, assign that waypoint to the service
+blueprint controls give the exact loop waypoint coordinates for the chosen length
+and orientation (default: four tiles right and three down from the clicked switch). In Routes, assign that waypoint to the service
 using the loop; leave the other service on the main branch. A tested example clicks
 (8,8), with stations A (4,8) and B (20,8): start one service A–B, another B–A,
 and give B–A waypoint (12,11). See [multiple services](MULTIPLE_SERVICES.md).
 
-This is a short horizontal template. Check that the entire train fits between
-holding points; longer consists need a longer siding. Keep station approaches
+The branch is three tiles away from the main line. Above/left footprints extend
+three tiles above/left of the clicked switch, and cannot clip the map boundary.
+Options apply to the next placement, not an existing draft; Discard plan before
+replacing a preview with a different length/orientation. Session tool settings are
+not saved as company rules. On empty ground a length L costs £(20×L + 240);
+existing compatible mainline rails reduce that price. Longer trains need more
+space: check that the entire train fits between holding points and choose a
+longer siding as needed. A numeric length alone is not a traffic safety guarantee. Keep station approaches
 outside the footprint. The template does not choose branches for trains or
 promise that arbitrary services, origins or signal arrangements cannot deadlock.
 There is no automatic route editing, train purchase, waypoint creation or save
@@ -79,3 +88,7 @@ schema change. After applying, capture the layout to your library if desired.
 refusals, atomic application, Undo/Redo, waypoint routing, physical shared-track
 running and save/load. Existing construction validation tests cover live
 reservation protection and stale drafts.
+
+`test_passing_loop_options.gd` checks minimum/maximum and even/odd lengths in
+all four orientations, both route directions, signal boundaries, price, above/left
+map edges, ordinary UI options, atomic apply/Undo and real save/load.

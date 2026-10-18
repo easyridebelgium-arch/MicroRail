@@ -41,6 +41,17 @@ No purchases, reservations, commands or RNG calls occur. The latest geometry res
 is cached and invalidates on changes to the world, terrain, rails, signals or claims;
 balance warnings refresh without rerunning construction searches.
 
+Choose **Preview suggested connection on map** to close the Guide, pause and frame
+the proposed station sites and rail path. Dashed lines and hatched platform boxes
+mark the suggestion independently of colour; they are not built track. The header
+notice quotes the full startup price. Use **Hide suggestion** beside Guide to clear
+it, then resume manually when ready. No money or simulation time is spent.
+
+The overlay clears on world, terrain, track, signal or claim changes and on loading
+a save. It never saves, reserves, applies a construction draft or purchases stations.
+Finish active strokes and apply/discard drafts before previewing. Existing city
+stations and the automatic tutorial use their normal live checklist instead.
+
 Once a station exists, the live checklist and nearby-city reference remain in use,
 rather than suggesting that the player buy the same stations twice. Save format and
 simulation rules are unchanged.

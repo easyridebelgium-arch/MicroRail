@@ -1,6 +1,8 @@
 extends RefCounted
 ## Optional, repeatable assistance. No purchases, route edits or simulation commands.
 const Guide = preload("res://scripts/core/first_service.gd")
+const Advice = preload("res://scripts/core/first_connection_advice.gd")
+const Stations = preload("res://scripts/core/station_construction.gd")
 var game: Node
 var dialog: AcceptDialog
 var heading: Label
@@ -12,6 +14,10 @@ var snapshot: Dictionary = {}
 var elapsed := 0.0
 var active := false
 var was_paused := true
+var preview_button: Button
+var hide_preview_button: Button
+var preview: Dictionary = {}
+var preview_source: Array = []
 
 func configure(owner_game: Node) -> void:
 	game = owner_game
@@ -35,6 +41,11 @@ func configure(owner_game: Node) -> void:
 	heading = _label(column)
 	steps = _label(column)
 	detail = _label(column)
+	preview_button = Button.new()
+	preview_button.text = "Preview suggested connection on map"
+	preview_button.tooltip_text = "Pause and frame a dashed planning guide. Nothing is built or reserved."
+	preview_button.pressed.connect(show_preview)
+	column.add_child(preview_button)
 	action_button = Button.new()
 	action_button.pressed.connect(_perform)
 	column.add_child(action_button)
@@ -49,6 +60,12 @@ func configure(owner_game: Node) -> void:
 	button.tooltip_text = "Optional first-service checklist. Available again from the game menu."
 	button.pressed.connect(open_guide)
 	game.get_node("Interface/ConstructionHistory").add_child(button)
+	hide_preview_button = Button.new()
+	hide_preview_button.text = "Hide suggestion"
+	hide_preview_button.tooltip_text = "Remove the first-connection planning overlay. The game stays paused."
+	hide_preview_button.pressed.connect(clear_preview)
+	hide_preview_button.hide()
+	game.get_node("Interface/ConstructionHistory").add_child(hide_preview_button)
 	refresh(0.0, true)
 
 func _label(column: Control) -> Label:
@@ -78,10 +95,12 @@ func close_guide(restore_pause: bool = true) -> void:
 	game._update_toolbar()
 
 func refresh(delta: float, force: bool = false) -> void:
+	if not preview.is_empty() and preview_source != _source(): clear_preview()
 	elapsed += delta
 	if not force and (elapsed < 0.25 or not (dialog.visible or game.objective_panel.visible)): return
 	elapsed = 0.0
 	snapshot = Guide.inspect(game)
+	preview_button.visible = snapshot.city_mode and game.station_definitions().is_empty()
 	var lines: PackedStringArray = []
 	for index in range(snapshot.rows.size()):
 		var row: Dictionary = snapshot.rows[index]
@@ -91,6 +110,63 @@ func refresh(delta: float, force: bool = false) -> void:
 	detail.text = snapshot.suggestion + "\n\n" + ("These checks describe the current company. You can reopen this guide at any time; it does not reset progress or pay rewards." if snapshot.complete else str(snapshot.rows[snapshot.next].hint))
 	action_button.visible = not snapshot.complete
 	if not snapshot.complete: action_button.text = snapshot.rows[snapshot.next].button
+
+func _source() -> Array:
+	return [game.world.state, game.river_terrain.profile, game.tracks, game.track_signals, game.reservations.owners]
+
+func clear_preview() -> void:
+	preview.clear()
+	preview_source.clear()
+	hide_preview_button.hide()
+	game.queue_redraw()
+
+func show_preview() -> void:
+	if game.is_dragging or game.right_pending or not game.construction_plan.is_empty():
+		detail.text = "Finish the stroke and apply or discard the draft before previewing a suggestion."
+		return
+	if not game.city_builder.is_city_game() or not game.station_definitions().is_empty():
+		clear_preview()
+		refresh(0.0, true)
+		return
+	var result := Advice.recommend(game.world.state, game.river_terrain, game.tracks, game.track_signals, game.reservations.owners)
+	if result.is_empty():
+		detail.text = "No validated simple connection found. Other station sites or detours may still work."
+		return
+	preview = result
+	preview_source = _source().duplicate(true)
+	close_guide(false)
+	game.paused = true
+	hide_preview_button.show()
+	_frame_preview()
+	game._show_notice("Dashed suggestion only — £%d including stations and shuttle. Nothing purchased. Hide suggestion to clear; resume manually when ready." % preview.budget)
+	game._update_toolbar()
+	game.queue_redraw()
+
+func _frame_preview() -> void:
+	var bounds := Rect2(game._cell_center(preview.a), Vector2.ONE)
+	for cell in preview.cells: bounds = bounds.expand(game._cell_center(cell))
+	bounds = bounds.grow(game.TILE_SIZE * 4.0)
+	var view: Rect2 = game.get_viewport_rect()
+	var left := 368.0 if game.network_map.visible or game.objective_panel.visible else 24.0
+	left = minf(left, view.size.x * 0.45)
+	var top: float = minf(game.header_background.offset_bottom + 24.0, view.size.y - 120.0)
+	var usable := Rect2(Vector2(left, top), Vector2(maxf(80.0, view.size.x - left - 24.0), maxf(80.0, view.size.y - top - 64.0)))
+	var zoom_value: float = minf(1.0 / game.applied_ui_scale, minf(usable.size.x / bounds.size.x, usable.size.y / bounds.size.y))
+	game.camera.zoom = Vector2.ONE * zoom_value
+	game.camera.position = bounds.get_center() - (usable.get_center() - view.get_center()) / zoom_value
+	game.camera.force_update_scroll()
+
+func draw_preview() -> void:
+	if preview.is_empty() or preview_source != _source(): return
+	var ink := Color(1.0, 0.95, 0.7, 0.9)
+	for index in range(1, preview.cells.size()):
+		game.draw_dashed_line(game._cell_center(preview.cells[index - 1]), game._cell_center(preview.cells[index]), ink, 2.0, 5.0)
+	for stop in [preview.a, preview.b]:
+		for cell in Stations.platform_cells(stop):
+			var rect := Rect2(Vector2(cell) * game.TILE_SIZE, Vector2.ONE * game.TILE_SIZE).grow(-3.0)
+			game.draw_rect(rect, ink, false, 2.0)
+			game.draw_line(rect.position, rect.end, ink, 1.0)
+		game.draw_string(ThemeDB.fallback_font, game._cell_center(stop) + Vector2(-40, -game.TILE_SIZE * 2.0), "Suggested station", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ink)
 
 func _perform() -> void:
 	refresh(0.0, true)

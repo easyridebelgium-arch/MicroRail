@@ -1089,6 +1089,7 @@ func _draw() -> void:
 		_draw_track(cell, tracks[cell], false)
 	_draw_platform_connection_points()
 	_draw_construction_draft()
+	if first_service_guide != null: first_service_guide.draw_preview()
 	_draw_inspection_paths()
 	for row in world.facilities():
 		_draw_station(row.cell, row.name)
@@ -2220,6 +2221,7 @@ func _load_game(save_path: String = "") -> bool:
 	_reset_autosave_schedule()
 	first_delivery_notice = ""
 	if first_service_guide != null:
+		first_service_guide.clear_preview()
 		first_service_guide.close_guide(false)
 		first_service_guide.refresh(0.0, true)
 	var loaded_notice: String = "Previous save loaded." if save_path.ends_with(".backup.json") else "Game loaded."

@@ -334,9 +334,14 @@ It reports actual station/rail/bridge/shuttle costs and coordinates, with explic
 bounded-search limits. Geometry is cached; current cash is checked separately.
 No purchases, authority requests, RNG consumption or save changes occur.
 
-**Next implementation:** show the suggested first connection on the map as an
-optional planning overlay, so coordinate guidance can be inspected before purchase.
-Broader terrain/elevation remains a later refinement.
+**First-connection map preview implemented:** Guide can pause and frame the
+validated witness with dashed rails and hatched station platforms. Hide suggestion
+clears it; map changes and loads invalidate it. It is session-only, makes no
+purchases or reservations, and preserves construction drafts.
+
+**Next implementation:** a focused river-crossing scenario with a validated
+starting budget and explicit cross-river passenger delivery goal. Broader terrain,
+elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained
 composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader

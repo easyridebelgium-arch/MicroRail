@@ -60,3 +60,6 @@ contract objectives in scenarios and optional deadline difficulty remain future 
 The [Network summary](NETWORK_SUMMARY.md) now shows the active order in its headline and review list. Deadline warnings use the final 25% of the time window or an observed freight obstacle, without predicting arrival. Review opens the active order; Locate points to Terminal.
 
 Optional [deadline reminders](NOTIFICATIONS.md) are now available through Settings. They default Off, fire once in the final quarter, and retain a warning tick in save version 51 so loading cannot repeat them. Muted warnings stay in history; enabling alerts later does not replay past reminders.
+
+The **Timber Connection** seeded scenario uses the ordinary timber order as its
+completion goal. Preparation is untimed; see [scenario instructions](SEEDED_SCENARIOS.md#timber-connection).

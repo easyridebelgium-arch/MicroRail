@@ -383,8 +383,16 @@ Muted events remain in history, enabling later does not replay them, and version
 persists one-time warning ticks across loads/history pruning. Auto-pause at 10× is
 FPS-independent; simultaneous autosaves preserve the alert explanation.
 
-**Next implementation:** a freight-focused seeded scenario reusing the existing
-production chain and contract goals. The current flat/river
+**Timber Connection implemented:** a fourth seeded scenario reuses the Sawmill
+chain and one-off timber contract. Its freight-specific Guide covers construction,
+Log Hauler purchase/service start, mill installation and acceptance. The ordinary
+£1430 starting layout is verified through real purchases; preparation is untimed,
+then 20 timber must reach Terminal within 18 game hours. Completion persists with
+no extra payout; expiry is explicit and normal company play can continue.
+
+**Next implementation:** guided passing-loop construction previews using the
+existing blueprint, signal and reservation layers, with explicit limitations
+rather than an automatic promise of deadlock-free routing. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

@@ -4146,9 +4146,9 @@ func _scenario_metrics() -> Dictionary:
 
 func _check_scenario_objectives() -> void:
 	if city_builder.is_city_game():
-		if seeded_challenge.advance(sim_clock.tick, city_service.state):
+		if seeded_challenge.advance(sim_clock.tick, city_service.state, freight_contracts.state):
 			_record_event(EventLog.OBJECTIVE_COMPLETED, "player", {"challenge": seeded_challenge.state.id, "reward": 0})
-			_show_notice("Scenario complete: %s! Your final journeys met every goal. Keep playing, or start another scenario." % SeededChallenges.DEFINITIONS[seeded_challenge.state.id].name)
+			_show_notice("Scenario complete: %s! You met every delivery goal. Keep playing, or start another scenario." % SeededChallenges.DEFINITIONS[seeded_challenge.state.id].name)
 		return
 	if scenario_goals.is_complete():
 		return
@@ -4248,6 +4248,14 @@ func _toggle_objective_panel() -> void:
 func _update_objective_panel() -> void:
 	if seeded_challenge.state.id != "":
 		var definition: Dictionary = SeededChallenges.DEFINITIONS[seeded_challenge.state.id]
+		if definition.has("contract"):
+			var order: Dictionary = freight_contracts.state[definition.contract]
+			objective_heading.text = "SCENARIO COMPLETE" if int(seeded_challenge.state.completed_tick) >= 0 else "ORDER EXPIRED — RETRY VIA NEW GAME" if order.status == "expired" else definition.name.to_upper()
+			objective_description.text = "Timber to Terminal: %d / 20\n%s" % [order.delivered, "Connect industry tiles → buy/start freight → build Sawmill → accept Timber order in Accounts." if order.status == "available" else "Order expired. Keep playing, or restart this scenario to retry." if order.status == "expired" else "Contract complete. Keep expanding your company." if order.status == "completed" else "Time left: " + FreightContracts.time_left(maxi(0, int(order.deadline) - sim_clock.tick))]
+			objective_details.text = "Seed 42 | Preparation untimed | 18h after acceptance | £300 contract bonus"
+			objective_progress.max_value = 20
+			objective_progress.value = order.delivered
+			return
 		var measured: Dictionary = seeded_challenge.progress(city_service.state, definition.get("origin", ""))
 		objective_heading.text = "SCENARIO COMPLETE" if int(seeded_challenge.state.completed_tick) >= 0 else definition.name.to_upper()
 		objective_description.text = "Final city journeys: %d / %d\nCities with 5+ final resident journeys: %d / %d" % [measured.delivered, definition.deliveries, measured.served, definition.served]

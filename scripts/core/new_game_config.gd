@@ -33,6 +33,14 @@ static func validate(value: Variant) -> Dictionary:
 	var two_stations: int = 2 * (Construction.STATION_PRICE + 5 * Construction.TRACK_PRICE)
 	var locomotive: int = Fleet.MODELS.passenger_standard.price
 	if challenge != "":
+		if Challenges.DEFINITIONS[challenge].has("contract"):
+			var freight_price: int = Fleet.MODELS.freight_standard.price
+			var mill_price: int = preload("res://resources/industries/sawmill.tres").build_price
+			var corridor: Array = Generator.planning(generated.world).freight_corridor
+			var rail_count: int = int(corridor[1][0]) - int(corridor[0][0]) + 1
+			if corridor[0][1] != corridor[1][1] or rail_count <= 0: return {"ok": false, "message": "Scenario needs a clear horizontal industry corridor."}
+			var rail_price: int = rail_count * Construction.TRACK_PRICE
+			return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge, "terrain": terrain}, "message": Challenges.description(challenge) + "\n\nDirect industry line: %d rails £%d + Log Hauler £%d + Sawmill £%d = £%d, leaving £%d for operations. No track, train or mill is prebuilt. Detours cost extra." % [rail_count, rail_price, freight_price, mill_price, rail_price + freight_price + mill_price, Start.STARTING_BALANCE - rail_price - freight_price - mill_price]}
 		var stations: int = int(Challenges.DEFINITIONS[challenge].served) * (Construction.STATION_PRICE + 5 * Construction.TRACK_PRICE)
 		var crossing_budget := ""
 		if challenge == "river_connection":

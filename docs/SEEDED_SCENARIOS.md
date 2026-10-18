@@ -11,8 +11,8 @@ the ordinary City sandbox keeps its editable seed, random button and city count.
 | Across the River | Seed 42, 3 cities, £5000, River preset | 40 final cross-river journeys by Town 3 residents | At least 5 resident journeys from one other city | Ordinary bank loans allowed |
 | Three Town Link | Seed 7, 3 cities, £5000 | 75 | At least 5 final resident journeys from each of all 3 cities | No bank borrowing for this company |
 
-These are short introductory challenges with **no deadline**, extra completion
-money, hidden penalties, medals or leaderboard. All start empty: build stations,
+The three passenger presets are short introductory challenges with **no deadline**, extra completion
+money, hidden penalties, medals or leaderboard. They start empty: build stations,
 connect rails, buy a locomotive and start a service. The optional Guide remains
 available. Initial growth is Normal and can be adjusted in Settings; that choice
 is not a ranked difficulty rule in this first slice.
@@ -54,8 +54,8 @@ autosaves retain their own scenario state.
 
 The first scenarios validate a complete loop of selecting a reproducible start,
 funding a feasible railway, moving real people and saving a clear outcome.
-Timed objectives, challenge modifiers, scoring/medals, scenario editing and cargo
-challenges remain extensions. Rivers and bridges now have a focused passenger scenario; broader scenario packs
+Challenge modifiers, scoring/medals and scenario editing remain extensions.
+Timber Connection below adds a focused timed freight goal. Rivers and bridges now have a focused passenger scenario; broader scenario packs
 can use this foundation later.
 
 ## Validation
@@ -95,3 +95,42 @@ qualified completion totals, preserving the cross-river inference.
 ordinary construction backend, buys/starts a shuttle, matches the quoted budget,
 runs generated passengers to completion and checks unfinished/completed save-load,
 terrain/geometry rejection and automatic terrain selection in the chooser.
+
+## Timber Connection
+
+Choose **New Game → Seeded scenario → Timber Connection** (seed 42, three cities,
+flat terrain, £5000). This freight-only challenge needs no passenger stations.
+Preparation is untimed; accepting the order starts its deadline.
+
+1. Pause and connect the Forest loading tile to Terminal along the horizontal
+   industry strip, passing through the proposed Sawmill loading tile. Keep its
+   building footprint above the rails clear. The direct line costs £430 (43 tiles).
+2. In Fleet buy a **Log Hauler (£500)** and start its freight service. Stay paused
+   with the empty train at Forest.
+3. Inspect Forest and **Build Sawmill (£500)**. The full starting investment is
+   £1430, leaving £3570 for operations. Detours and other purchases cost extra.
+4. When ready, open **Accounts → Freight contracts** and accept **Timber**.
+5. Resume. Deliver **20 timber to Terminal within 18 game hours** after acceptance.
+   Sawmill receipts and deliveries made before acceptance do not count. Do not
+   install Factory before finishing: it changes the terminal's output cargo.
+
+The optional **Guide** now shows freight steps and opens the relevant tools.
+Goals displays order progress and time remaining. Optional deadline reminders
+are available in Settings. Ordinary loans are allowed. The existing contract
+pays £300 once; scenario completion adds no bonus. After completion you may keep
+building, including the Factory.
+
+If the order expires, Goals explains that the scenario remains incomplete. There
+is no fine, forced reset or teleport; continue the company or start a fresh Timber
+Connection scenario to retry the one-off order. Existing save slots remain separate.
+
+Current version 51 already stores the identity, completion tick and contract.
+No new save schema or duplicate delivery counter is needed. A claimed completion
+must reference a completed timber order whose finish tick is no later than the
+scenario completion tick; the ordinary contract validator also verifies actual
+terminal totals. Older builds that do not recognize this identity cannot load it.
+
+`test_timber_challenge.gd` constructs the generated line through ordinary building,
+buys/starts freight, installs the mill, checks the exact budget, runs the physical
+production chain to completion and validates active/completed save-load. Passenger
+volume, expired orders and forged completion histories cannot substitute.

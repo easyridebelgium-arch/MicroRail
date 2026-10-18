@@ -5,6 +5,7 @@ const Advice = preload("res://scripts/core/first_connection_advice.gd")
 const FleetData = preload("res://scripts/fleet.gd")
 
 static func inspect(game: Node) -> Dictionary:
+	if game.seeded_challenge.state.id == "timber_connection": return freight_inspect(game)
 	var city_mode: bool = game.city_builder.is_city_game()
 	var stations: Dictionary = game.station_definitions()
 	var towns: Dictionary = {}
@@ -70,3 +71,23 @@ static func nearest_pair(settlements: Array) -> String:
 				closest = distance
 				pair = "%s and %s" % [a.name, b.name]
 	return "Nearby starting pair: %s (closest city centres). Check the track preview price before building." % pair if not pair.is_empty() else "Choose two nearby cities."
+
+static func freight_inspect(game: Node) -> Dictionary:
+	var order: Dictionary = game.freight_contracts.state.timber
+	var owns := false
+	for train in game.fleet.trains:
+		if FleetData.MODELS[train.model].kind == "freight": owns = true
+	var rows: Array[Dictionary] = [
+		{"done": not Router.find_route(game.tracks, game.FOREST_SITE, game.CARGO_TERMINAL).is_empty(), "title": "Connect Forest through Sawmill to Terminal", "hint": "The industry loading tiles form one horizontal line. Drag along it; no passenger stations are needed. Keep the Sawmill building footprint above its loading tile clear.", "action": "connect", "button": "Choose Connect track"},
+		{"done": owns, "title": "Buy a Log Hauler (£500)", "hint": "Open Fleet and buy the freight locomotive. The guide makes no purchases.", "action": "fleet", "button": "Open Fleet"},
+		{"done": game.services.has("freight"), "title": "Start its freight service in Fleet", "hint": "Select the stored Log Hauler and start freight service. Stay paused so it remains empty at Forest.", "action": "fleet", "button": "Open Fleet"},
+		{"done": game.sawmill.state.installed, "title": "Install the Sawmill (£500)", "hint": "In the Forest inspector choose Build Sawmill while the train is empty at Forest. Do not install Factory until the timber order is complete.", "action": "forest", "button": "Inspect Forest"},
+		{"done": order.status != "available", "title": "Accept the Timber order when ready", "hint": "Accounts → Freight contracts: accept Timber. The 18-game-hour deadline starts now; only later terminal deliveries count.", "action": "contracts", "button": "Review Timber order"},
+		{"done": order.status == "completed", "title": "Deliver 20 timber to Terminal", "hint": "Resume. Logs become timber at the Sawmill; only Terminal deliveries finish the order. Expiry requires a new scenario to retry; ordinary company play remains available.", "action": "run" if order.status != "expired" else "contracts", "button": "Resume and watch freight" if order.status != "expired" else "Review expired order"}
+	]
+	var next_index := rows.size()
+	var done_count := 0
+	for index in range(rows.size()):
+		if rows[index].done: done_count += 1
+		elif next_index == rows.size(): next_index = index
+	return {"freight": true, "city_mode": true, "rows": rows, "next": next_index, "done": done_count, "complete": next_index == rows.size(), "connection": "Industry corridor", "suggestion": "Timber Connection: untimed preparation, then 20 timber within 18 game hours. Normal contract bonus £300; no extra scenario reward.", "delivered": order.delivered}

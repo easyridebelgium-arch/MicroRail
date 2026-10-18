@@ -100,12 +100,13 @@ func refresh(delta: float, force: bool = false) -> void:
 	if not force and (elapsed < 0.25 or not (dialog.visible or game.objective_panel.visible)): return
 	elapsed = 0.0
 	snapshot = Guide.inspect(game)
-	preview_button.visible = snapshot.city_mode and game.station_definitions().is_empty()
+	preview_button.visible = not snapshot.get("freight", false) and snapshot.city_mode and game.station_definitions().is_empty()
 	var lines: PackedStringArray = []
 	for index in range(snapshot.rows.size()):
 		var row: Dictionary = snapshot.rows[index]
 		lines.append(("[Done] " if row.done else "[Next] " if snapshot.next == index else "[ ] ") + str(row.title))
 	heading.text = "First passenger journey complete — %d delivered. Keep improving your railway." % snapshot.delivered if snapshot.delivered > 0 else "Your first city service" if snapshot.city_mode else "Your first tutorial service"
+	if snapshot.get("freight", false): heading.text = "Timber Connection — freight checklist"
 	steps.text = "\n".join(lines)
 	detail.text = snapshot.suggestion + "\n\n" + ("These checks describe the current company. You can reopen this guide at any time; it does not reset progress or pay rewards." if snapshot.complete else str(snapshot.rows[snapshot.next].hint))
 	action_button.visible = not snapshot.complete
@@ -183,6 +184,10 @@ func _perform() -> void:
 		"connect":
 			game.paused = true
 			game._select_straight_track()
+		"forest":
+			game.paused = true
+			game._inspect_station_at(game.FOREST_SITE)
+		"contracts": game.contracts_dialog.open_dialog("timber")
 		"fleet": game._open_fleet_editor()
 		"run":
 			game.paused = false

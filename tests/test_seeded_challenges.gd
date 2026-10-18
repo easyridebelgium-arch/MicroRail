@@ -16,7 +16,7 @@ func run() -> void:
 	check(not Config.validate({"mode": "cities", "seed": "43", "city_count": 3, "challenge": "first_connection"}).ok, "preset cannot silently use another seed")
 	for key in Challenges.DEFINITIONS:
 		var definition: Dictionary = Challenges.DEFINITIONS[key]
-		if definition.has("terrain"): continue # River preset has a separate end-to-end suite.
+		if definition.has("terrain") or definition.has("contract"): continue # River preset has a separate end-to-end suite.
 		var configuration := {"mode": "cities", "seed": definition.seed, "city_count": definition.cities, "challenge": key}
 		check(Config.validate(configuration).ok, "scenario preview uses validated generated start")
 		game = load("res://scenes/main/main.tscn").instantiate()

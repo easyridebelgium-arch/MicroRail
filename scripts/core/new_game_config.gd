@@ -18,8 +18,8 @@ static func validate(value: Variant) -> Dictionary:
 	var challenge: Variant = value.get("challenge", "")
 	if not challenge is String or (challenge != "" and not Challenges.DEFINITIONS.has(challenge)): return {"ok": false, "message": "Choose a listed scenario."}
 	if challenge != "":
-		if terrain != "flat": return {"ok": false, "message": "Scenario presets use flat land."}
 		var definition: Dictionary = Challenges.DEFINITIONS[challenge]
+		if terrain != definition.get("terrain", "flat"): return {"ok": false, "message": "Use the scenario preset terrain."}
 		if value.get("seed") != definition.seed or value.get("city_count") != definition.cities: return {"ok": false, "message": "Scenario seed and city count must match its preset."}
 	var count: Variant = value.get("city_count")
 	if typeof(count) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(count)) or float(count) != floor(float(count)) or count < Generator.MIN_CITIES or count > Generator.MAX_CITIES:
@@ -34,5 +34,12 @@ static func validate(value: Variant) -> Dictionary:
 	var locomotive: int = Fleet.MODELS.passenger_standard.price
 	if challenge != "":
 		var stations: int = int(Challenges.DEFINITIONS[challenge].served) * (Construction.STATION_PRICE + 5 * Construction.TRACK_PRICE)
-		return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge, "terrain": terrain}, "message": Challenges.description(challenge) + "\n\nNo stations, track or trains are prebuilt. The required stations cost £%d and a passenger shuttle costs £%d, leaving £%d for track and operations. Growth can be adjusted in Settings." % [stations, locomotive, Start.STARTING_BALANCE - stations - locomotive]}
+		var crossing_budget := ""
+		if challenge == "river_connection":
+			var river := Terrain.new()
+			river.profile = terrain
+			var witness := preload("res://scripts/core/first_connection_path.gd").find(generated.world, river, Vector2i(64, 15), Vector2i(65, 29))
+			if witness.is_empty() or int(witness.station_cost) + int(witness.track_cost) + locomotive > Start.STARTING_BALANCE: return {"ok": false, "message": "The river scenario no longer has an affordable checked starting connection."}
+			crossing_budget = "\nChecked Town 3–Town 1 layout: stations £%d + connecting rails/bridge £%d + shuttle £%d = £%d. Other layouts can cost more." % [witness.station_cost, witness.track_cost, locomotive, int(witness.station_cost) + int(witness.track_cost) + locomotive]
+		return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge, "terrain": terrain}, "message": Challenges.description(challenge) + "\n\nNo stations, track or trains are prebuilt. The required stations cost £%d and a passenger shuttle costs £%d, leaving £%d for track and operations. Growth can be adjusted in Settings." % [stations, locomotive, Start.STARTING_BALANCE - stations - locomotive] + crossing_budget}
 	return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge, "terrain": terrain}, "message": ("%s: straight north–south bridges must include all water tiles and both dry banks. Water rails cost £50 each (refund £25); banks £10. Bridge spans vary with the terrain. Failed water drags highlight a feasible crossing; approaches cost extra.\n\n" % Terrain.PROFILE_NAMES[Terrain.PROFILES.find(terrain)] if terrain != "flat" else "") + "City sandbox: %d cities, four industry sites, £%d.\nNo stations, track or trains are prebuilt. Two new stations cost £%d and a passenger shuttle costs £%d, leaving £%d for connecting track and operations.\nPopulation drives city trip requests. City growth is bounded, with a day of protection against decline; adjust its rate in Settings; introductory tutorial rewards do not apply. Same seed and city count reproduce this starting layout." % [int(count), Start.STARTING_BALANCE, two_stations, locomotive, Start.STARTING_BALANCE - two_stations - locomotive]}

@@ -1830,7 +1830,6 @@ func _is_valid_save(data: Dictionary) -> bool:
 	if not ProgressReports.valid(data.get("progress_reports"), ProgressReports.from_save(data), int(sim.clock.tick)): return false
 	if not SeededChallenges.valid(data.get("seeded_challenge"), data, int(sim.clock.tick)): return false
 	if not RiverTerrain.valid(data.get("terrain"), city_save): return false
-	if data.seeded_challenge.id != "" and data.terrain.profile != "flat": return false
 	if not Timetable.valid_dispatch(data.get("dispatch"), data.services, int(sim.clock.tick)): return false
 	if not SimRng.is_valid_state(sim.get("rng")):
 		return false
@@ -4188,9 +4187,11 @@ func _toggle_objective_panel() -> void:
 func _update_objective_panel() -> void:
 	if seeded_challenge.state.id != "":
 		var definition: Dictionary = SeededChallenges.DEFINITIONS[seeded_challenge.state.id]
-		var measured: Dictionary = seeded_challenge.progress(city_service.state)
+		var measured: Dictionary = seeded_challenge.progress(city_service.state, definition.get("origin", ""))
 		objective_heading.text = "SCENARIO COMPLETE" if int(seeded_challenge.state.completed_tick) >= 0 else definition.name.to_upper()
 		objective_description.text = "Final city journeys: %d / %d\nCities with 5+ final resident journeys: %d / %d" % [measured.delivered, definition.deliveries, measured.served, definition.served]
+		if definition.has("origin"):
+			objective_description.text = "Town 3 resident cross-river final journeys: %d / %d\nCities with 5+ final resident journeys: %d / %d" % [measured.delivered, definition.deliveries, measured.served, definition.served]
 		objective_details.text = "Seed %s | No deadline | %s" % [definition.seed, "No bank loans" if definition.no_loans else "Loans available"]
 		objective_progress.max_value = definition.deliveries
 		objective_progress.value = mini(measured.delivered, definition.deliveries)

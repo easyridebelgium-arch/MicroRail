@@ -339,9 +339,15 @@ validated witness with dashed rails and hatched station platforms. Hide suggesti
 clears it; map changes and loads invalidate it. It is session-only, makes no
 purchases or reservations, and preserves construction drafts.
 
-**Next implementation:** a focused river-crossing scenario with a validated
-starting budget and explicit cross-river passenger delivery goal. Broader terrain,
-elevation and tunnels remain later refinements.
+**River-crossing scenario implemented:** [Across the River](SEEDED_SCENARIOS.md)
+fixes seed 42 and the river preset, verifies an affordable complete bridge layout,
+and requires 40 matched final journeys by the unique north-bank city’s residents
+plus useful service from another city. Physical journey completion, terrain/geometry
+validation and save/load are tested; existing scenarios and save schema remain unchanged.
+
+**Next implementation:** broaden terrain planning feedback with bridge/span
+inspection and clear construction cost information. Elevation and tunnels remain
+later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained
 composite score. Initial short scenarios and a first river/bridge profile are implemented; expand terrain variety before broader

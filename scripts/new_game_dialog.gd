@@ -106,7 +106,7 @@ func refresh() -> void:
 	elif mode_choice.selected == 2:
 		var key: String = str(scenario_choice.get_item_metadata(scenario_choice.selected))
 		var definition: Dictionary = Config.Challenges.DEFINITIONS[key]
-		config = {"mode": "cities", "seed": definition.seed, "city_count": definition.cities, "city_growth": "normal", "challenge": key}
+		config = {"mode": "cities", "seed": definition.seed, "city_count": definition.cities, "city_growth": "normal", "challenge": key, "terrain": definition.get("terrain", "flat")}
 	validation = Config.validate(config)
 	explanation.text = validation.message + "\n\nStarting replaces the current game in memory. Existing manual saves change only when you Save; autosaves keep separate recovery copies. Cancel keeps the current game."
 	get_ok_button().disabled = not validation.ok

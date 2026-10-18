@@ -6,11 +6,14 @@ extends RefCounted
 ## All members are static, so any script can read them without an autoload:
 ##     if GameSettings.reduced_motion: ...
 
+const NotificationPolicy = preload("res://scripts/core/notification_policy.gd")
+static var notification_rules: Dictionary = NotificationPolicy.defaults()
+
 const SETTINGS_PATH: String = "user://settings.cfg"
 
-## Offered scales. The whole view is scaled (world and interface together);
-## 200% needs the header and toolbar layouts to reflow first (planned for Phase 1).
-const UI_SCALES: Array[float] = [1.0, 1.25, 1.5]
+## Offered scales. The window scales everything; main.gd cancels that for the
+## map camera, so only the interface grows.
+const UI_SCALES: Array[float] = [1.0, 1.25, 1.5, 1.75, 2.0]
 
 enum PaletteMode {
 	DEFAULT,
@@ -24,12 +27,31 @@ const PALETTE_NAMES: Array[String] = [
 	"High contrast"
 ]
 
+const TERRAIN_STYLES: Array[String] = ["summer", "autumn", "winter", "plain"]
+const TERRAIN_NAMES: Array[String] = ["Summer grass", "Autumn leaves", "Snow", "Plain grid"]
+static var terrain_style: String = "summer"
+static var show_grid: bool = true
+const AUTOSAVE_HOURS: Array[int] = [0, 1, 3, 6]
+static var autosave_hours: int = 1
+
 static var ui_scale: float = 1.0
 static var palette_mode: int = PaletteMode.DEFAULT
 static var reduced_motion: bool = false
+static var fullscreen: bool = false
+## Restore the previous desktop window when leaving fullscreen.
+static var _windowed_mode: Window.Mode = Window.MODE_MAXIMIZED
+
+## Hides the title and key hints and shortens the status text. Always on at 175%
+## and above, where the header would otherwise fill the window.
+static var compact_header: bool = false
+static var map_visible: bool = false
+static var goals_visible: bool = false
+static var slow_on_incident: bool = false
 
 ## {action name: [key codes]} as saved. Empty means "use the defaults".
 static var key_bindings: Dictionary = {}
+## {action name: [mouse button indices]} as saved.
+static var mouse_bindings: Dictionary = {}
 
 
 static func load_settings() -> void:
@@ -38,33 +60,85 @@ static func load_settings() -> void:
 	if config.load(SETTINGS_PATH) != OK:
 		return
 
+	var saved_interval: Variant = config.get_value("saves", "autosave_hours", 1)
+	autosave_hours = int(saved_interval) if typeof(saved_interval) == TYPE_INT and saved_interval in AUTOSAVE_HOURS else 1
 	ui_scale = nearest_scale(float(config.get_value("display", "ui_scale", 1.0)))
 	palette_mode = clampi(
 		int(config.get_value("display", "palette", PaletteMode.DEFAULT)),
 		0,
 		PaletteMode.size() - 1
 	)
+	var ground_choice: String = str(config.get_value("display", "terrain_style", "summer"))
+	terrain_style = ground_choice if ground_choice in TERRAIN_STYLES else "summer"
+	show_grid = bool(config.get_value("display", "show_grid", true))
 	reduced_motion = bool(config.get_value("display", "reduced_motion", false))
+	compact_header = bool(config.get_value("display", "compact_header", false))
+	fullscreen = bool(config.get_value("display", "fullscreen", false))
+	map_visible = bool(config.get_value("panels", "map_visible", false))
+	goals_visible = bool(config.get_value("panels", "goals_visible", false))
+	slow_on_incident = bool(config.get_value("notifications", "slow_on_incident", false))
+
+	notification_rules = NotificationPolicy.normalize(config.get_value("notifications", "rules", {}))
 
 	var saved_bindings: Variant = config.get_value("input", "bindings", {})
 	key_bindings = saved_bindings if saved_bindings is Dictionary else {}
+	var saved_mouse: Variant = config.get_value("input", "mouse_bindings", {})
+	mouse_bindings = saved_mouse if saved_mouse is Dictionary else {}
 
 
 ## Returns true when the file was written.
 static func save_settings() -> bool:
 	var config := ConfigFile.new()
 
+	config.set_value("saves", "autosave_hours", autosave_hours)
+	config.set_value("display", "terrain_style", terrain_style)
+	config.set_value("display", "show_grid", show_grid)
 	config.set_value("display", "ui_scale", ui_scale)
 	config.set_value("display", "palette", palette_mode)
 	config.set_value("display", "reduced_motion", reduced_motion)
+	config.set_value("display", "compact_header", compact_header)
+	config.set_value("display", "fullscreen", fullscreen)
+	config.set_value("panels", "map_visible", map_visible)
+	config.set_value("panels", "goals_visible", goals_visible)
+	config.set_value("notifications", "slow_on_incident", slow_on_incident)
 	config.set_value("input", "bindings", key_bindings)
+	config.set_value("input", "mouse_bindings", mouse_bindings)
+	config.set_value("notifications", "rules", NotificationPolicy.normalize(notification_rules))
 
 	return config.save(SETTINGS_PATH) == OK
 
 
 ## Applies the settings that act on the window itself.
 static func apply(window: Window) -> void:
+	# Use the real window size: enlarging it reveals more map, rather than
+	# enlarging a fixed 1280x720 canvas. UI scaling still works independently.
+	window.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+	window.content_scale_size = Vector2i.ZERO
 	window.content_scale_factor = ui_scale
+	apply_fullscreen(window)
+
+
+static func apply_fullscreen(window: Window) -> void:
+	var currently_fullscreen: bool = window.mode in [Window.MODE_FULLSCREEN, Window.MODE_EXCLUSIVE_FULLSCREEN]
+	if fullscreen == currently_fullscreen:
+		return
+	if fullscreen:
+		_windowed_mode = window.mode if window.mode in [Window.MODE_WINDOWED, Window.MODE_MAXIMIZED] else Window.MODE_MAXIMIZED
+		window.mode = Window.MODE_FULLSCREEN
+	else:
+		window.mode = _windowed_mode
+
+
+static func toggle_fullscreen(window: Window) -> void:
+	fullscreen = not fullscreen
+	apply_fullscreen(window)
+	if not save_settings():
+		push_warning("Could not save fullscreen preference; it applies for this session only.")
+
+
+static func use_compact_header() -> bool:
+	# Reserve map space for actionable alerts as well as the wrapping ribbon.
+	return compact_header or ui_scale >= 1.5
 
 
 static func nearest_scale(value: float) -> float:

@@ -9,16 +9,36 @@ extends RefCounted
 
 signal event_recorded(event: Dictionary)
 
+const CONTRACT_DEADLINE := "contract_deadline"
+const CONTRACT_ACCEPTED := "contract_accepted"
+const CONTRACT_COMPLETED := "contract_completed"
+const CONTRACT_EXPIRED := "contract_expired"
+
 # Event types. Add new ones here so names stay consistent.
+const LOAN_BORROWED: String = "loan_borrowed"
+const LOAN_PAYMENT: String = "loan_payment"
+const LOAN_OVERDUE: String = "loan_overdue"
 const TRAIN_DEPARTED: String = "train_departed"
+const DEADLOCK_DETECTED: String = "deadlock_detected"
+const DEADLOCK_CLEARED: String = "deadlock_cleared"
+const SIGNAL_CHANGED: String = "signal_changed"
+const DISPATCH_CHANGED: String = "dispatch_changed"
+const TRAIN_REVERSED: String = "train_reversed"
+const TRAIN_RECOVERED: String = "train_recovered"
+const TRAIN_WAITING: String = "train_waiting"
+const PASSENGERS_TRANSFERRED: String = "passengers_transferred"
 const TRAIN_ARRIVED: String = "train_arrived"
 const CARGO_DELIVERED: String = "cargo_delivered"
+const CONSTRUCTION_APPLIED: String = "construction_applied"
 const TRACK_BUILT: String = "track_built"
 const TRACK_DEMOLISHED: String = "track_demolished"
+const SWITCH_CHANGED: String = "switch_changed"
 const ROUTE_CHANGED: String = "route_changed"
 const OBJECTIVE_COMPLETED: String = "objective_completed"
 const UPGRADE_BOUGHT: String = "upgrade_bought"
 const SERVICE_TOGGLED: String = "service_toggled"
+const CONSTRUCTION_UNDONE: String = "construction_undone"
+const CONSTRUCTION_REDONE: String = "construction_redone"
 
 const MAX_EVENTS: int = 2000
 const MAX_SAVED_EVENTS: int = 200
@@ -100,6 +120,73 @@ static func describe(event: Dictionary) -> String:
 		event["type"],
 		JSON.stringify(event["data"])
 	]
+
+
+## Short line for the in-game event log. Colour is not used as the only cue.
+static func summary(event: Dictionary) -> String:
+	var data: Dictionary = event.get("data", {})
+	var kind: String = str(event.get("type", ""))
+	var who: String = str(event.get("subject", ""))
+
+	match kind:
+		LOAN_BORROWED:
+			return "Borrowed £%d from the bank" % int(data.get("amount", 0))
+		LOAN_PAYMENT:
+			return "Loan payment £%d" % int(data.get("paid", 0))
+		LOAN_OVERDUE:
+			return "Loan payment overdue: £%d" % int(data.get("due", 0))
+		DEADLOCK_DETECTED:
+			return "Deadlock detected: open Traffic for recovery"
+		DEADLOCK_CLEARED:
+			return "Deadlock cleared"
+		SIGNAL_CHANGED:
+			return "Signal %s at %s,%s" % [data.get("mode", ""), data.get("x", 0), data.get("y", 0)]
+		DISPATCH_CHANGED:
+			return "Train #%s %s" % [who, "held" if data.get("hold", false) else "released"]
+		TRAIN_REVERSED:
+			return "Train #%s reversed toward its departure stop" % who
+		TRAIN_RECOVERED:
+			return "Train #%s returned to its departure stop" % who
+		TRAIN_WAITING:
+			return "Train #%s: %s" % [who, data.get("reason", "Waiting for track")]
+		TRAIN_DEPARTED:
+			return "%s departed %s" % [who, data.get("stop", "")]
+		PASSENGERS_TRANSFERRED:
+			return "%d passengers changed trains at %s" % [int(data.get("passengers", 0)), data.get("stop", "")]
+		TRAIN_ARRIVED:
+			return "%s arrived at %s" % [who, data.get("stop", "")]
+		CARGO_DELIVERED:
+			return "Delivered %s logs" % str(int(data.get("logs", 0)))
+		CONSTRUCTION_APPLIED:
+			return "Applied %d track edits and %d signal edits" % [int(data.get("tracks", 0)), int(data.get("signals", 0))]
+		TRACK_BUILT:
+			return "Built %s tiles" % str(int(data.get("new_tiles", data.get("tiles", 0))))
+		TRACK_DEMOLISHED:
+			return "Removed %s tiles" % str(int(data.get("tiles", 0)))
+		SWITCH_CHANGED:
+			return "Switch %s" % str(data.get("change", "changed"))
+		ROUTE_CHANGED:
+			return "Passenger route updated"
+		CONTRACT_DEADLINE:
+			return "%s contract deadline approaching — review Accounts → Freight contracts" % str(data.get("cargo", "Freight")).capitalize()
+		CONTRACT_ACCEPTED:
+			return "%s delivery contract accepted" % str(data.get("cargo", "Freight"))
+		CONTRACT_COMPLETED:
+			return "%s contract completed: bonus £%d" % [str(data.get("cargo", "Freight")), int(data.get("bonus", 0))]
+		CONTRACT_EXPIRED:
+			return "%s contract expired (no extra fine)" % str(data.get("cargo", "Freight"))
+		OBJECTIVE_COMPLETED:
+			return "Objective completed"
+		UPGRADE_BOUGHT:
+			return "%s bought a %s upgrade" % [who, str(data.get("kind", ""))]
+		SERVICE_TOGGLED:
+			return "%s service %s" % [who, "enabled" if bool(data.get("enabled", false)) else "withdrawn"]
+		CONSTRUCTION_UNDONE:
+			return "Construction undone"
+		CONSTRUCTION_REDONE:
+			return "Construction redone"
+		_:
+			return "%s %s" % [who, kind]
 
 
 func save_state() -> Dictionary:

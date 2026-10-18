@@ -1,0 +1,183 @@
+{
+  "source": "art/generated/microrail_pack_v1/sheets/terrain.png",
+  "runtime_copy": "assets/environment/terrain/sheets/terrain.png",
+  "sha256": "e0eefde5104505c31c7e9247f932c24af1c16d8b514f0e0744de005c4cd08408",
+  "entries": [
+    {
+      "id": "grass_summer",
+      "resource": "assets/environment/terrain/materials/grass_summer.tres",
+      "region": [
+        2,
+        2,
+        309,
+        309
+      ],
+      "used_as_ground_style": true
+    },
+    {
+      "id": "grass_meadow",
+      "resource": "assets/environment/terrain/materials/grass_meadow.tres",
+      "region": [
+        315,
+        2,
+        310,
+        309
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "grass_dry",
+      "resource": "assets/environment/terrain/materials/grass_dry.tres",
+      "region": [
+        629,
+        2,
+        309,
+        309
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "leaf_litter",
+      "resource": "assets/environment/terrain/materials/leaf_litter.tres",
+      "region": [
+        942,
+        2,
+        310,
+        309
+      ],
+      "used_as_ground_style": true
+    },
+    {
+      "id": "snow_fresh",
+      "resource": "assets/environment/terrain/materials/snow_fresh.tres",
+      "region": [
+        2,
+        315,
+        309,
+        310
+      ],
+      "used_as_ground_style": true
+    },
+    {
+      "id": "snow_patchy",
+      "resource": "assets/environment/terrain/materials/snow_patchy.tres",
+      "region": [
+        315,
+        315,
+        310,
+        310
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "ice_packed",
+      "resource": "assets/environment/terrain/materials/ice_packed.tres",
+      "region": [
+        629,
+        315,
+        309,
+        310
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "mountain_rock",
+      "resource": "assets/environment/terrain/materials/mountain_rock.tres",
+      "region": [
+        942,
+        315,
+        310,
+        310
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "water_deep",
+      "resource": "assets/environment/terrain/materials/water_deep.tres",
+      "region": [
+        2,
+        629,
+        309,
+        309
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "water_shallow",
+      "resource": "assets/environment/terrain/materials/water_shallow.tres",
+      "region": [
+        315,
+        629,
+        310,
+        309
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "sand",
+      "resource": "assets/environment/terrain/materials/sand.tres",
+      "region": [
+        629,
+        629,
+        309,
+        309
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "gravel",
+      "resource": "assets/environment/terrain/materials/gravel.tres",
+      "region": [
+        942,
+        629,
+        310,
+        309
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "soil",
+      "resource": "assets/environment/terrain/materials/soil.tres",
+      "region": [
+        2,
+        942,
+        309,
+        310
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "ploughed_soil",
+      "resource": "assets/environment/terrain/materials/ploughed_soil.tres",
+      "region": [
+        315,
+        942,
+        310,
+        310
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "asphalt",
+      "resource": "assets/environment/terrain/materials/asphalt.tres",
+      "region": [
+        629,
+        942,
+        309,
+        310
+      ],
+      "used_as_ground_style": false
+    },
+    {
+      "id": "station_paving",
+      "resource": "assets/environment/terrain/materials/station_paving.tres",
+      "region": [
+        942,
+        942,
+        310,
+        310
+      ],
+      "used_as_ground_style": false
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/core/industry_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+industry_id = "factory"
+display_name = "Factory"
+build_price = 800
+input_cargo = "timber"
+output_cargo = "goods"
+processing_ticks = 600
+input_per_batch = 1

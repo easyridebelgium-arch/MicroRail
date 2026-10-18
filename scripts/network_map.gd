@@ -7,8 +7,11 @@ signal navigation_requested(world_position: Vector2)
 var map_cells: Vector2i = Vector2i(80, 50)
 var world_tile_size: float = 32.0
 
+var has_river := false
+var river_profile := "flat"
 var track_data: Dictionary = {}
 var facilities: Array[Dictionary] = []
+var train_kinds: Array[String] = []
 var train_positions: Array[Vector2] = []
 
 var camera_world_rect: Rect2 = Rect2()
@@ -76,6 +79,12 @@ func _draw() -> void:
 	draw_rect(area, Color("#172C27"))
 
 	# Tracks.
+	if has_river:
+		var terrain := preload("res://scripts/core/river_terrain.gd").new()
+		terrain.profile = river_profile
+		for x in range(map_cells.x):
+			for y in terrain.water_rows(x): draw_rect(Rect2(area.position + Vector2(x, y) * cell_size, cell_size), Color("#629fbf"))
+
 	for cell in track_data:
 		if cell.x < 0 or cell.x >= map_cells.x:
 			continue
@@ -99,6 +108,9 @@ func _draw() -> void:
 		var world_position: Vector2 = (
 			Vector2(cell) + Vector2(0.5, 0.5)
 		) * world_tile_size
+		if facility.get("settlement", false):
+			draw_rect(Rect2(_world_to_map(world_position) - Vector2(4, 4), Vector2(8, 8)), color, false, 1)
+			continue
 
 		draw_rect(
 			Rect2(
@@ -144,7 +156,7 @@ func _draw() -> void:
 		draw_circle(
 			_world_to_map(world_position),
 			2.5,
-			colors[index % colors.size()]
+			colors[1 if index < train_kinds.size() and train_kinds[index] == "freight" else 0]
 		)
 
 

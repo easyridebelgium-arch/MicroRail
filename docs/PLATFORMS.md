@@ -1,0 +1,133 @@
+# Platform lengths (Phase 1B foundation)
+
+A stop's **platform** is now a measured quantity instead of a vague "clearance"
+rule. `scripts/core/platforms.gd` measures the continuous run of straight,
+horizontal, signal-free track through the stop tile. Trains stop centred on the
+stop tile, so a train needs the same number of whole tiles on each side.
+
+| Platform tiles each side of the stop | Longest train | Fits |
+| --- | --- | --- |
+| 0 (bare station tile) | 31 px | locomotive only |
+| 1 | 95 px | locomotive + 2 vehicles |
+| 2 | 159 px | locomotive + 4 vehicles (the maximum) |
+
+The station panel now shows a line such as
+`Platform: 5 tiles (160 px), fits locomotive + 4 vehicles`. It is measured from the
+live track, so laying straight track behind a stop lengthens the platform at once;
+a signal or switch ends it. Nothing new needs buying or saving: no save fields were
+added, and the earlier save format (v23) is unchanged.
+
+## Numbered platforms and sidings
+
+A station can now have up to three platforms, found automatically from the track
+(no new tool, no save fields):
+
+| Number | ID | Where |
+| --- | --- | --- |
+| 1 | `<station>/1` | the stop tile's own track |
+| 2 | `<station>/2` | a straight signal-free siding on the row **below** the stop tile |
+| 3 | `<station>/3` | the same on the row **above** it |
+
+Numbers come from the row offset, so they are stable: building platform 3 never
+renumbers platform 2, and removing platform 2 leaves platform 3 unchanged. A siding
+must contain the tile directly beside the stop tile (same column). The station
+panel lists every platform with its length, the longest train it fits and the train
+currently occupying it.
+
+## Choosing a platform for a service
+
+In **Routes**, select a stop in the stop list and pick **Platform 1/2/3** beside the
+Up/Down buttons; the list shows `— platform N` for any choice other than 1. Apply
+rebuilds the route to that platform's stop tile, so the train really drives onto the
+siding and loads/unloads there. Two services can therefore use different platforms
+of one station, and the existing reservations and signals keep them apart.
+
+Rules:
+
+- The choice is stored per stop in the service as `platforms: {stop: number}`. It is
+  optional; services without it keep using platform 1. No save-version change was
+  needed. Saved runtime routes must end on the chosen platform's stop tile, or the
+  save is rejected.
+- The siding must already be built and connected (normally with a switch), exactly
+  like any other track. If it is missing or not connected, Apply refuses and
+  changes nothing.
+- A consist's platform fit is checked at the chosen platform's stop tile, using the
+  siding's own straight length.
+- The first stop's platform cannot change while that service stands on its current
+  platform, because the train starts every trip there. Choose platforms for later
+  stops, or move the first stop to another station.
+- Platform choices for stops removed from a route are dropped automatically.
+
+Platform choice is fixed per service. The automatic rule that picks a free platform
+at arrival time (`Platforms.assign`, below) is not wired to movement yet.
+
+`Platforms.assign` is the basic assignment rule: the lowest-numbered platform that
+fits the whole train and is not busy. It is a pure function with tests; services use
+sidings only through the fixed per-stop choice above.
+
+## Relationship to the existing check
+
+`Consists.stop_clearance` still decides whether a consist may start, edit or
+continue; its behaviour is unchanged. `tests/test_platforms.gd` checks that the
+formal rule agrees with it for every consist size and every combination of
+extension tiles behind the start and beyond the end of a route (172 checks).
+`tests/test_platform_ui.gd` checks the panel text.
+
+## Automatic choice
+
+The Routes editor offers "Auto" per stop. On Apply, each Auto stop (except the first,
+which stays on the platform the train stands on) takes the first platform that is not
+used by another service's stop, fits the assigned train and can be routed to
+(`Platforms.choose`); otherwise a shared platform that fits and routes, otherwise
+platform 1 with a note. Stored services always hold a concrete number. Wait
+messages name the platform ("Waiting for X at Station B platform 2 (track 20,9)") and
+the station panel lists which services use each platform.
+
+## Re-routing at departure
+
+Stops set to Auto are remembered (`auto` in the service, saved with it). When a train
+is about to leave a stop for an Auto stop, `Main._maybe_reroute_platform` checks that
+station's platforms in order (planned platform first): a platform is free when no other
+train stands on its stop tile and no other train's current leg ends there, and it must
+fit the train and be routable. If the planned platform is not free, the train
+switches to the first free one: the stored platform and the route are replaced while
+the train stands still, and the train's distance becomes the new distance of the stop it
+is standing at. Shuttle services only; Loop and fixed platforms are never changed. If no
+platform is free the train waits at its stop (see below). Tests:
+`tests/test_platform_reroute.gd`.
+
+## Single-track holds
+
+Auto platforms only choose platforms; they do not stop two trains entering the same
+one-track stretch from opposite ends. `scripts/core/single_track.gd` and
+`Main._section_check` add that rule: a train leaving a stop claims the plain
+(non-switch) tiles to its next stop, with its direction. Only sections bounded by
+switches at both ends count; dead-end approaches and passing loops are left to the
+normal reservations, so opposing services can still meet in a loop. It waits at the stop while an
+opposing claim overlaps, while another train's claim ends on the same platform tile, or
+while another train stands on its destination platform tile (unless that train is
+heading for this train's own platform, i.e. they swap ends). A held train reserves no
+lookahead, so it does not block the siding the other train needs. Wait text:
+"Waiting for X to clear the single-track section (Station B platform 1)".
+`tests/test_single_track_holds.gd` runs the A–B plus A–B–C layout with Auto platforms for
+four simulated minutes. Claims are transient (not saved).
+
+A claimant that is stalled (waiting for a signal or tile) outside the shared stretch has
+not entered it and does not hold other trains back; otherwise a train waiting at a
+signal and a train waiting at a station could block each other. Reservation footprints
+on a diagonal ignore the few pixels where a sprite corner reaches the next tile
+(`CORNER_TOLERANCE`), so a train leaving a siding no longer claims the main line beside
+it. `tests/test_signalled_sidings.gd` runs the same layout with auto signals.
+
+Limit: both services still use one platform at their first stop (the platform the train
+stands on), so two services sharing one platform at both ends take turns.
+
+## Not yet implemented
+
+- Switching platform while the train is already moving towards a station; the choice
+  is made when it leaves its previous stop.
+- Platform choice for the first stop, and for freight terminals.
+- A build tool or overlay for sidings; today they are ordinary track.
+- Vertical or diagonal platforms (the existing rule only accepts horizontal track).
+- Routing consist bodies through planned reversals and repeated paths, which is
+  still the other open item of Phase 1B.

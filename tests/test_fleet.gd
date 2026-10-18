@@ -108,7 +108,7 @@ func _run() -> void:
 		game.tracks[Vector2i(x, 8)] = false
 	game._check_route()
 	game.waiting_at_a = 30
-	game._move_train(1.0)
+	_advance_passenger(game, 1.0)
 	check(game.passengers_on_train == 12 and absf(game.route_distance - 120.0) < 0.1, "Fast model must actually board and move with its own specifications")
 	game.operating_timer = 0.0
 	var before_cost: int = game.money
@@ -120,7 +120,7 @@ func _run() -> void:
 	game.toggle_fleet_service(fast_id)
 	for step in range(400):
 		if game._passenger_service_is_active():
-			game._move_train(0.1)
+			_advance_passenger(game, 0.1)
 	check(not game._passenger_service_is_active() and game.passengers_on_train == 0, "Withdrawal must finish deliveries and park empty at the first stop")
 	game.assign_fleet_train(1, "passenger")
 	check(Fleet.assigned(game.fleet, "passenger")["id"] == 1 and game.passenger_service_enabled, "A returned train can be replaced and the new train is enabled")
@@ -135,7 +135,7 @@ func _run() -> void:
 	game.forest_stock = 60
 	game.logs_produced = 60
 	before_cost = game.money
-	game.forest_stock -= game.freight_train.advance(1.0, game.forest_stock)
+	_advance_freight(game, 1.0)
 	check(game.freight_train.cargo == 40 and game.forest_stock == 20, "Heavy model must load forty logs without loss")
 	check(absf(game.freight_train.distance_along_route - 40.0) < 0.1 and game.money == before_cost - 2, "Heavy freight movement and costs must match its model")
 	game.assign_fleet_train(2, "freight")
@@ -160,7 +160,7 @@ func _run() -> void:
 		check(game.fleet == saved_fleet and game.money == saved_money and game.freight_train.cargo == 40, "Inconsistent upgrades or over-capacity cargo must fail load atomically")
 	game.toggle_fleet_service(heavy_id)
 	for step in range(500):
-		game.forest_stock -= game.freight_train.advance(0.1, game.forest_stock)
+		_advance_freight(game, 0.1)
 	check(not game.freight_train.service_is_active() and game.freight_train.cargo == 0 and game.logs_delivered == 40, "Heavy freight must deliver and withdraw without reloading")
 	game.assign_fleet_train(2, "freight")
 	check(Fleet.assigned(game.fleet, "freight")["id"] == 2, "An empty returned freight train can be replaced")
@@ -191,3 +191,14 @@ func _run() -> void:
 	await process_frame
 	print("Fleet tests: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
+
+# Movement tests use the same fixed-step reservation refresh as the game.
+func _advance_passenger(game: Node, seconds: float) -> void:
+	for step in range(roundi(seconds * 60)):
+		game._rebuild_reservations(true)
+		game._move_train(1.0 / 60.0)
+
+func _advance_freight(game: Node, seconds: float) -> void:
+	for step in range(roundi(seconds * 60)):
+		game._rebuild_reservations(true)
+		game.forest_stock -= game.freight_train.advance(1.0 / 60.0, game.forest_stock)

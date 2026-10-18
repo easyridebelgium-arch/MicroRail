@@ -390,9 +390,14 @@ Log Hauler purchase/service start, mill installation and acceptance. The ordinar
 then 20 timber must reach Terminal within 18 game hours. Completion persists with
 no extra payout; expiry is explicit and normal company play can continue.
 
-**Next implementation:** guided passing-loop construction previews using the
-existing blueprint, signal and reservation layers, with explicit limitations
-rather than an automatic promise of deadlock-free routing. The current flat/river
+**Guided passing-loop previews implemented:** Overlays draft tools offer a built-in
+9×4 horizontal layout with two switches and four automatic signals. Placement
+reuses matching track and reports the waypoint needed in Routes, with explicit
+whole-train fit and routing limitations. Normal atomic draft pricing, protected
+track/reservation checks and Undo/Redo apply; the local blueprint library is untouched.
+
+**Next implementation:** configurable passing-loop length and orientation, retaining
+explicit route assignment and train-fit guidance before automatic branch selection. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

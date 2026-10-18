@@ -49,6 +49,10 @@ keep arrivals outside the switch and station approach until departures clear it.
 Do not place that holding boundary between the switch and platform: an arrival
 could then wait on the switch and obstruct the departure.
 
+To draft this geometry automatically, choose **Overlays → Draft construction →
+Preview passing loop** and click **(8,8)**, then review and Apply plan. This adds
+track and signals, not services or waypoints. See [template guidance](TRACK_BLUEPRINTS.md#guided-passing-loop-preview).
+
 This tested example uses A (4,8), B (20,8) and horizontal mainline track:
 
 - Left switch **(8,8)**: west stem, east straight branch, south loop branch.
@@ -66,7 +70,9 @@ Both trains can deliver repeatedly. A red signal also limits track reservations
 beyond it, so a waiting train cannot lock the switch needed by a departure.
 Different layouts, shared origins, additional trains or poor signal placement can
 still produce deadlocks; Traffic explains and supports physical reversal. Automatic
-passing-loop selection, one-way signals and multi-platform stations remain planned.
+passing-loop branch selection remains planned; the template still needs explicit
+route waypoints. One-way signals and numbered/automatic compatible platforms are
+covered by their own current controls.
 
 ## Fleet management
 

@@ -9,6 +9,7 @@ signal pick_blueprint(which: int)
 signal save_blueprint
 signal import_blueprints
 signal export_blueprint
+signal place_passing_loop
 signal place_blueprint
 var blueprint_name: LineEdit
 var blueprint_search: LineEdit
@@ -101,6 +102,18 @@ func _ready() -> void:
 	stage.focus_mode = Control.FOCUS_NONE
 	stage.pressed.connect(func() -> void: draft_corridor.emit())
 	plan_controls.add_child(stage)
+	var loop_title := Label.new()
+	loop_title.text = "Guided passing loop"
+	plan_controls.add_child(loop_title)
+	var loop_hint := Label.new()
+	loop_hint.text = "9×4 tiles, horizontal main line, loop below. Two switches + four automatic signals. Click the left switch tile; review the draft before Apply. Assign a loop waypoint in Routes. Check train length; branches are not chosen automatically."
+	loop_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	plan_controls.add_child(loop_hint)
+	var loop_button := Button.new()
+	loop_button.text = "Preview passing loop"
+	loop_button.tooltip_text = "Nothing is purchased until Apply plan. Matching rails are reused; incompatible track refuses placement."
+	loop_button.pressed.connect(func() -> void: place_passing_loop.emit())
+	plan_controls.add_child(loop_button)
 	var blueprint_title := Label.new()
 	blueprint_title.text = "Track blueprints"
 	plan_controls.add_child(blueprint_title)

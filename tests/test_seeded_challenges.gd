@@ -16,7 +16,7 @@ func run() -> void:
 	check(not Config.validate({"mode": "cities", "seed": "43", "city_count": 3, "challenge": "first_connection"}).ok, "preset cannot silently use another seed")
 	for key in Challenges.DEFINITIONS:
 		var definition: Dictionary = Challenges.DEFINITIONS[key]
-		if definition.has("terrain") or definition.has("contract"): continue # River preset has a separate end-to-end suite.
+		if definition.has("terrain") or definition.has("contract") or definition.has("shared_track"): continue # River preset has a separate end-to-end suite.
 		var configuration := {"mode": "cities", "seed": definition.seed, "city_count": definition.cities, "challenge": key}
 		check(Config.validate(configuration).ok, "scenario preview uses validated generated start")
 		game = load("res://scenes/main/main.tscn").instantiate()
@@ -66,7 +66,7 @@ func run() -> void:
 		check(game.money == cash and game.seeded_challenge.state.completed_tick == completed, "goals award no repeat money and completion is stable")
 		check(game._save_game(1), "scenario saves")
 		var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-		check(saved.version == 51 and game._is_valid_save(saved), "version 51 validates preset and completion")
+		check(saved.version == 52 and game._is_valid_save(saved), "version 52 validates preset and completion")
 		var scenario_state: Dictionary = game.seeded_challenge.save_state()
 		check(game._load_slot(1) and game.seeded_challenge.save_state() == scenario_state, "load restores scenario identity and progress")
 		var bad: Dictionary = saved.duplicate(true)

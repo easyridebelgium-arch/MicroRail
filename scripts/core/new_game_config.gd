@@ -33,6 +33,10 @@ static func validate(value: Variant) -> Dictionary:
 	var two_stations: int = 2 * (Construction.STATION_PRICE + 5 * Construction.TRACK_PRICE)
 	var locomotive: int = Fleet.MODELS.passenger_standard.price
 	if challenge != "":
+		if challenge == "passing_place":
+			var quote := Challenges.Shared.quote()
+			if not quote.ok: return {"ok": false, "message": "Shared-track preset no longer has a checked affordable layout."}
+			return {"ok": true, "configuration": {"mode": "cities", "seed": value.seed, "city_count": int(count), "city_growth": growth, "challenge": challenge, "terrain": terrain}, "message": Challenges.description(challenge) + "\n\nChecked starting layout: stations £%d + connecting track/loop/switches £%d + two shuttles £%d = £%d; £%d left for operations. Nothing is prebuilt or bought by the Guide." % [quote.stations, quote.track, quote.trains, quote.total, Start.STARTING_BALANCE - int(quote.total)]}
 		if Challenges.DEFINITIONS[challenge].has("contract"):
 			var freight_price: int = Fleet.MODELS.freight_standard.price
 			var mill_price: int = preload("res://resources/industries/sawmill.tres").build_price

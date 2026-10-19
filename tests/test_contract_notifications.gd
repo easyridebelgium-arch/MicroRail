@@ -67,12 +67,12 @@ func run() -> void:
 	check(not game.paused and game.event_log.query(Events.CONTRACT_DEADLINE).is_empty(), "load cannot rearm reminder even when its event was pruned")
 	game.paused = true
 	var saved: Dictionary = game._save_snapshot()
-	check(saved.version == 51 and game._is_valid_save(saved), "version 51 validates the one-time warning marker")
+	check(saved.version == 52 and game._is_valid_save(saved), "version 52 validates the one-time warning marker")
 	var old := saved.duplicate(true)
 	old.version = 50
 	for order in old.freight_contracts.values(): order.erase("warned_tick")
 	var migrated: Dictionary = Migrations.migrate(old).data
-	check(migrated.version == 51 and migrated.freight_contracts.logs.warned_tick == -1 and migrated.state == old.state and migrated.sim == old.sim, "v50 migration adds unset warning markers without changing simulation or progress")
+	check(migrated.version == 52 and migrated.freight_contracts.logs.warned_tick == -1 and migrated.state == old.state and migrated.sim == old.sim, "v50 migration adds unset warning markers without changing simulation or progress")
 	game.queue_free()
 	await process_frame
 	game = fixture()

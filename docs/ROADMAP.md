@@ -426,8 +426,17 @@ examined while the intended branch paths remain intact; broken paths invalidate
 the interpretation. Reports are cached, advisory and explicitly labelled draft
 IDs; they never request authority, change signals, spend or advance simulation.
 
-**Next implementation:** a guided shared-track challenge with a checked budget
-and explicit delivery goals, teaching loop waypoints and signal boundaries together. The current flat/river
+**Passing Place challenge implemented:** a fifth preset (seed 4, three cities)
+starts empty with £5000 and a checked £2040 layout: two stations, shared line,
+9×4 signalled loop and two opposing shuttles. Its Guide offers a dashed map plan
+and normal draft/Routes handoffs. Completion requires ten new final journeys
+per correctly routed service after setup is ready; incomplete running setup or
+changed selected services restarts the unfinished attempt. No deadline or bonus.
+Version 52 persists delivery baselines and a completed milestone independently
+of later service retirement; v51 migration adds empty evidence to existing companies.
+
+**Next implementation:** a scenario completion review using measured elapsed time,
+delivery totals and operating results, before broader challenge packs or scoring. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

@@ -30,6 +30,7 @@ const RiverTerrain = preload("res://scripts/core/river_terrain.gd")
 var river_terrain := RiverTerrain.new()
 const SeededChallenges = preload("res://scripts/core/seeded_challenges.gd")
 var seeded_challenge := SeededChallenges.new()
+var shared_track_challenge := SeededChallenges.Shared.new()
 @export_range(3, 8, 1) var startup_city_count := 4
 
 const TILE_SIZE: int = 32
@@ -4146,9 +4147,19 @@ func _scenario_metrics() -> Dictionary:
 	}
 
 
+func shared_track_progress(adjusted: bool = true) -> Dictionary:
+	var measured: Dictionary = shared_track_challenge.inspect(world.state, tracks, track_signals, services, fleet, service_performance.state)
+	if adjusted:
+		var evidence: Dictionary = seeded_challenge.state.get("evidence", {})
+		var matches: bool = not evidence.is_empty() and measured.ready and evidence.direct == measured.direct and evidence.bypass == measured.bypass
+		for role in ["direct", "bypass"]:
+			measured[role + "_finals"] = maxi(0, int(measured[role + "_finals"]) - int(evidence[role + "_baseline"])) if matches else 0
+	return measured
+
 func _check_scenario_objectives() -> void:
 	if city_builder.is_city_game():
-		if seeded_challenge.advance(sim_clock.tick, city_service.state, freight_contracts.state):
+		var shared: Dictionary = shared_track_progress(false) if seeded_challenge.state.id == "passing_place" and int(seeded_challenge.state.completed_tick) < 0 else {}
+		if seeded_challenge.advance(sim_clock.tick, city_service.state, freight_contracts.state, shared):
 			_record_event(EventLog.OBJECTIVE_COMPLETED, "player", {"challenge": seeded_challenge.state.id, "reward": 0})
 			_show_notice("Scenario complete: %s! You met every delivery goal. Keep playing, or start another scenario." % SeededChallenges.DEFINITIONS[seeded_challenge.state.id].name)
 		return
@@ -4250,6 +4261,16 @@ func _toggle_objective_panel() -> void:
 func _update_objective_panel() -> void:
 	if seeded_challenge.state.id != "":
 		var definition: Dictionary = SeededChallenges.DEFINITIONS[seeded_challenge.state.id]
+		if seeded_challenge.state.id == "passing_place":
+			var finished: bool = int(seeded_challenge.state.completed_tick) >= 0
+			var current: Dictionary = shared_track_progress()
+			var counts: Dictionary = seeded_challenge.state.evidence if finished else current
+			objective_heading.text = "SCENARIO COMPLETE" if finished else "PASSING PLACE"
+			objective_description.text = "Main-line service final journeys: %d / 10\nLoop service final journeys: %d / 10" % [counts.direct_finals, counts.bypass_finals]
+			objective_details.text = "Seed 4 | No deadline | Guide: stations → shared loop → opposite services → waypoint. " + ("Milestone saved; keep playing." if finished else "Both routes/layout must be ready." if not current.ready else "Resume to carry passengers.")
+			objective_progress.max_value = 20
+			objective_progress.value = mini(int(counts.direct_finals), 10) + mini(int(counts.bypass_finals), 10)
+			return
 		if definition.has("contract"):
 			var order: Dictionary = freight_contracts.state[definition.contract]
 			objective_heading.text = "SCENARIO COMPLETE" if int(seeded_challenge.state.completed_tick) >= 0 else "ORDER EXPIRED — RETRY VIA NEW GAME" if order.status == "expired" else definition.name.to_upper()

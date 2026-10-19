@@ -87,3 +87,8 @@ Existing games/scenarios stay flat. See [bridge rules](RIVERS_AND_BRIDGES.md).
 or locally shifted crossings. Failed water drags highlight a feasible bridge
 column and quote the span separately from its approach rails. See [terrain
 variety and guidance](RIVER_VARIETY.md).
+
+**Passing Place** is a guided shared-track preset: seed 4, three cities, £5000,
+with a checked £2040 two-service setup. Open Guide for its dashed station/loop
+plan, build through normal tools, then carry ten new final journeys with each
+opposing service. See [scenario instructions](SEEDED_SCENARIOS.md#passing-place--guided-shared-track-challenge).

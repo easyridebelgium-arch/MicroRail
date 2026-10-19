@@ -410,8 +410,16 @@ refresh after fleet changes and invalidate after template geometry/signal edits;
 apply, discard and load clear preview-only state. This is local clearance, not
 a block-isolation, route-choice or deadlock guarantee, and never blocks construction.
 
-**Next implementation:** a loop-waypoint handoff into the Routes draft for a
-player-selected service, with explicit review before applying route changes. The current flat/river
+**Loop-waypoint handoff implemented:** after applying a loop, Overlays offers
+Use loop waypoint in Routes. It fills the coordinates and keeps a persistent
+select-service/leg → Add waypoint → review/Apply hint; opening never inserts a
+waypoint or edits live routes. Existing directives, duplicate limits, linked-route
+controls and empty-at-first-stop restrictions remain authoritative. Pending
+construction, missing/edited template geometry and an open dialog block the
+shortcut; Undo/Redo updates availability, and load clears temporary context.
+
+**Next implementation:** block-boundary diagnostics for loop previews, distinguishing
+local body fit from actual branch isolation in the surrounding network. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

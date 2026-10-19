@@ -9,8 +9,11 @@ signal pick_blueprint(which: int)
 signal save_blueprint
 signal import_blueprints
 signal export_blueprint
+signal use_loop_waypoint
 signal place_passing_loop
 signal place_blueprint
+var loop_routes: Button
+var loop_route_hint: Label
 var loop_fit: Label
 var loop_length: SpinBox
 var loop_orientation: OptionButton
@@ -134,6 +137,15 @@ func _ready() -> void:
 	loop_fit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
 	plan_controls.add_child(loop_fit)
+	loop_routes = Button.new()
+	loop_routes.text = "Use loop waypoint in Routes"
+	loop_routes.disabled = true
+	loop_routes.pressed.connect(func() -> void: use_loop_waypoint.emit())
+	plan_controls.add_child(loop_routes)
+	loop_route_hint = Label.new()
+	loop_route_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loop_route_hint.text = "Preview and apply a loop first. Then choose a service and leg in Routes; Add waypoint changes only its draft."
+	plan_controls.add_child(loop_route_hint)
 	var blueprint_title := Label.new()
 	blueprint_title.text = "Track blueprints"
 	plan_controls.add_child(blueprint_title)

@@ -2214,6 +2214,7 @@ func _load_game(save_path: String = "") -> bool:
 	event_log.restore_state(data["sim"]["events"])
 	notifications.reset()
 	construction_plan.clear()
+	passing_loop_handoff.clear()
 	_clear_passing_loop_fit()
 	if train_inspector != null: train_inspector.hide()
 	object_pins = data.watchlist.duplicate(true)
@@ -4506,7 +4507,7 @@ func _setup_routes_editor() -> void:
 	routes_button.pressed.connect(_open_routes_editor)
 	$Interface/HeaderBox/Toolbar.add_child(routes_button)
 
-func _open_routes_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
+func _open_routes_editor(cell: Vector2i = Vector2i(-1, -1), context: String = "") -> void:
 	paused = true
 	is_dragging = false
 	is_panning = false
@@ -4515,7 +4516,7 @@ func _open_routes_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 	build_plan.clear()
 	_close_station_inspector()
 	_update_toolbar()
-	route_editor.open_editor(cell)
+	route_editor.open_editor(cell, context)
 
 const FIRST_PLATFORM_MESSAGE := "The first stop's platform cannot change while the train stands on its current platform. Choose platforms for the later stops, or move the first stop to another station."
 
@@ -5849,6 +5850,7 @@ func _setup_inspection() -> void:
 	inspection_panel.pick_blueprint.connect(func(which: int) -> void:
 		corridor_pick = which + 2
 		_show_notice("Click the map to choose blueprint corner %d." % which))
+	inspection_panel.use_loop_waypoint.connect(_open_loop_waypoint_routes)
 	inspection_panel.place_passing_loop.connect(func() -> void:
 		corridor_pick = 6
 		_show_notice("Click the first switch tile (leftmost horizontal / topmost vertical) for the selected passing-loop draft. Escape cancels."))
@@ -5907,6 +5909,7 @@ func _update_inspection() -> void:
 		var quote: Dictionary = construction_plan.quote()
 		var error: String = construction_plan.validate(tracks, reservations.owners, track_signals, Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected, money)
 		_update_passing_loop_fit()
+		_update_loop_waypoint_controls()
 		inspection_panel.plan_summary.text = "Draft: %d tracks / %d signals\nBuild £%d | Refund £%d | Net £%d\n%s" % [construction_plan.changes.size(), construction_plan.signal_changes.size(), quote.cost, quote.refund, quote.net, "Ready to apply as one action." if error.is_empty() else error]
 	inspection_panel.corridor_label.text = "Signal corridor: %s → %s\n%d selected route tiles" % [str(corridor_start), str(corridor_end), corridor_cells.size()]
 	var lines: PackedStringArray = ["Paths: retained train routes; gaps remain visible. Squares mark route origins; circles mark the next destination. Labels use permanent train IDs.", "Reservations: use the toolbar toggle for hatched ownership."]
@@ -6178,6 +6181,7 @@ func _apply_draft() -> bool:
 	construction_undo.back()["signals_before"] = signals_before
 	construction_undo.back()["signals_after"] = signals_after
 	_record_event(EventLog.CONSTRUCTION_APPLIED, "player", {"tracks": after.size(), "signals": signals_after.size(), "cost": quote.cost, "refund": quote.refund})
+	if not passing_loop_preview.is_empty(): passing_loop_handoff = passing_loop_preview.duplicate(true)
 	construction_plan.clear()
 	_clear_passing_loop_fit()
 	corridor_pick = 0
@@ -6303,13 +6307,50 @@ func _place_blueprint(anchor: Vector2i) -> bool:
 	queue_redraw()
 	return true
 
+var passing_loop_handoff: Dictionary = {}
 var passing_loop_preview: Dictionary = {}
 var passing_loop_fit_key: Array = []
+
+func _loop_waypoint_reason() -> String:
+	var source: Dictionary = passing_loop_preview if not passing_loop_preview.is_empty() else passing_loop_handoff
+	if source.is_empty(): return "Preview and apply a loop first."
+	if not construction_plan.is_empty(): return "Apply or discard the construction draft first. Routes uses built track only."
+	var helper = preload("res://scripts/core/passing_loop_fit.gd")
+	if not helper.layout_error(source.anchor, source.length, source.orientation, tracks, track_signals).is_empty(): return "Loop track or signals changed. Preview and apply a fresh template before using this shortcut."
+	if services.is_empty(): return "Start a service in Fleet first, then choose its leg in Routes."
+	return ""
+
+func _update_loop_waypoint_controls() -> void:
+	var reason := _loop_waypoint_reason()
+	inspection_panel.loop_routes.disabled = not reason.is_empty()
+	inspection_panel.loop_routes.tooltip_text = reason if not reason.is_empty() else "Open Routes with the loop cell filled in. Choose service and leg, Add waypoint, then review and Apply. Nothing is assigned automatically."
+	if not reason.is_empty():
+		inspection_panel.loop_route_hint.text = reason
+	else:
+		var source: Dictionary = passing_loop_preview if not passing_loop_preview.is_empty() else passing_loop_handoff
+		var via: Vector2i = preload("res://scripts/core/passing_loop_template.gd").waypoint(source.anchor, source.length, source.orientation)
+		inspection_panel.loop_route_hint.text = "Built loop waypoint %d,%d ready. Choose a service and leg in Routes; Add waypoint changes only its draft. Apply validates the complete route and train state." % [via.x, via.y]
+
+func _open_loop_waypoint_routes() -> void:
+	var reason := _loop_waypoint_reason()
+	if not reason.is_empty():
+		_show_notice(reason)
+		return
+	if _modal_open():
+		_show_notice("Close the current dialog first. Its draft is kept intact.")
+		return
+	var source: Dictionary = passing_loop_preview if not passing_loop_preview.is_empty() else passing_loop_handoff
+	var template = preload("res://scripts/core/passing_loop_template.gd")
+	var via: Vector2i = template.waypoint(source.anchor, source.length, source.orientation)
+	corridor_pick = 0
+	_open_routes_editor(via, "Passing-loop cell %d,%d. Choose the intended service and leg, then Add waypoint. It appends after existing directives; review their order, then Apply. Shuttle return legs retrace the selected path. Linked services follow their source; select that source or Unlink deliberately. Nothing has been added automatically." % [via.x, via.y])
 
 func _clear_passing_loop_fit() -> void:
 	passing_loop_preview.clear()
 	passing_loop_fit_key.clear()
-	if inspection_panel != null: inspection_panel.loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
+	if inspection_panel != null:
+		inspection_panel.loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
+		_update_loop_waypoint_controls()
 
 func _update_passing_loop_fit() -> void:
 	if passing_loop_preview.is_empty(): return
@@ -6337,9 +6378,11 @@ func _draft_passing_loop(anchor: Vector2i) -> bool:
 		return false
 	construction_plan.stage(proposal.tracks, tracks)
 	construction_plan.stage_signals(proposal.signals, track_signals, tracks)
+	passing_loop_handoff.clear()
 	passing_loop_preview = {"anchor": anchor, "length": length, "orientation": orientation}
 	passing_loop_fit_key.clear()
 	_update_passing_loop_fit()
+	_update_loop_waypoint_controls()
 	inspection_panel.blueprint_status.text = template.instructions(anchor, length, orientation)
 	var via: Vector2i = template.waypoint(anchor, length, orientation)
 	_show_notice("Passing loop drafted. Review cost in Overlays before Apply; use loop waypoint %d,%d in Routes. Nothing purchased yet." % [via.x, via.y])

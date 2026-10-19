@@ -20,6 +20,7 @@ var stop_remove_button: Button
 var up_button: Button
 var down_button: Button
 var platform_choice: OptionButton
+var waypoint_hint: Label
 var waypoint_leg: OptionButton
 var waypoint_list: ItemList
 var waypoint_x: SpinBox
@@ -206,6 +207,10 @@ func configure(owner_game: Node) -> void:
 	var waypoint_heading := Label.new()
 	waypoint_heading.text = "Pass-through waypoints — no loading or station wait"
 	box.add_child(waypoint_heading)
+	waypoint_hint = Label.new()
+	waypoint_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	waypoint_hint.hide()
+	box.add_child(waypoint_hint)
 	waypoint_leg = OptionButton.new()
 	box.add_child(waypoint_leg)
 	waypoint_leg.item_selected.connect(func(_index: int) -> void: _refresh_waypoints())
@@ -252,7 +257,9 @@ func _button(title_text: String, callback: Callable) -> Button:
 	editing_controls.add_child(button)
 	return button
 
-func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
+func open_editor(cell: Vector2i = Vector2i(-1, -1), context: String = "") -> void:
+	waypoint_hint.text = context
+	waypoint_hint.visible = not context.is_empty()
 	game.refresh_station_choices(station_choice)
 	draft = game.services.duplicate(true)
 	for key in draft:
@@ -268,6 +275,7 @@ func open_editor(cell: Vector2i = Vector2i(-1, -1)) -> void:
 		service_choice.add_item("%s — #%d" % [game.services[key].name, int(train.id)])
 		service_choice.set_item_metadata(service_choice.item_count - 1, key)
 	for control in body.get_children(): control.visible = control != empty_label
+	waypoint_hint.visible = not context.is_empty()
 	get_ok_button().disabled = draft.is_empty()
 	if draft.is_empty():
 		for control in body.get_children(): control.visible = control == empty_label

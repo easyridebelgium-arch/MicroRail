@@ -8,9 +8,9 @@ const Signals = preload("res://scripts/core/block_signals.gd")
 const Fleet = preload("res://scripts/fleet.gd")
 const ALLOWANCE := 2.0
 
-static func inspect(anchor: Vector2i, length: int, orientation: int, tracks: Dictionary, signs: Dictionary, fleet: Dictionary, tile_size: float) -> Dictionary:
+static func layout_error(anchor: Vector2i, length: int, orientation: int, tracks: Dictionary, signs: Dictionary) -> String:
 	var design := Template.design(length, orientation)
-	if design.is_empty() or tile_size <= 0: return {"ok": false, "message": "Choose a valid passing-loop preview first."}
+	if design.is_empty(): return "Choose a valid passing-loop preview first."
 	var expected: Dictionary = {}
 	var expected_signs: Dictionary = {}
 	var origin := anchor + Template.footprint_offset(orientation)
@@ -18,7 +18,13 @@ static func inspect(anchor: Vector2i, length: int, orientation: int, tracks: Dic
 	for row in design.signals: expected_signs[origin + Vector2i(row[0], row[1])] = row[2]
 	for cell in expected:
 		if typeof(tracks.get(cell)) != typeof(expected[cell]) or tracks.get(cell) != expected[cell] or signs.get(cell) != expected_signs.get(cell):
-			return {"ok": false, "message": "Last loop preview has been edited. Fit unavailable: discard and place a fresh template to measure its holding points."}
+			return "Last loop preview has been edited. Fit unavailable: discard and place a fresh template to measure its holding points."
+	return ""
+
+static func inspect(anchor: Vector2i, length: int, orientation: int, tracks: Dictionary, signs: Dictionary, fleet: Dictionary, tile_size: float) -> Dictionary:
+	if tile_size <= 0: return {"ok": false, "message": "Choose a valid passing-loop preview first."}
+	var error := layout_error(anchor, length, orientation, tracks, signs)
+	if not error.is_empty(): return {"ok": false, "message": error}
 	var main := _branch(anchor, length, orientation, false, tile_size)
 	var loop := _branch(anchor, length, orientation, true, tile_size)
 	var rows: Array = []

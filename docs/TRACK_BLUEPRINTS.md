@@ -128,3 +128,38 @@ and never move the simulation or spend money.
 runtime stopping directions, short/long synthetic clearance cases, graph/fleet
 immutability, row ordering, cache refresh, stale draft detection and cleanup on
 apply/discard/load. Existing running tests continue to verify shared-track safety.
+
+## Loop waypoint shortcut
+
+1. Place a guided loop preview, review cost and fit, then **Apply plan**.
+2. In Overlays, click **Use loop waypoint in Routes**. The helper shows which
+   built loop cell it will use. It opens Routes paused with that cell's X/Y filled
+   in and a persistent instruction beside the waypoint controls.
+3. Choose the intended **service and leg**, then click **Add waypoint**. Existing
+   waypoints remain in order; this appends the loop cell. Use Up/Down if needed.
+4. Review the full route and click **Apply**. Closing/Cancel discards the route
+   draft; the already-built track is a separate construction transaction.
+
+Opening the shortcut makes no purchases, inserts no waypoint and changes no
+service. Choose the train/service that should use the loop; the other service
+can stay on the main branch. Shuttle return trips retrace that leg's selected
+path. Loop mode has separate legs, including the closing leg; choose deliberately.
+A linked service follows its source: select that source or deliberately Unlink
+before editing independently. Existing duplicate/16-point limits and safe route
+application rules remain in force. A running train cannot be teleported or have
+its route changed through this shortcut; finish the trip or physically reverse
+back to its first stop as the normal Routes message explains.
+
+The shortcut requires built, unmodified template geometry/signals, a service and
+no pending construction. Apply or discard other construction first. It never
+applies construction on your behalf or overwrites an already-open dialog draft.
+Undo disables a shortcut whose track disappears; Redo can restore it. An identical
+already-built template can be previewed at no cost to recover the shortcut. The
+last applied template context is temporary and clears on load; an applied service
+waypoint is saved through the ordinary route schema. Editing the length/orientation
+controls does not move the cell associated with an earlier preview.
+
+`test_loop_waypoint_handoff.gd` covers pre-build refusal, Apply/Undo/Redo,
+explicit service selection, draft-only Add, duplicate refusal, protection of an
+open draft, Cancel, normal Apply, running-train restrictions, pending construction,
+ordinary Routes hint reset and saved waypoint persistence without saved handoff state.

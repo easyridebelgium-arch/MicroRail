@@ -402,8 +402,16 @@ boundaries transform together; the clicked point remains the first switch. Price
 and exact waypoint guidance follow the selected shape, and normal bounds/protection
 checks reject clipped footprints. Options affect the next draft, not existing track.
 
-**Next implementation:** measured train-fit diagnostics for passing-loop drafts,
-before automatic branch selection or service changes. The current flat/river
+**Measured passing-loop train fit implemented:** the last template preview reports
+main/loop inner holding spans and per-owned-train results, including stored trains
+and actual carriage lengths. Read-only checks use runtime red-signal stopping and
+whole-body footprints in both directions, with a 2 px planning allowance. Results
+refresh after fleet changes and invalidate after template geometry/signal edits;
+apply, discard and load clear preview-only state. This is local clearance, not
+a block-isolation, route-choice or deadlock guarantee, and never blocks construction.
+
+**Next implementation:** a loop-waypoint handoff into the Routes draft for a
+player-selected service, with explicit review before applying route changes. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

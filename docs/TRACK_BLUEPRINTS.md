@@ -92,3 +92,39 @@ reservation protection and stale drafts.
 `test_passing_loop_options.gd` checks minimum/maximum and even/odd lengths in
 all four orientations, both route directions, signal boundaries, price, above/left
 map edges, ordinary UI options, atomic apply/Undo and real save/load.
+
+## Measured train fit
+
+After placing a guided loop preview, **Overlays** shows **Last loop preview —
+measured train fit** below its controls. It lists both inner holding spans in
+map tiles, followed by every owned train's permanent ID, name, actual consist length
+and **main fits / loop fits** or **TOO SHORT**. Stored trains are labelled too.
+An empty fleet is explained rather than given an unconditional success message.
+
+The span is the route distance inside the two signal boundaries. Fit uses the
+runtime red-signal stopping calculation and the whole train's conservative body
+footprint at **both ends** of each branch, including curved loop geometry. Every
+occupied tile must lie inside the branch, clear of the two signals and switches;
+a 2 px planning allowance is included. Displayed lengths are rounded to one
+decimal tile; the calculation uses full precision. A raw span is not used as a substitute for
+this body test. Current single locomotives and four-coach consists fit the default
+loop; the measurement also supports longer bodies as rolling stock expands.
+
+If a branch is too short, choose a longer length or shorten the consist, discard
+the old draft and preview again. These are advisory local clearance results:
+construction remains subject to ordinary cost/protection/reservation checks, and
+this panel does not assign routes, alter trains, predict traffic or prove that
+surrounding signal blocks are isolated. An incorrectly routed train or shared
+station approach can still deadlock even when every body fits this local siding.
+
+Measurements refresh when the fleet changes. Later edits to template track or
+signals replace the result with **Fit unavailable**, requiring a fresh preview.
+Changing the length/orientation controls affects only the next placement. Applying,
+discarding or loading clears the preview-specific measurement; no new save state
+or gameplay rules are introduced. Measurements are cached between relevant edits
+and never move the simulation or spend money.
+
+`test_passing_loop_fit.gd` covers four orientations, real consist lengths, both
+runtime stopping directions, short/long synthetic clearance cases, graph/fleet
+immutability, row ordering, cache refresh, stale draft detection and cleanup on
+apply/discard/load. Existing running tests continue to verify shared-track safety.

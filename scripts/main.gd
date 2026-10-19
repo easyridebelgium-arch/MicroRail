@@ -2214,6 +2214,7 @@ func _load_game(save_path: String = "") -> bool:
 	event_log.restore_state(data["sim"]["events"])
 	notifications.reset()
 	construction_plan.clear()
+	_clear_passing_loop_fit()
 	if train_inspector != null: train_inspector.hide()
 	object_pins = data.watchlist.duplicate(true)
 	service_performance.restore_state(data.service_performance)
@@ -5905,6 +5906,7 @@ func _update_inspection() -> void:
 	if planning_mode:
 		var quote: Dictionary = construction_plan.quote()
 		var error: String = construction_plan.validate(tracks, reservations.owners, track_signals, Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected, money)
+		_update_passing_loop_fit()
 		inspection_panel.plan_summary.text = "Draft: %d tracks / %d signals\nBuild £%d | Refund £%d | Net £%d\n%s" % [construction_plan.changes.size(), construction_plan.signal_changes.size(), quote.cost, quote.refund, quote.net, "Ready to apply as one action." if error.is_empty() else error]
 	inspection_panel.corridor_label.text = "Signal corridor: %s → %s\n%d selected route tiles" % [str(corridor_start), str(corridor_end), corridor_cells.size()]
 	var lines: PackedStringArray = ["Paths: retained train routes; gaps remain visible. Squares mark route origins; circles mark the next destination. Labels use permanent train IDs.", "Reservations: use the toolbar toggle for hatched ownership."]
@@ -6114,6 +6116,7 @@ func _set_planning_mode(enabled: bool) -> void:
 		inspection_panel.plan_toggle.set_pressed_no_signal(true)
 		_show_notice("Apply or discard the draft before leaving planning mode.")
 		return
+	if not enabled: _clear_passing_loop_fit()
 	planning_mode = enabled
 	corridor_pick = 0
 	is_dragging = false
@@ -6131,6 +6134,7 @@ func _discard_draft() -> void:
 	corridor_pick = 0
 	corridor_cells.clear()
 	construction_plan.clear()
+	_clear_passing_loop_fit()
 	is_dragging = false
 	build_plan.clear()
 	_show_notice("Construction draft discarded.")
@@ -6175,6 +6179,7 @@ func _apply_draft() -> bool:
 	construction_undo.back()["signals_after"] = signals_after
 	_record_event(EventLog.CONSTRUCTION_APPLIED, "player", {"tracks": after.size(), "signals": signals_after.size(), "cost": quote.cost, "refund": quote.refund})
 	construction_plan.clear()
+	_clear_passing_loop_fit()
 	corridor_pick = 0
 	_check_route()
 	_show_notice("Applied %d tracks and %d signals; net cost £%d. Undo treats the plan as one action." % [after.size(), signals_after.size(), quote.net])
@@ -6298,6 +6303,25 @@ func _place_blueprint(anchor: Vector2i) -> bool:
 	queue_redraw()
 	return true
 
+var passing_loop_preview: Dictionary = {}
+var passing_loop_fit_key: Array = []
+
+func _clear_passing_loop_fit() -> void:
+	passing_loop_preview.clear()
+	passing_loop_fit_key.clear()
+	if inspection_panel != null: inspection_panel.loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
+
+func _update_passing_loop_fit() -> void:
+	if passing_loop_preview.is_empty(): return
+	var projected: Dictionary = construction_plan.projected(tracks)
+	var signs: Dictionary = construction_plan.projected_signals(track_signals)
+	var key: Array = [passing_loop_preview.hash(), projected.hash(), signs.hash(), fleet.hash()]
+	if key == passing_loop_fit_key: return
+	passing_loop_fit_key = key
+	var helper = preload("res://scripts/core/passing_loop_fit.gd")
+	var result: Dictionary = helper.inspect(passing_loop_preview.anchor, passing_loop_preview.length, passing_loop_preview.orientation, projected, signs, fleet, float(TILE_SIZE))
+	inspection_panel.loop_fit.text = helper.describe(result)
+
 func _draft_passing_loop(anchor: Vector2i) -> bool:
 	if not planning_mode: return false
 	var template = preload("res://scripts/core/passing_loop_template.gd")
@@ -6313,6 +6337,9 @@ func _draft_passing_loop(anchor: Vector2i) -> bool:
 		return false
 	construction_plan.stage(proposal.tracks, tracks)
 	construction_plan.stage_signals(proposal.signals, track_signals, tracks)
+	passing_loop_preview = {"anchor": anchor, "length": length, "orientation": orientation}
+	passing_loop_fit_key.clear()
+	_update_passing_loop_fit()
 	inspection_panel.blueprint_status.text = template.instructions(anchor, length, orientation)
 	var via: Vector2i = template.waypoint(anchor, length, orientation)
 	_show_notice("Passing loop drafted. Review cost in Overlays before Apply; use loop waypoint %d,%d in Routes. Nothing purchased yet." % [via.x, via.y])

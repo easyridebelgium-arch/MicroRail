@@ -11,6 +11,7 @@ signal import_blueprints
 signal export_blueprint
 signal place_passing_loop
 signal place_blueprint
+var loop_fit: Label
 var loop_length: SpinBox
 var loop_orientation: OptionButton
 var blueprint_name: LineEdit
@@ -129,6 +130,10 @@ func _ready() -> void:
 	loop_button.tooltip_text = "Nothing is purchased until Apply plan. Matching rails are reused; incompatible track refuses placement."
 	loop_button.pressed.connect(func() -> void: place_passing_loop.emit())
 	plan_controls.add_child(loop_button)
+	loop_fit = Label.new()
+	loop_fit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
+	plan_controls.add_child(loop_fit)
 	var blueprint_title := Label.new()
 	blueprint_title.text = "Track blueprints"
 	plan_controls.add_child(blueprint_title)

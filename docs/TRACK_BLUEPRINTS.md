@@ -163,3 +163,44 @@ controls does not move the cell associated with an earlier preview.
 explicit service selection, draft-only Add, duplicate refusal, protection of an
 open draft, Cancel, normal Apply, running-train restrictions, pending construction,
 ordinary Routes hint reset and saved waypoint persistence without saved handoff state.
+
+## Signal-block isolation in loop previews
+
+The **Last loop preview — signal blocks (draft)** report complements measured
+train fit. It uses the same conservative connected-block partition as operating
+signals, over **all projected track and signals**, including track outside the
+loop. It lists blocks for the main branch, loop branch and both end switches,
+with switch coordinates. Preview block IDs may differ from current live IDs.
+
+The report explains:
+
+- Missing boundary signals, with coordinates and which areas now share a block.
+- Main and loop branches joined through additional track.
+- Both end switches sharing a block through an unsignalled outside connection.
+  Inspect that joining connection and add appropriate boundaries there; keep
+  the platform-to-switch approaches arranged as described in the tested example.
+- Extra signals splitting a branch into multiple holding areas.
+- Manual stop signals that still divide blocks but hold trains until released.
+
+A train that fits the local siding may still hold both approaches if an outside
+connection merges their blocks. Conversely, different block IDs do not establish
+that a train fits, has a valid assigned route, or can never deadlock. These are
+current topology facts, not authority grants, traffic predictions or automatic
+repairs. An isolated template with no outer track yet still needs connecting to
+stations and assigning services. Warnings do not block ordinary construction.
+
+Removing a boundary or adding a junction can still be diagnosed if both original
+branch paths and the two end switches remain identifiable. A missing rail or
+incompatible port makes the block check unavailable, instead of interpreting an
+unrelated new layout. Body-fit checks remain independent and may require a fresh
+unmodified template after such edits. Conservative crossing connectivity is the
+same as in the operating block model; a shared block is not proof a train can turn
+between every port in it. One-way route legality, platform access and occupancy
+remain governed by their normal systems.
+
+Reports refresh with the projected graph and clear with the preview on
+apply/discard/load. No new save state, notification events or simulation decisions
+are introduced. `test_passing_loop_blocks.gd` covers four orientations and three
+lengths, external rejoining/cutting, added central connections, missing/manual/extra
+signals, broken paths, read-only inputs and UI invalidation/cleanup. Existing fit,
+waypoint handoff, template and block-authority tests remain in place.

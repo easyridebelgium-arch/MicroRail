@@ -14,6 +14,7 @@ signal place_passing_loop
 signal place_blueprint
 var loop_routes: Button
 var loop_route_hint: Label
+var loop_blocks: Label
 var loop_fit: Label
 var loop_length: SpinBox
 var loop_orientation: OptionButton
@@ -137,6 +138,10 @@ func _ready() -> void:
 	loop_fit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
 	plan_controls.add_child(loop_fit)
+	loop_blocks = Label.new()
+	loop_blocks.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loop_blocks.text = "Place a passing-loop preview to inspect its signal blocks."
+	plan_controls.add_child(loop_blocks)
 	loop_routes = Button.new()
 	loop_routes.text = "Use loop waypoint in Routes"
 	loop_routes.disabled = true

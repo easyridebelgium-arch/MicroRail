@@ -6350,6 +6350,7 @@ func _clear_passing_loop_fit() -> void:
 	passing_loop_fit_key.clear()
 	if inspection_panel != null:
 		inspection_panel.loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
+		inspection_panel.loop_blocks.text = "Place a passing-loop preview to inspect its signal blocks."
 		_update_loop_waypoint_controls()
 
 func _update_passing_loop_fit() -> void:
@@ -6362,6 +6363,9 @@ func _update_passing_loop_fit() -> void:
 	var helper = preload("res://scripts/core/passing_loop_fit.gd")
 	var result: Dictionary = helper.inspect(passing_loop_preview.anchor, passing_loop_preview.length, passing_loop_preview.orientation, projected, signs, fleet, float(TILE_SIZE))
 	inspection_panel.loop_fit.text = helper.describe(result)
+	var block_helper = preload("res://scripts/core/passing_loop_blocks.gd")
+	var connectivity: Dictionary = block_helper.inspect(passing_loop_preview.anchor, passing_loop_preview.length, passing_loop_preview.orientation, projected, signs)
+	inspection_panel.loop_blocks.text = block_helper.describe(connectivity)
 
 func _draft_passing_loop(anchor: Vector2i) -> bool:
 	if not planning_mode: return false

@@ -418,8 +418,16 @@ controls and empty-at-first-stop restrictions remain authoritative. Pending
 construction, missing/edited template geometry and an open dialog block the
 shortcut; Undo/Redo updates availability, and load clears temporary context.
 
-**Next implementation:** block-boundary diagnostics for loop previews, distinguishing
-local body fit from actual branch isolation in the surrounding network. The current flat/river
+**Passing-loop block diagnostics implemented:** preview text reuses the operating
+block partition over the full projected network. It identifies shared main/loop/
+end-switch blocks, missing boundaries, manual holds, split holding areas and an
+external unsignalled connection joining both approaches. Extra junctions can be
+examined while the intended branch paths remain intact; broken paths invalidate
+the interpretation. Reports are cached, advisory and explicitly labelled draft
+IDs; they never request authority, change signals, spend or advance simulation.
+
+**Next implementation:** a guided shared-track challenge with a checked budget
+and explicit delivery goals, teaching loop waypoints and signal boundaries together. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

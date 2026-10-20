@@ -443,8 +443,13 @@ retirement preserve them. Older completions clearly label current-only figures,
 with no invented historical finances. Existing v52 evidence and simulation survive
 migration. No automatic popup, score or extra payout.
 
-**Next implementation:** local result-summary export for sharing playtest feedback,
-before broader challenge packs or scoring. The current flat/river
+**Local result-summary sharing implemented:** Results can copy a summary or export
+a UTF-8 text file with seed, content versions, scenario rules and the displayed
+completion figures. Historical/current-only caveats survive export; no simulation
+changes or automatic uploads.
+
+**Next implementation:** a playtest feedback checklist linking shared summaries to
+clear reproduction steps, before broader challenge packs or scoring. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

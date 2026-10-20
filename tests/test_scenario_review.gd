@@ -45,6 +45,23 @@ func run() -> void:
 	game.results_button.pressed.emit()
 	check(game.results_button.visible and game.scenario_review_dialog.visible and game.paused and game._modal_open(), "Results opens paused and participates in modal input handling")
 	check(game.scenario_review_dialog.details.text.contains("Saved company totals at completion"), "new results identify their historical scope")
+	var dialog = game.scenario_review_dialog
+	var exported: String = dialog.summary
+	check(exported.contains("Map seed: 42") and exported.contains("Scenario ID: first_connection") and exported.contains("generator:") and exported.contains("content:") and exported.contains("loans: allowed"), "share summary includes reproducibility metadata and scenario rules")
+	check(exported.contains(dialog.details.text) and not exported.contains("user://") and not exported.contains("/workspace"), "share summary uses displayed historical figures without local file paths")
+	var tick_before: int = game.sim_clock.tick
+	dialog.export_button.pressed.emit()
+	check(dialog.export_picker.visible and dialog.export_picker.file_mode == FileDialog.FILE_MODE_SAVE_FILE and dialog.export_picker.current_file == "microrail-first_connection-results.txt", "export action opens a save picker with a safe suggested filename")
+	dialog.export_picker.hide()
+	check(dialog.visible and game.paused, "cancelling export keeps the review open and company paused")
+	var report_path := "user://scenario-result-test.txt"
+	dialog._export(report_path)
+	check(FileAccess.get_file_as_string(report_path) == exported and dialog.export_status.text.begins_with("Summary saved"), "export writes exact UTF-8 report including pound symbols")
+	dialog._export("user://missing-export-directory/report.txt")
+	check(dialog.export_status.text.begins_with("Could not save") and dialog.visible, "write failure is actionable and leaves results available")
+	check(game.sim_clock.tick == tick_before and game.seeded_challenge.state.review == recorded, "sharing does not advance simulation or modify historical results")
+	check(Review.write_summary(report_path, "") == ERR_INVALID_DATA and FileAccess.get_file_as_string(report_path) == exported, "empty unfinished report cannot overwrite an existing export")
+	DirAccess.remove_absolute(report_path)
 	game.scenario_review_dialog.hide()
 	check(game._save_game(3) and game._load_slot(3) and game.seeded_challenge.state.review == recorded, "historical results survive actual save/load")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(3)))
@@ -62,6 +79,7 @@ func run() -> void:
 	game.seeded_challenge.restore_state(migrated.seeded_challenge)
 	game.open_scenario_results()
 	check(game.scenario_review_dialog.details.text.contains("CURRENT company totals") and game.scenario_review_dialog.details.text.contains("older completion"), "older completion clearly labels current-only financial fallback")
+	check(game.scenario_review_dialog.summary.contains("CURRENT company totals") and game.scenario_review_dialog.summary.contains("older completion"), "legacy export preserves current-only disclaimer")
 	game.scenario_review_dialog.hide()
 	game.seeded_challenge.restore_state(saved.seeded_challenge)
 	var old_scale: float = game.GameSettings.ui_scale
@@ -72,7 +90,13 @@ func run() -> void:
 	check(game.results_button.get_global_rect().end.x <= game.get_viewport_rect().size.x, "Results button remains reachable at 200 percent scale")
 	check(game.scenario_review_dialog.size.x <= root.get_visible_rect().size.x and game.scenario_review_dialog.size.y <= root.get_visible_rect().size.y, "review dialog fits at 200 percent scale")
 	check(game.scenario_review_dialog.get_ok_button().get_global_rect().end.y <= game.scenario_review_dialog.size.y, "Close remains reachable at 200 percent scale")
+	var export_rect: Rect2 = game.scenario_review_dialog.export_button.get_global_rect()
+	check(export_rect.end.x <= game.scenario_review_dialog.size.x and export_rect.end.y <= game.scenario_review_dialog.size.y, "Export control remains reachable at 200 percent scale")
+	game.scenario_review_dialog.export_button.pressed.emit()
+	for frame in range(2): await process_frame
+	check(game.scenario_review_dialog.export_picker.size.x <= root.get_visible_rect().size.x and game.scenario_review_dialog.export_picker.size.y <= root.get_visible_rect().size.y, "export picker fits at 200 percent scale")
 	game.scenario_review_dialog.hide()
+	check(not game.scenario_review_dialog.export_picker.visible, "closing review hides its child export picker")
 	game.GameSettings.ui_scale = old_scale
 	game._apply_settings()
 	game.queue_free()

@@ -48,3 +48,17 @@ static func describe(state: Dictionary, definition: Dictionary, current: Diction
 	lines.append("Company final passenger journeys: %d\nPassenger fares: £%d\nFreight receipts: £%d\nRunning costs: £%d\nOperating contribution: £%d\nCash balance: £%d" % [recorded.delivered, recorded.fares, recorded.freight, recorded.running, int(recorded.fares) + int(recorded.freight) - int(recorded.running), recorded.cash])
 	lines.append("Operating contribution = fares + freight receipts − running costs. Construction, fleet purchases, rewards, contract bonuses, loans and interest affect cash separately. Boarding and transfers do not add final journeys. Close and keep playing; Results remains available.")
 	return "\n\n".join(lines)
+
+static func export_summary(state: Dictionary, definition: Dictionary, current: Dictionary, world: Dictionary, terrain: String) -> String:
+	if state.id == "" or int(state.completed_tick) < 0: return ""
+	return "MicroRail — playtest result summary (format 1)\nScenario ID: %s\nMap seed: %s\nLayout: %s; generator: %s; content: %s\nTerrain: %s; initial cities: %d; loans: %s\n\n%s\n\nLocal player-provided report; not a verified score or replay. Seed and content versions alone do not reproduce player actions.\n" % [state.id, str(world.layout_seed), str(world.layout_id), str(world.generator_version), str(world.content_version), terrain, world.settlements.size(), "disabled" if definition.get("no_loans", false) else "allowed", describe(state, definition, current)]
+
+static func write_summary(path: String, contents: String) -> Error:
+	if contents.is_empty(): return ERR_INVALID_DATA
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null: return FileAccess.get_open_error()
+	file.store_string(contents)
+	file.flush()
+	var result := file.get_error()
+	file.close()
+	return result

@@ -47,3 +47,24 @@ seeded-scenario completion button.
 results, operating arithmetic, current-only legacy fallback, validation, migration,
 modal/pause behavior and 200% layout/Close access. All existing scenario and
 save/autosave tests also run against version 53.
+
+## Sharing playtest feedback
+
+Results offers **Copy summary** and **Export .txt**. Copy places a plain-text
+report on the clipboard; Export opens a save picker with a suggested name such
+as `microrail-first_connection-results.txt`. Choose a location, confirm replacement
+if needed, then attach the UTF-8 text file to feedback. Cancelling leaves Results
+open and the company paused. A failed write shows an explanation in the review;
+choose another writable location and retry.
+
+Both actions use the report captured when Results was opened. It includes the
+scenario ID, map seed, layout/generator/content versions, terrain profile, initial
+city count and loan rule, followed by the displayed figures and their historical
+or current-only caveat. It includes no save contents or local file paths. This is
+a player-provided summary, not a verified score or replay: matching seeds and
+content versions do not reproduce player decisions. Nothing is uploaded.
+
+Export adds no save fields or version bump, advances no ticks, and changes no
+finances, goal counters or historical results. Export controls and the save picker
+are covered by the scenario review integration suite, including UTF-8 output,
+failed-write recovery, cancellation, immutable state and 200% dialog bounds.

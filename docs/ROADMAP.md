@@ -435,8 +435,16 @@ changed selected services restarts the unfinished attempt. No deadline or bonus.
 Version 52 persists delivery baselines and a completed milestone independently
 of later service retirement; v51 migration adds empty evidence to existing companies.
 
-**Next implementation:** a scenario completion review using measured elapsed time,
-delivery totals and operating results, before broader challenge packs or scoring. The current flat/river
+**Scenario completion review implemented:** [Results](SCENARIO_RESULTS.md) appears
+for completed seeded scenarios. It opens a paused, scrollable view with elapsed
+company time, qualifying deliveries, company receipts/running costs, operating
+contribution and cash. Version 53 snapshots these once; continued play and service
+retirement preserve them. Older completions clearly label current-only figures,
+with no invented historical finances. Existing v52 evidence and simulation survive
+migration. No automatic popup, score or extra payout.
+
+**Next implementation:** local result-summary export for sharing playtest feedback,
+before broader challenge packs or scoring. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained

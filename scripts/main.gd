@@ -103,6 +103,8 @@ const NetworkSummary = preload("res://scripts/core/network_summary.gd")
 var network_summary: ConfirmationDialog
 const ProgressReports = preload("res://scripts/core/progress_reports.gd")
 var progress_reports := ProgressReports.new()
+var scenario_review_dialog: AcceptDialog
+var results_button: Button
 var progress_dialog: ConfirmationDialog
 
 const TrackBlueprints = preload("res://scripts/core/track_blueprints.gd")
@@ -537,7 +539,7 @@ func _ready() -> void:
 	bridge_inspector.configure(self)
 	_reset_autosave_schedule()
 	_frame_starting_view.call_deferred()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog, contracts_dialog]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog, contracts_dialog, scenario_review_dialog]:
 		window.window_input.connect(_tool_window_input.bind(window))
 
 func _process(delta: float) -> void:
@@ -681,7 +683,7 @@ func _modal_open() -> bool:
 	if first_service_guide != null and first_service_guide.dialog.visible: return true
 	if game_menu != null and game_menu.active: return true
 	if new_game_dialog != null and new_game_dialog.visible: return true
-	return (progress_dialog != null and progress_dialog.visible) or (network_summary != null and network_summary.visible) or (service_cards != null and service_cards.visible) or _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
+	return (scenario_review_dialog != null and scenario_review_dialog.visible) or (progress_dialog != null and progress_dialog.visible) or (network_summary != null and network_summary.visible) or (service_cards != null and service_cards.visible) or _management_window_is_open() or (settings_dialog != null and settings_dialog.visible) or (blueprint_file_dialog != null and blueprint_file_dialog.visible)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -2225,6 +2227,7 @@ func _load_game(save_path: String = "") -> bool:
 	if contracts_dialog != null: contracts_dialog.hide()
 	seeded_challenge.restore_state(data.seeded_challenge)
 	river_terrain.restore_state(data.terrain)
+	if scenario_review_dialog != null: scenario_review_dialog.hide()
 	if progress_dialog != null: progress_dialog.hide()
 	if service_cards != null: service_cards.hide()
 	if network_summary != null: network_summary.hide()
@@ -2345,7 +2348,7 @@ func _reset_track_tools(keep_right_gesture: bool = false) -> void:
 	demolition_cells.clear()
 	demolition_blocked.clear()
 	_close_station_inspector()
-	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog, contracts_dialog]:
+	for window in [traffic_dialog, train_inspector, route_editor, fleet_editor, problems_dialog, object_browser, service_cards, network_summary, progress_dialog, contracts_dialog, scenario_review_dialog]:
 		if window != null: window.hide()
 	_update_toolbar()
 	queue_redraw()
@@ -4160,8 +4163,19 @@ func _check_scenario_objectives() -> void:
 	if city_builder.is_city_game():
 		var shared: Dictionary = shared_track_progress(false) if seeded_challenge.state.id == "passing_place" and int(seeded_challenge.state.completed_tick) < 0 else {}
 		if seeded_challenge.advance(sim_clock.tick, city_service.state, freight_contracts.state, shared):
+			var definition: Dictionary = SeededChallenges.DEFINITIONS[seeded_challenge.state.id]
+			var measured: Dictionary = SeededChallenges.progress(city_service.state, definition.get("origin", ""))
+			var primary: int = measured.delivered
+			var secondary: int = measured.served
+			if definition.has("shared_track"):
+				primary = int(seeded_challenge.state.evidence.direct_finals)
+				secondary = int(seeded_challenge.state.evidence.bypass_finals)
+			elif definition.has("contract"):
+				primary = int(freight_contracts.state[definition.contract].delivered)
+				secondary = 0
+			seeded_challenge.state.review = SeededChallenges.Review.capture(_progress_values(), primary, secondary)
 			_record_event(EventLog.OBJECTIVE_COMPLETED, "player", {"challenge": seeded_challenge.state.id, "reward": 0})
-			_show_notice("Scenario complete: %s! You met every delivery goal. Keep playing, or start another scenario." % SeededChallenges.DEFINITIONS[seeded_challenge.state.id].name)
+			_show_notice("Scenario complete: %s! You met every delivery goal. Open Results to review, or keep playing." % SeededChallenges.DEFINITIONS[seeded_challenge.state.id].name)
 		return
 	if scenario_goals.is_complete():
 		return
@@ -4246,6 +4260,13 @@ func _setup_objective_panel() -> void:
 	goals_button.pressed.connect(_toggle_objective_panel)
 
 	$Interface/ConstructionHistory.add_child(goals_button)
+	results_button = Button.new()
+	results_button.text = "Results"
+	results_button.focus_mode = Control.FOCUS_NONE
+	results_button.tooltip_text = "Review a completed seeded scenario. Opens paused; closing leaves the game paused."
+	results_button.hide()
+	results_button.pressed.connect(open_scenario_results)
+	$Interface/ConstructionHistory.add_child(results_button)
 
 	_update_objective_panel()
 
@@ -4259,6 +4280,7 @@ func _toggle_objective_panel() -> void:
 
 
 func _update_objective_panel() -> void:
+	results_button.visible = seeded_challenge.state.id != "" and int(seeded_challenge.state.completed_tick) >= 0
 	if seeded_challenge.state.id != "":
 		var definition: Dictionary = SeededChallenges.DEFINITIONS[seeded_challenge.state.id]
 		if seeded_challenge.state.id == "passing_place":
@@ -6467,6 +6489,9 @@ func _export_blueprint(path: String) -> bool:
 	return false
 
 func _setup_object_browser() -> void:
+	scenario_review_dialog = preload("res://scripts/scenario_review_dialog.gd").new()
+	$Interface.add_child(scenario_review_dialog)
+	scenario_review_dialog.configure(self)
 	progress_dialog = preload("res://scripts/progress_reports_dialog.gd").new()
 	$Interface.add_child(progress_dialog)
 	progress_dialog.configure(self)
@@ -6514,6 +6539,17 @@ func _advance_progress_reports() -> void:
 
 func request_report_mode(mode: String) -> void:
 	if mode in ProgressReports.MODES and mode != progress_reports.state.mode: _submit_command("report_mode", {"mode": mode})
+
+func open_scenario_results() -> void:
+	if seeded_challenge.state.id == "" or int(seeded_challenge.state.completed_tick) < 0: return
+	if is_dragging or right_pending or not construction_plan.is_empty() or _modal_open():
+		_show_notice("Finish the stroke, resolve the construction draft and close other dialogs before opening Results.")
+		return
+	paused = true
+	is_panning = false
+	corridor_pick = 0
+	_update_toolbar()
+	scenario_review_dialog.open_dialog()
 
 func open_progress_reports() -> void:
 	paused = true

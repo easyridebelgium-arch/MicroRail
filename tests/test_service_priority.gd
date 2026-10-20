@@ -78,7 +78,7 @@ func run() -> void:
 	var before_ranks: Dictionary = game.dispatch_ranks.duplicate()
 	check(game._save_game(4), "priorities save")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(4)))
-	check(saved.version == 52 and game._is_valid_save(saved) and game._load_slot(4) and game.services.passenger.priority == 2, "version 52 priority roundtrip validates")
+	check(saved.version == 53 and game._is_valid_save(saved) and game._load_slot(4) and game.services.passenger.priority == 2, "version 53 priority roundtrip validates")
 	check(game.dispatch_ranks == before_ranks, "save/load reconstructs the same weighted rank at the same tick")
 	var bad_save := saved.duplicate(true)
 	bad_save.services.passenger.priority = 4
@@ -87,7 +87,7 @@ func run() -> void:
 	old.version = 48
 	for service in old.services.values(): service.erase("priority")
 	var migrated: Dictionary = Migrations.migrate(old).data
-	check(migrated.version == 52 and migrated.state == old.state and migrated.sim == old.sim and migrated.services == old.services, "v48 migration changes no physical state or instructions")
+	check(migrated.version == 53 and migrated.state == old.state and migrated.sim == old.sim and migrated.services == old.services, "v48 migration changes no physical state or instructions")
 	check(game._load_game(game.SaveSlots.path(4)), "new priority save remains loadable after rejection checks")
 	game.queue_free()
 	await process_frame

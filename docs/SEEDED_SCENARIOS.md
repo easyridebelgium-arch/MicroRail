@@ -85,7 +85,7 @@ leave and enter platforms horizontally. Bank loans remain available; there is no
 deadline or completion bonus. Growth rules remain adjustable.
 
 The preset uses the existing scenario identity, completion tick and city resident
-measurements, with no new saved counters or save-format change (current version 52, which also retains priorities, optional freight contracts, reminder markers and scenario evidence).
+measurements, with no new saved counters or save-format change (current version 53, which also retains priorities, optional freight contracts, reminder markers and scenario evidence).
 Older companies and the original two scenarios retain their goals. An older build
 that does not know this new scenario identity will reject its saves as incompatible.
 Loading checks the required river profile and original city geometry as well as
@@ -187,3 +187,9 @@ Guide/Overlays/Routes flow, matches the checked budget, runs both physical servi
 monitors shared-track occupancy and deadlocks, saves partial/completed attempts,
 checks old-delivery exclusion and restart rules, retires a service and reloads its
 completed milestone. Prior scenarios and save migrations remain covered.
+
+After completing a seeded preset, open **Results** beside Goals/Guide for its
+[saved completion review](SCENARIO_RESULTS.md). New completions retain their
+company-time, delivery and operating figures as play continues. Older completions
+show an explicitly labelled current-company fallback for unavailable historical
+figures. Version 53 migrates existing scenario evidence automatically.

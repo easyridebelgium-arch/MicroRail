@@ -66,7 +66,7 @@ func run() -> void:
 		check(game.money == cash and game.seeded_challenge.state.completed_tick == completed, "goals award no repeat money and completion is stable")
 		check(game._save_game(1), "scenario saves")
 		var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.SaveSlots.path(1)))
-		check(saved.version == 52 and game._is_valid_save(saved), "version 52 validates preset and completion")
+		check(saved.version == 53 and game._is_valid_save(saved), "version 53 validates preset and completion")
 		var scenario_state: Dictionary = game.seeded_challenge.save_state()
 		check(game._load_slot(1) and game.seeded_challenge.save_state() == scenario_state, "load restores scenario identity and progress")
 		var bad: Dictionary = saved.duplicate(true)

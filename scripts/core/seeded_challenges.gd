@@ -1,6 +1,7 @@
 extends RefCounted
 ## Immutable scenario goals derived from final deliveries or completed contracts.
 const Generator = preload("res://scripts/core/world_generator.gd")
+const Review = preload("res://scripts/core/scenario_review.gd")
 const Shared = preload("res://scripts/core/shared_track_challenge.gd")
 const Numbers = preload("res://scripts/core/arrival_targets.gd")
 const DEFINITIONS := {
@@ -10,9 +11,9 @@ const DEFINITIONS := {
 	"timber_connection": {"name": "Timber Connection", "seed": "42", "cities": 3, "no_loans": false, "contract": "timber"},
 	"passing_place": {"name": "Passing Place", "seed": "4", "cities": 3, "no_loans": false, "deliveries": 20, "served": 2, "shared_track": true}
 }
-var state: Dictionary = {"id": "", "completed_tick": -1, "evidence": {}}
+var state: Dictionary = {"id": "", "completed_tick": -1, "evidence": {}, "review": {}}
 func initialize(id: String) -> void:
-	state = {"id": id if DEFINITIONS.has(id) else "", "completed_tick": -1, "evidence": {}}
+	state = {"id": id if DEFINITIONS.has(id) else "", "completed_tick": -1, "evidence": {}, "review": {}}
 func no_loans() -> bool: return bool(DEFINITIONS.get(state.id, {}).get("no_loans", false))
 static func progress(measurements: Dictionary, origin: String = "") -> Dictionary:
 	var delivered := 0
@@ -59,11 +60,16 @@ func save_state() -> Dictionary: return state.duplicate(true)
 func restore_state(value: Dictionary) -> void:
 	state = value.duplicate(true)
 	state.completed_tick = int(state.completed_tick)
+	for field in state.review: state.review[field] = int(state.review[field])
 	if state.id == "passing_place" and not state.evidence.is_empty():
 		for field in ["direct_baseline", "bypass_baseline", "direct_finals", "bypass_finals"]: state.evidence[field] = int(state.evidence[field])
 static func valid(value: Variant, data: Dictionary, tick: int) -> bool:
+	if not _valid_goal(value, data, tick): return false
+	return Review.valid(value.review, int(value.completed_tick), DEFINITIONS.get(value.id, {}), value.evidence, data)
+
+static func _valid_goal(value: Variant, data: Dictionary, tick: int) -> bool:
 	if not value is Dictionary or not value.get("id") is String or not Numbers.whole(value.get("completed_tick"), -1, tick): return false
-	if value.size() != 3 or not value.get("evidence") is Dictionary: return false
+	if value.size() != 4 or not value.get("evidence") is Dictionary or not value.get("review") is Dictionary: return false
 	if value.id != "passing_place" and not value.evidence.is_empty(): return false
 	if value.id == "": return int(value.completed_tick) == -1
 	if not DEFINITIONS.has(value.id) or data.get("game_mode") != "cities": return false

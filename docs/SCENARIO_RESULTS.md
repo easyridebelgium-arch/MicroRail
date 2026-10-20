@@ -68,3 +68,7 @@ Export adds no save fields or version bump, advances no ticks, and changes no
 finances, goal counters or historical results. Export controls and the save picker
 are covered by the scenario review integration suite, including UTF-8 output,
 failed-write recovery, cancellation, immutable state and 200% dialog bounds.
+
+Use the [playtest checklist and report template](PLAYTEST_CHECKLIST.md) to add
+reproduction steps, build details and observations to the exported summary.
+An unfinished scenario can be reported without a Results file.

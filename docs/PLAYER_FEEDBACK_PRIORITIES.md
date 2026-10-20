@@ -54,6 +54,10 @@ in one review. The separate v1 artwork pack has 112 proposed art entries.
 
 ## Feedback collection
 
+Use the [playtest checklist and copyable report template](PLAYTEST_CHECKLIST.md)
+for new sessions. Completed scenarios can attach a [Results summary](SCENARIO_RESULTS.md);
+incomplete sessions remain useful and need no completion report.
+
 Offer a five-question quick test in addition to the full catalogue questionnaire:
 
 1. Could you start a working service?
@@ -74,5 +78,5 @@ progress icon candidates and 16 city/station/passenger candidates, each exposed
 as a named Godot AtlasTexture. A separate review scene shows large and intended-size
 previews. Original artwork is retained. This batch **does not implement** the
 first-service guide, rotating autosaves, city growth or service cards by itself.
-The guide and autosaves have since been implemented in code; city growth and
-service cards remain future work in the revised [roadmap](ROADMAP.md).
+The guide, autosaves, bounded city growth and service cards have since been
+implemented in code; see the current [roadmap](ROADMAP.md) for remaining work.

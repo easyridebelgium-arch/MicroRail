@@ -448,8 +448,14 @@ a UTF-8 text file with seed, content versions, scenario rules and the displayed
 completion figures. Historical/current-only caveats survive export; no simulation
 changes or automatic uploads.
 
-**Next implementation:** a playtest feedback checklist linking shared summaries to
-clear reproduction steps, before broader challenge packs or scoring. The current flat/river
+**Playtest handoff implemented:** the [short checklist and report template](PLAYTEST_CHECKLIST.md)
+links shared Results to build details, reproduction steps, save evidence and
+measured balance observations. Incomplete runs can be reported without Results.
+Real-display feel and sound remain player assessments, separate from headless checks.
+
+**Next implementation:** arrival-time platform selection in Phase 1B, building on
+existing fixed per-stop platform assignments and reservation/body safety checks.
+Broader challenge packs and scoring remain later. The current flat/river
 map-variety slice is complete; elevation and tunnels remain later refinements.
 
 The actionable summary and initial period reports are implemented without an unexplained
@@ -935,7 +941,9 @@ service-frequency scoring, industry/jobs and geographic expansion remain extensi
    safety/platform/body-routing extensions when this work requires them.
 2. **Focused goals (2B / 2C):** initial fixed-seed passenger scenarios, explicit
    final-journey/multi-city goals and a no-borrowing rule are implemented. Timed
-   goals, richer modifiers, cargo scenarios and comparable scores remain extensions. Contracts follow clear
+   goals, richer modifiers and comparable scores remain extensions. A timed timber
+   cargo scenario, a shared-track challenge, saved Results and local result exports
+   are implemented. Contracts follow clear
    scoring, failure/recovery and measured delivery accounting.
 3. **Map variety:** rivers and bridges first, then additional terrain/elevation,
    tunnels and map settings. Art alone never adds crossing permissions or geometry.

@@ -90,7 +90,7 @@ func _run() -> void:
 		check(game.traffic_metrics.records.is_empty(), "load must start a new diagnostic measurement window")
 		check(not game.incident_rows().is_empty(), "existing saved event history must survive loading")
 		game.passenger_held = false
-		game._use_signal_tool(Vector2i(10, 8))
+		for click in range(3): game._use_signal_tool(Vector2i(10, 8))
 		for step in range(120): tick(game)
 		check(game.problem_rows().is_empty(), "clearing the signal should remove current wait problems")
 		check(not game.incident_rows().is_empty(), "cleared problems must remain in historical events")

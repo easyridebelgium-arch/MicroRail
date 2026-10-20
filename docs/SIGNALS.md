@@ -4,8 +4,8 @@
 
 1. Select **Signals** in the toolbar. Click straight track outside platforms:
    first click adds **A** (automatic), second changes it to **S** (manual stop),
-   third removes it. A circle and a square distinguish modes without relying
-   only on colour. These symbols show the mode, not a one-way green/red aspect.
+   third/fourth select the two one-way directions; fifth removes it. A circle and a square distinguish modes without relying
+   only on colour. One-way modes use an arrow in the permitted travel direction.
 2. Put automatic signals on approaches and exits around a junction or shared
    section. Signal tiles divide the connected network into blocks; switches and
    connected branches inside a block are treated as one conservative block.
@@ -35,8 +35,8 @@ reservations remain the final safety check, including when new signals divide a
 block containing multiple trains. Missing track ahead on the current leg freezes trains; a gap behind permits
 delivery before the return-leg check.
 
-Both signal modes share the rotating dispatch request policy. Priority classes,
-route/platform signals and automatic passing-loop selection remain extensions. Signals alone cannot resolve a poor single-track layout; a cycle
+All signal modes share the rotating dispatch request policy. Player-selected fair dispatch weights are implemented. Advanced route/platform
+signals and automatic congestion detours remain extensions. Signals alone cannot resolve a poor single-track layout; a cycle
 may require [physical reversal](DEADLOCKS.md). Connected branches can make a block
 larger than expected: add boundaries on each approach/exit. There is one assigned
 running train per service. Use [waypoint directives](WAYPOINTS.md) to choose pass-through tracks.
@@ -58,3 +58,7 @@ actual Hold/Resume buttons, persistence/invalid saves, v18 migration and equal
 positions, money and events at 30/60/120 FPS. Also run reservation/deadlock suites.
 
 [Dispatch fairness](DISPATCH_FAIRNESS.md) explains rotating first choice and prolonged-wait diagnostics.
+
+One-way controls, directional routing and reversal preflight are documented in
+[the station/routing/planning update](OPERATIONS_BATCHES_1_3.md). A one-way signal
+remains an automatic block boundary in its permitted direction.

@@ -65,7 +65,7 @@ func _run() -> void:
 	for step in range(400): tick(game)
 	check(game.route_distance < before and game.route_distance > 0 and game.passenger_returning, "return travels physically then waits before a stop signal")
 	check(str(game.train_diagnostics(1).reason).to_lower().contains("manual stop"), "return wait identifies the real signal restriction")
-	game._use_signal_tool(Vector2i(8, 8))
+	for click in range(3): game._use_signal_tool(Vector2i(8, 8))
 	for step in range(600):
 		tick(game)
 		if game.passenger_held: break

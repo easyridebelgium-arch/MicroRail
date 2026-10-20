@@ -4,8 +4,8 @@ extends RefCounted
 const Router = preload("res://scripts/rail_router.gd")
 const Geometry = preload("res://scripts/track_geometry.gd")
 
-static func find_route(tracks: Dictionary, start: Vector2i, destination: Vector2i, points: Array) -> Array[Vector2i]:
-	if points.is_empty(): return Router.find_route(tracks, start, destination)
+static func find_route(tracks: Dictionary, start: Vector2i, destination: Vector2i, points: Array, signals: Dictionary = {}) -> Array[Vector2i]:
+	if points.is_empty() and signals.is_empty(): return Router.find_route(tracks, start, destination)
 	var empty: Array[Vector2i] = []
 	if not tracks.has(start) or not tracks.has(destination): return empty
 	var required: Array[Vector2i] = []
@@ -25,9 +25,13 @@ static func find_route(tracks: Dictionary, start: Vector2i, destination: Vector2
 		var exits := Geometry.connections(tracks[current]) if state.z < 0 else Geometry.exits_from(tracks[current], Geometry.DIRECTIONS[state.z])
 		for direction in exits:
 			var next: Vector2i = current + direction
+			if signals.has(current) and not preload("res://scripts/core/signal_rules.gd").permits(str(signals[current]), direction): continue
+			if signals.has(next) and not preload("res://scripts/core/signal_rules.gd").permits(str(signals[next]), direction): continue
 			if not tracks.has(next) or Geometry.exits_from(tracks[next], -direction).is_empty(): continue
 			var progress: int = state.w
-			if progress < required.size() and next == required[progress]: progress += 1
+			if progress < required.size() and next == required[progress]:
+				if points[progress].size() == 3 and direction != Geometry.DIRECTIONS[int(points[progress][2])]: continue
+				progress += 1
 			# A destination platform is the stopping point, not an incidental
 			# pass-through before the directives have been completed.
 			if next == destination and progress < required.size(): continue

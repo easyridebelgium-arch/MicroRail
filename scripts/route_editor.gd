@@ -6,6 +6,7 @@ var game: Node
 var draft: Dictionary
 var service_choice: OptionButton
 var priority_choice: OptionButton
+var independent_return: Button
 var route_mode: OptionButton
 var heading: Label
 var style_label: LineEdit
@@ -22,6 +23,7 @@ var down_button: Button
 var platform_choice: OptionButton
 var waypoint_hint: Label
 var waypoint_leg: OptionButton
+var waypoint_direction: OptionButton
 var waypoint_list: ItemList
 var waypoint_x: SpinBox
 var waypoint_y: SpinBox
@@ -128,6 +130,16 @@ func configure(owner_game: Node) -> void:
 	route_mode.add_item("Loop — last stop returns directly to first")
 	box.add_child(route_mode)
 	route_mode.item_selected.connect(_select_mode)
+	independent_return = Button.new()
+	independent_return.text = "Edit independent return path"
+	independent_return.tooltip_text = "For two stops: use a Loop with separate outward and return directives. Carriages still require a continuous circuit. Changes remain a draft until Apply."
+	independent_return.pressed.connect(func() -> void:
+		route_mode.select(1)
+		_select_mode(1)
+		waypoint_leg.select(1)
+		_refresh_waypoints()
+		status.text = "Independent return draft: edit this closing leg's waypoints. Outward directives stay intact. Apply validates both paths and whole-train clearance.")
+	box.add_child(independent_return)
 	headway_controls = HFlowContainer.new()
 	box.add_child(headway_controls)
 	var headway_title := Label.new()
@@ -197,7 +209,7 @@ func configure(owner_game: Node) -> void:
 	platform_choice = OptionButton.new()
 	for number in [1, 2, 3]: platform_choice.add_item("Platform %d" % number)
 	platform_choice.add_item("Auto")
-	platform_choice.tooltip_text = "Platform used at the selected stop. Platforms 2 and 3 are sidings beside the station tile; build and connect them first. Auto picks a free platform that fits the train when you Apply."
+	platform_choice.tooltip_text = "Platform used at the selected stop. Platforms 2 and 3 are sidings beside the station tile; build and connect them first. Auto chooses a connected platform that fits. It can reconsider on approach while the body, travelled path and reserved lookahead stay unchanged. After commitment, it waits for its chosen platform."
 	platform_choice.disabled = true
 	platform_choice.item_selected.connect(_select_platform)
 	editing_controls.add_child(platform_choice)
@@ -217,6 +229,20 @@ func configure(owner_game: Node) -> void:
 	waypoint_list = ItemList.new()
 	waypoint_list.custom_minimum_size.y = 90
 	box.add_child(waypoint_list)
+	waypoint_direction = OptionButton.new()
+	for text in ["Waypoint: any approach", "Approach travelling N", "Approach travelling NE", "Approach travelling E", "Approach travelling SE", "Approach travelling S", "Approach travelling SW", "Approach travelling W", "Approach travelling NW"]: waypoint_direction.add_item(text)
+	waypoint_direction.tooltip_text = "Applies to a selected waypoint, or the next waypoint added. Shuttle uses the same path in reverse; use a two-stop Loop for independently editable outbound and return legs."
+	waypoint_list.item_selected.connect(func(index: int) -> void:
+		var point: Array = _points()[index]
+		waypoint_direction.select(int(point[2]) + 1 if point.size() == 3 else 0))
+	waypoint_direction.item_selected.connect(func(index: int) -> void:
+		var selected := waypoint_list.get_selected_items()
+		if selected.is_empty(): return
+		var point: Array = _points()[selected[0]]
+		point.resize(2)
+		if index > 0: point.append(index - 1)
+		_refresh_waypoints(selected[0]))
+	box.add_child(waypoint_direction)
 	var point_controls := HFlowContainer.new()
 	box.add_child(point_controls)
 	for axis in ["X", "Y"]:
@@ -417,6 +443,8 @@ func _show_service() -> void:
 	style_colour.select(int(identity.colour))
 	editing_controls.visible = Services.is_passenger_key(_key())
 	route_mode.visible = Services.is_passenger_key(_key())
+	independent_return.visible = Services.is_passenger_key(_key()) and draft[_key()].stops.size() == 2
+	independent_return.disabled = linked
 	route_mode.select(1 if draft[_key()].get("mode", "shuttle") == "loop" else 0)
 	_refresh_copy_sources()
 	_refresh_stops()
@@ -428,7 +456,7 @@ func _show_service() -> void:
 	else:
 		route_mode.disabled = false
 		waypoint_add.disabled = false
-	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle returns through stops in reverse; Loop closes from last to first, with its own waypoints. Names can change mid-trip." if Services.is_passenger_key(_key()) else ("Forest → Sawmill → Factory → Terminal → Forest. Keep industry directives 18,24 and 23,24." if game.factory.state.installed else "Forest: logs → Sawmill: unload/process/load timber → Terminal: sell → Forest. Keep the 18,24 directive." if game.sawmill.state.installed else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse.")
+	status.text = "Mode/stop/waypoint edits require an empty train at the first station. Shuttle retraces its path. For independent outbound/return directives on a two-stop service, select Loop and edit both A → B and B → A legs. Multi-stop Loop visits its stops in order, then returns directly to the first. Names can change mid-trip." if Services.is_passenger_key(_key()) else ("Forest → Sawmill → Factory → Terminal → Forest. Keep industry directives 18,24 and 23,24." if game.factory.state.installed else "Forest: logs → Sawmill: unload/process/load timber → Terminal: sell → Forest. Keep the 18,24 directive." if game.sawmill.state.installed else "Forest: load → Terminal: unload → return. Waypoint edits require the train at the forest. Return trips use the selected path in reverse.")
 
 func _refresh_copy_sources() -> void:
 	copy_controls.visible = Services.is_passenger_key(_key())
@@ -602,18 +630,19 @@ func _refresh_waypoints(selected: int = -1) -> void:
 	if waypoint_leg.item_count == 0: return
 	var points := _points()
 	for index in range(points.size()):
-		waypoint_list.add_item("%d. Track %d,%d" % [index + 1, int(points[index][0]), int(points[index][1])])
+		waypoint_list.add_item(("%d. Track %d,%d" % [index + 1, int(points[index][0]), int(points[index][1])]) + (" — approach " + ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][int(points[index][2])] if points[index].size() == 3 else ""))
 	if selected >= 0 and selected < points.size(): waypoint_list.select(selected)
 	_refresh_arrival_hint()
 
 func _add_waypoint() -> void:
 	var point: Array = [int(waypoint_x.value), int(waypoint_y.value)]
+	if waypoint_direction.selected > 0: point.append(waypoint_direction.selected - 1)
 	var cell := Vector2i(point[0], point[1])
 	if not game.can_place_waypoint(cell):
 		status.text = "Choose existing track outside station/industry platforms."
 		return
 	var points := _points()
-	if points.size() >= 16 or points.has(point):
+	if points.size() >= 16 or points.any(func(existing: Array) -> bool: return existing[0] == point[0] and existing[1] == point[1]):
 		status.text = "Use up to 16 different waypoint cells per leg."
 		return
 	points.append(point)

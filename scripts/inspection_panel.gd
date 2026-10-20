@@ -20,6 +20,8 @@ var loop_length: SpinBox
 var loop_orientation: OptionButton
 var blueprint_name: LineEdit
 var blueprint_search: LineEdit
+var blueprint_rotation: OptionButton
+var blueprint_mirror: CheckButton
 var blueprint_choice: OptionButton
 var blueprint_status: Label
 var blueprint_names: Array[String] = []
@@ -179,6 +181,13 @@ func _ready() -> void:
 	blueprint_choice.fit_to_longest_item = false
 	blueprint_choice.focus_mode = Control.FOCUS_NONE
 	plan_controls.add_child(blueprint_choice)
+	blueprint_rotation = OptionButton.new()
+	for angle in [0, 90, 180, 270]: blueprint_rotation.add_item("Rotation: %d°" % angle)
+	plan_controls.add_child(blueprint_rotation)
+	blueprint_mirror = CheckButton.new()
+	blueprint_mirror.text = "Mirror blueprint"
+	blueprint_mirror.tooltip_text = "Reflect horizontally, then apply the selected clockwise rotation. The saved source is unchanged."
+	plan_controls.add_child(blueprint_mirror)
 	var place_design := Button.new()
 	place_design.text = "Place selected blueprint"
 	place_design.focus_mode = Control.FOCUS_NONE

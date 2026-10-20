@@ -55,7 +55,7 @@ func _run() -> void:
 	game._use_signal_tool(Vector2i(18, 8))
 	advance_until(game, func() -> bool: return game.traffic_metrics.statistics(1).continuous_seconds > 1.0)
 	check(game.passenger_stop_index == 0 and game.route_distance < game.stop_distances[1] and game.reservation_waits.get("passenger", "").contains("Manual stop"), "long multi-stop train obeys a manual signal before B")
-	game._use_signal_tool(Vector2i(18, 8))
+	for click in range(3): game._use_signal_tool(Vector2i(18, 8))
 	advance_until(game, func() -> bool: return game.passenger_stop_index == 1)
 	check(game.travelling_to_b and game._next_passenger_stop() == 2 and game.wait_remaining > 0, "outward arrival at B dwells without reversing")
 	var middle_poses := poses(game)

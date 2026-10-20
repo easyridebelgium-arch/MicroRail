@@ -65,3 +65,11 @@ godot --headless --path . --script res://tests/test_directional_routes.gd
 Checks cover forced bypasses, ordered traversal, invalid coordinates, switch and
 crossing port safety, actual editor controls, physical no-dwell movement, atomic
 mid-trip refusal, save/load, migration, direction-aware stops and 200% UI layout.
+
+## Directional approaches and independent return
+
+Routes now offers an approach-direction selector for a selected/new waypoint.
+The direction describes travel into the cell (E means arriving from the west).
+For two stops, **Edit independent return path** creates a Loop draft and selects
+its closing leg, retaining outward directives. Full route/body validation still
+applies. See [controls and limitations](OPERATIONS_BATCHES_1_3.md).

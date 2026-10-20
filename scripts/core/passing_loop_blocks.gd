@@ -17,7 +17,7 @@ static func inspect(anchor: Vector2i, length: int, orientation: int, tracks: Dic
 		for index in range(cells.size()):
 			var cell: Vector2i = cells[index]
 			if not tracks.has(cell): return _unavailable()
-			if signs.has(cell) and (not Geometry.is_straight(tracks[cell]) or signs[cell] not in ["auto", "stop"]): return _unavailable()
+			if signs.has(cell) and (not Geometry.is_straight(tracks[cell]) or not preload("res://scripts/core/signal_rules.gd").valid_on(signs[cell], tracks[cell])): return _unavailable()
 			var ports := Geometry.connections(tracks[cell])
 			if index > 0 and not ports.has(cells[index - 1] - cell): return _unavailable()
 			if index + 1 < cells.size() and not ports.has(cells[index + 1] - cell): return _unavailable()
@@ -35,7 +35,7 @@ static func inspect(anchor: Vector2i, length: int, orientation: int, tracks: Dic
 		if not signs.has(cell):
 			complete = false
 			issues.append("Missing boundary signal at %d,%d. Restore a suitable boundary before relying on branch isolation." % [cell.x, cell.y])
-		elif not Geometry.is_straight(tracks[cell]) or signs[cell] not in ["auto", "stop"]:
+		elif not Geometry.is_straight(tracks[cell]) or not preload("res://scripts/core/signal_rules.gd").valid_on(signs[cell], tracks[cell]):
 			return _unavailable()
 		elif signs[cell] == "stop": issues.append("Manual stop at %d,%d keeps trains held until released; it is still a block boundary." % [cell.x, cell.y])
 	var blocks := Signals.new()

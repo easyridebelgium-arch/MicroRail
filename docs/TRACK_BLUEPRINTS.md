@@ -204,3 +204,11 @@ are introduced. `test_passing_loop_blocks.gd` covers four orientations and three
 lengths, external rejoining/cutting, added central connections, missing/manual/extra
 signals, broken paths, read-only inputs and UI invalidation/cleanup. Existing fit,
 waypoint handoff, template and block-authority tests remain in place.
+
+## Rotation and reflection
+
+Before Place, select Rotation (0/90/180/270°) and optional Mirror blueprint.
+Mirroring is horizontal in the source footprint and precedes clockwise rotation.
+All ports, switch roles and one-way signal directions transform; saved originals
+remain unchanged. The preview uses the ordinary atomic draft/Undo rules. See
+[the combined update](OPERATIONS_BATCHES_1_3.md) for bounds and validation.

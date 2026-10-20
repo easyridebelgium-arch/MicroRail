@@ -100,7 +100,7 @@ func run() -> void:
 	legacy.version = 51
 	legacy.seeded_challenge = {"id": "", "completed_tick": -1}
 	var migrated: Dictionary = game.SaveMigrations.migrate(legacy).data
-	check(migrated.version == 53 and migrated.seeded_challenge.evidence.is_empty() and migrated.state == legacy.state and migrated.sim == legacy.sim, "v51 migration adds empty milestone state without changing actors, RNG or accounting")
+	check(migrated.version == 54 and migrated.seeded_challenge.evidence.is_empty() and migrated.state == legacy.state and migrated.sim == legacy.sim, "v51 migration adds empty milestone state without changing actors, RNG or accounting")
 	game.toggle_fleet_service(b.id)
 	for batch in range(180):
 		for tick in range(60):

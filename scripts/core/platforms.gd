@@ -113,3 +113,18 @@ static func label_for_cell(tracks: Dictionary, signs: Dictionary, cell: Vector2i
 
 static func _usable(tracks: Dictionary, signs: Dictionary, cell: Vector2i) -> bool:
 	return tracks.has(cell) and not signs.has(cell) and Geometry.same_connections(tracks[cell], false)
+
+## A moving train may change only the uncommitted part of its route. Preserve
+## the whole travelled leg, body poses and current reservation lookahead.
+static func safe_rebase(old_path: Curve2D, new_path: Curve2D, current: float, old_departure: float, new_departure: float, body: float, forward: bool, lookahead: float) -> bool:
+	var shift := new_departure - old_departure
+	var nose := current + (1.0 if forward else -1.0) * (body * 0.5 + lookahead)
+	var low := minf(old_departure, nose) - body * 0.5
+	var high := maxf(old_departure, nose) + body * 0.5
+	var cursor := low
+	while cursor <= high:
+		var before_pose := preload("res://scripts/core/route_body.gd").pose(old_path, cursor)
+		var after_pose := preload("res://scripts/core/route_body.gd").pose(new_path, cursor + shift)
+		if before_pose.origin.distance_to(after_pose.origin) > 0.05 or before_pose.x.dot(after_pose.x) < 0.999: return false
+		cursor += 1.0
+	return true

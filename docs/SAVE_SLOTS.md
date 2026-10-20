@@ -30,7 +30,7 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 53, including amenities, loan state, route appearance,
+schema is version 54, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
 history, gradual demand factor/carry, and original journey clocks with recent
@@ -148,3 +148,6 @@ Version 53 adds `seeded_challenge.review` for immutable completion delivery and
 financial counters. Version 52 migration leaves it empty rather than inventing
 historical totals. Completed older scenarios can still open Results with a clearly
 labelled current-company fallback. See [scenario results](SCENARIO_RESULTS.md).
+
+Version 54 supports directional signals and optional waypoint approach directions;
+v53 migration preserves existing geometry, actors, RNG, goals and finances.

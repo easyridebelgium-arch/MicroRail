@@ -75,7 +75,7 @@ func run() -> void:
 	legacy.version = 52
 	legacy.seeded_challenge.erase("review")
 	var migrated: Dictionary = game.SaveMigrations.migrate(legacy).data
-	check(migrated.version == 53 and migrated.seeded_challenge.review.is_empty() and migrated.state == legacy.state and migrated.sim == legacy.sim and game._is_valid_save(migrated), "v52 migration preserves old completion without inventing historical finances")
+	check(migrated.version == 54 and migrated.seeded_challenge.review.is_empty() and migrated.state == legacy.state and migrated.sim == legacy.sim and game._is_valid_save(migrated), "v52 migration preserves old completion without inventing historical finances")
 	game.seeded_challenge.restore_state(migrated.seeded_challenge)
 	game.open_scenario_results()
 	check(game.scenario_review_dialog.details.text.contains("CURRENT company totals") and game.scenario_review_dialog.details.text.contains("older completion"), "older completion clearly labels current-only financial fallback")

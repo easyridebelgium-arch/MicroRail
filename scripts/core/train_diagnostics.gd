@@ -122,6 +122,7 @@ static func snapshot(game: Node, id: int) -> Dictionary:
 		result.wait_seconds = stats.continuous_seconds
 		if result.state != "Confirmed deadlock":
 			match str(conflict.get("kind", "track_reservation")):
+				"oneway_signal": result.advice = "This movement opposes a one-way arrow. Correct its direction or edit a safe route; a two-stop Loop can use separate outbound and return paths. Waiting alone will not change the direction rule."
 				"manual_signal": result.advice = "Locate the manual stop. Use Signals to change/remove it when safe; it will not release automatically."
 				"block_busy", "block_authority": result.advice = "Inspect the signal block and its authority holders; automatic signals release when the block clears. Check boundaries and route choices before changing infrastructure."
 				_: result.advice = "Locate the blocking train and inspect the shared track/switch. Let it clear, or review the routes and signal boundaries. A passing loop is useful only if the layout and route choices allow trains to pass."

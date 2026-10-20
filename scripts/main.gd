@@ -818,7 +818,7 @@ func _check_route(force_reset: bool = false) -> void:
 		_refresh_directional_routes()
 		_rebuild_reservations()
 		return
-	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}), station_definitions())
+	var built: Dictionary = ServiceRoutes.build(tracks, services["passenger"]["stops"], float(TILE_SIZE), services["passenger"].get("waypoints", {}), services["passenger"].get("mode", "shuttle"), services["passenger"].get("platforms", {}), station_definitions(), track_signals)
 	var new_route: Array[Vector2i] = []
 	new_route.assign(built["cells"])
 	for cell in track_signals.keys():
@@ -1498,7 +1498,7 @@ func _passenger_configurations() -> Dictionary:
 		else:
 			if passenger_services[key].held or passenger_services[key].returning: continue
 		var config: Dictionary = services[key]
-		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), config.get("platforms", {}), station_definitions())
+		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), config.get("platforms", {}), station_definitions(), track_signals)
 		if not built.cells.is_empty(): available[key] = config
 	return available
 
@@ -4619,7 +4619,7 @@ func _resolve_auto_platforms(configuration: Dictionary) -> Dictionary:
 				trial[stop] = candidate_number
 				for other in trial.keys():
 					if int(trial[other]) == 0: trial[other] = 1
-				return not ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), trial, station_definitions())["cells"].is_empty()
+				return not ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), trial, station_definitions(), track_signals)["cells"].is_empty()
 			var number := Platforms.choose(options, body, float(TILE_SIZE), busy, probe)
 			if number == 0:
 				number = 1
@@ -4653,7 +4653,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 	if sawmill.state.installed and Sawmill.count_points(configuration.freight.get("waypoints", {}).get("forest>terminal", []), world.cell("industry:sawmill")) != 1: return "Keep the sawmill directive at %s in the freight route." % _industry_coordinate("sawmill")
 	if factory.state.installed and _factory_point_count(configuration.freight.get("waypoints", {}).get("forest>terminal", [])) != 1: return "Keep the factory directive at %s in the freight route." % _industry_coordinate("factory")
 	if factory.state.installed:
-		var factory_route := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, configuration.freight.get("waypoints", {}).get("forest>terminal", []))
+		var factory_route := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, configuration.freight.get("waypoints", {}).get("forest>terminal", []), track_signals)
 		if factory_route.is_empty() or factory_route.find(world.cell("industry:factory")) <= factory_route.find(world.cell("industry:sawmill")): return "Freight must reach the factory after the sawmill."
 	configuration = ServiceRoutes.from_save(configuration)
 	if not _valid_service_assignments(configuration, fleet): return "Create or remove additional services in Fleet before editing their routes."
@@ -4670,7 +4670,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 		var home: Vector2 = _cell_center(ServiceRoutes.stop_cell(proposed.get("platforms", {}), proposed.stops[0], station_definitions()))
 		if running.passengers > 0 or running.returning or running.position.distance_to(home) > 0.1:
 			return "%s: finish the trip or reverse back first. Edit with an empty train at its first stop." % current.name
-		var built := ServiceRoutes.build(tracks, proposed.stops, float(TILE_SIZE), proposed.get("waypoints", {}), proposed.get("mode", "shuttle"), proposed.get("platforms", {}), station_definitions())
+		var built := ServiceRoutes.build(tracks, proposed.stops, float(TILE_SIZE), proposed.get("waypoints", {}), proposed.get("mode", "shuttle"), proposed.get("platforms", {}), station_definitions(), track_signals)
 		if built.cells.is_empty(): return "%s: complete the new route before applying." % current.name
 		extra_built[key] = built
 	var changed: bool = configuration.has("passenger") and (configuration["passenger"].get("mode", "shuttle") != services["passenger"].get("mode", "shuttle") or configuration["passenger"]["stops"] != services["passenger"]["stops"] or configuration["passenger"].get("waypoints", {}) != services["passenger"].get("waypoints", {}) or configuration["passenger"].get("platforms", {}) != services["passenger"].get("platforms", {}))
@@ -4685,7 +4685,7 @@ func _apply_resolved_routes(configuration: Dictionary) -> String:
 		var new_home: Vector2 = _cell_center(ServiceRoutes.stop_cell(configuration["passenger"].get("platforms", {}), configuration["passenger"]["stops"][0], station_definitions()))
 		if passengers_on_train > 0 or passenger_returning or train_position.distance_to(new_home) > 0.1:
 			return "Finish the trip or reverse back first. Route mode, stops and waypoints can only change with an empty train at the first stop."
-		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE), configuration["passenger"].get("waypoints", {}), configuration["passenger"].get("mode", "shuttle"), configuration["passenger"].get("platforms", {}), station_definitions())["cells"].is_empty():
+		if ServiceRoutes.build(tracks, configuration["passenger"]["stops"], float(TILE_SIZE), configuration["passenger"].get("waypoints", {}), configuration["passenger"].get("mode", "shuttle"), configuration["passenger"].get("platforms", {}), station_definitions(), track_signals)["cells"].is_empty():
 			return "Complete the new route before changing the stop order."
 		# Reparameterise a path only when its origin is this exact physical spot.
 		route_cells.clear()
@@ -4966,8 +4966,11 @@ func _claim_end_cell(other: int) -> Vector2i:
 ## A platform is free for `id` when no other train stands on its stop tile and
 ## no other train's current leg ends there.
 func _platform_free(id: int, cell: Vector2i) -> bool:
-	var holder := int(reservations.occupied_owners.get(cell, -1))
-	if holder > 0 and holder != id: return false
+	var length := Fleet.length(Fleet.find(fleet, id))
+	var reach := maxi(0, floori((length * 0.5 + TILE_SIZE * 0.5 - 0.001) / TILE_SIZE))
+	for offset in range(-reach, reach + 1):
+		var holder := int(reservations.occupied_owners.get(cell + Vector2i(offset, 0), -1))
+		if holder > 0 and holder != id: return false
 	for other in section_claims.keys():
 		if int(other) != id and _claim_end_cell(int(other)) == cell: return false
 	return true
@@ -4978,7 +4981,7 @@ func _platform_free(id: int, cell: Vector2i) -> bool:
 func _maybe_reroute_platform(service: String) -> void:
 	var config: Dictionary = services.get(service, {})
 	var marks: Dictionary = config.get("auto", {})
-	if marks.is_empty() or config.get("mode", "shuttle") != "shuttle" or paused: return
+	if marks.is_empty() or paused: return
 	var index: int
 	var next_index: int
 	var distance: float
@@ -5000,10 +5003,15 @@ func _maybe_reroute_platform(service: String) -> void:
 		returning = running.returning
 	else:
 		return
-	if returning or next_index < 0 or next_index >= distances.size() or index >= distances.size() or absf(distance - float(distances[index])) > 0.001: return
+	if returning or next_index < 0 or next_index >= distances.size() or index >= distances.size(): return
+	var moving_on_leg := absf(distance - float(distances[index])) > 0.001
+	var old_path: Curve2D = route_path if service == "passenger" else running.path
 	var stop: String = config.stops[next_index]
 	if not marks.has(stop): return
 	var id := int(Fleet.assigned(fleet, service)["id"])
+	# A departure section claim is a commitment to the selected branch. Keep it
+	# until arrival; changing its destination could invalidate another departure.
+	if moving_on_leg and not section_claims.get(id, {}).get("corridor", {}).is_empty(): return
 	var planned := int(config.get("platforms", {}).get(stop, 1))
 	var body := Fleet.length(Fleet.assigned(fleet, service))
 	var options := Platforms.for_station(tracks, track_signals, stop, station_definitions()[stop]["cell"], float(TILE_SIZE))
@@ -5019,20 +5027,32 @@ func _maybe_reroute_platform(service: String) -> void:
 		var trial: Dictionary = config.get("platforms", {}).duplicate()
 		if number == 1: trial.erase(stop)
 		else: trial[stop] = number
-		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), "shuttle", trial, station_definitions())
+		var built := ServiceRoutes.build(tracks, config.stops, float(TILE_SIZE), config.get("waypoints", {}), config.get("mode", "shuttle"), trial, station_definitions(), track_signals)
 		if built.cells.is_empty() or built.distances.size() != distances.size(): continue
+		var rebased := distance + float(built.distances[index]) - float(distances[index])
+		if moving_on_leg and not Platforms.safe_rebase(old_path, built.path, distance, float(distances[index]), float(built.distances[index]), body, config.get("mode", "shuttle") == "loop" or next_index > index, float(TILE_SIZE) * reservations.LOOKAHEAD_TILES): continue
+		if not Fleet.Consists.route_shape_error(built.path, built.cells, body, config.get("mode", "shuttle"), tracks).is_empty(): continue
+		var target_index := index + 1 if config.get("mode", "shuttle") == "loop" else next_index
+		if not Fleet.Consists.stop_clearance(built.path, float(built.distances[target_index]), body, tracks, float(TILE_SIZE), track_signals).is_empty(): continue
+		var proposed_section := SingleTrack.corridor(built.path, rebased, float(built.distances[target_index]), tracks, float(TILE_SIZE))
+		if moving_on_leg and SingleTrack.conflict(proposed_section, section_claims, id) > 0: continue
 		config["platforms"] = trial
 		if service == "passenger":
 			route_cells.assign(built.cells)
 			route_path = built.path
 			stop_distances.assign(built.distances)
-			route_distance = float(built.distances[index])
+			route_distance = rebased
 		else:
 			running.cells.assign(built.cells)
 			running.path = built.path
 			running.distances.assign(built.distances)
-			running.distance = float(built.distances[index])
+			running.distance = rebased
 			running.configuration = config.duplicate(true)
+		# At a stop the completed arrival claim must expire normally before
+		# the next departure can test opposing claims. Never retarget it there.
+		if moving_on_leg and section_claims.has(id):
+			section_claims[id].target = float(built.distances[target_index])
+			section_claims[id].corridor.merge(proposed_section, true)
 		_refresh_switch_states(route_cells)
 		_refresh_directional_routes()
 		_rebuild_reservations()
@@ -5178,7 +5198,7 @@ func arrival_target_guidance(group: String, configuration: Dictionary, leg: Stri
 		var route: Dictionary = resolved[key]
 		for number in route.get("platforms", {}).values():
 			if int(number) == 0: return {"known": false, "text": "Journey guidance unavailable until Auto platforms resolve on Apply; select fixed platforms for a draft estimate."}
-		var built := ServiceRoutes.build(tracks, route.stops, float(TILE_SIZE), route.get("waypoints", {}), route.get("mode", "shuttle"), route.get("platforms", {}), station_definitions())
+		var built := ServiceRoutes.build(tracks, route.stops, float(TILE_SIZE), route.get("waypoints", {}), route.get("mode", "shuttle"), route.get("platforms", {}), station_definitions(), track_signals)
 		if built.cells.is_empty(): return {"known": false, "text": "Journey guidance unavailable: complete the draft track and waypoint route for " + str(route.name) + "."}
 		var from_index: int = route.stops.find(leg.get_slice(">", 0))
 		var to_index: int = route.stops.find(leg.get_slice(">", 1))
@@ -5425,6 +5445,15 @@ func reverse_train_reason(id: int) -> String:
 	else: return "Select an assigned passenger or freight train."
 	if path.point_count < 2: return "No retained path to return along."
 	if absf(distance - departure) <= 0.001: return "This train is already at its departure stop."
+	var previous_point: Vector2 = path.sample_baked(distance)
+	var cursor := distance
+	while absf(cursor - departure) > 0.001:
+		cursor = move_toward(cursor, departure, 1.0)
+		var point := path.sample_baked(cursor)
+		var cell := Vector2i(floori(point.x / TILE_SIZE), floori(point.y / TILE_SIZE))
+		var travel := Vector2i(roundi((point - previous_point).normalized().x), roundi((point - previous_point).normalized().y))
+		if track_signals.has(cell) and not preload("res://scripts/core/signal_rules.gd").permits(str(track_signals[cell]), travel): return "Cannot reverse: one-way signal at %d,%d forbids the return direction." % [cell.x, cell.y]
+		previous_point = point
 	return ""
 
 func reverse_deadlocked_train(id: int) -> String:
@@ -5517,7 +5546,7 @@ func _is_valid_signal_list(value: Array, checked_tracks: Dictionary, installed_o
 		if not RuntimeRoutes.valid_cells([[entry[0], entry[1]]]): return false
 		var cell := Vector2i(int(entry[0]), int(entry[1]))
 		if seen.has(cell) or not checked_tracks.has(cell) or _is_station_space(cell, installed_override, factory_override, catalog) or cell in facility_cells(installed_override, factory_override, catalog): return false
-		if not TrackGeometry.is_straight(checked_tracks[cell]) or entry[2] not in ["auto", "stop"]: return false
+		if not TrackGeometry.is_straight(checked_tracks[cell]) or not preload("res://scripts/core/signal_rules.gd").valid_on(entry[2], checked_tracks[cell]): return false
 		seen[cell] = true
 	return true
 
@@ -5526,7 +5555,7 @@ func _setup_signal_tool() -> void:
 	signal_button.text = "Signals"
 	signal_button.toggle_mode = true
 	signal_button.focus_mode = Control.FOCUS_NONE
-	signal_button.tooltip_text = "Click straight track: automatic block signal → manual stop → remove. Signals apply in both directions."
+	signal_button.tooltip_text = "Click straight track: automatic → manual stop → one-way in each rail direction → remove. Arrow signals restrict travel."
 	signal_button.pressed.connect(func() -> void:
 		city_builder.active = false
 		demolition_mode = false
@@ -5545,15 +5574,15 @@ func _use_signal_tool(cell: Vector2i) -> void:
 		if _plan_protected(cell) or not working.has(cell) or not TrackGeometry.is_straight(working[cell]): return
 		var signs: Dictionary = construction_plan.projected_signals(track_signals)
 		var draft_mode: Variant = null
-		if not signs.has(cell): draft_mode = "auto"
-		elif signs[cell] == "auto": draft_mode = "stop"
+		var selected := preload("res://scripts/core/signal_rules.gd").next_mode(str(signs.get(cell, "")), working[cell])
+		if not selected.is_empty(): draft_mode = selected
 		construction_plan.stage_signals({cell: draft_mode}, track_signals, tracks)
 		return
 	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in facility_cells():
 		_show_notice("Place a signal on straight track outside station platforms.")
 		return
 	var old: String = str(track_signals.get(cell, ""))
-	var mode := "auto" if old == "" else ("stop" if old == "auto" else "")
+	var mode := preload("res://scripts/core/signal_rules.gd").next_mode(old, tracks[cell])
 	_submit_command("set_signal", {"x": cell.x, "y": cell.y, "mode": mode})
 
 func _execute_set_signal(data: Dictionary) -> void:
@@ -5563,7 +5592,7 @@ func _execute_set_signal(data: Dictionary) -> void:
 	if river_terrain.water(cell):
 		_show_notice("Place signals on the dry bank, not over water.")
 		return
-	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in facility_cells() or mode not in ["", "auto", "stop"]: return
+	if not tracks.has(cell) or not TrackGeometry.is_straight(tracks[cell]) or _is_station_space(cell) or cell in facility_cells() or (not mode.is_empty() and not preload("res://scripts/core/signal_rules.gd").valid_on(mode, tracks[cell])): return
 	if mode.is_empty(): track_signals.erase(cell)
 	else: track_signals[cell] = mode
 	_rebuild_reservations()
@@ -5581,7 +5610,14 @@ func _draw_signals() -> void:
 		else: draw_circle(center, 6, colour, false, 1.5)
 		if cue == "H": draw_line(center + Vector2(-7, -7), center + Vector2(7, 7), colour, 2)
 		if cue == "R": draw_line(center + Vector2(-6, 7), center + Vector2(6, 7), colour, 2)
-		draw_string(ThemeDB.fallback_font, center + Vector2(-4, 4), cue, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, colour)
+		var arrow := preload("res://scripts/core/signal_rules.gd").direction(str(track_signals[cell]))
+		if arrow != Vector2i.ZERO:
+			var tip := center + Vector2(arrow) * 8
+			draw_line(center - Vector2(arrow) * 8, tip, colour, 2)
+			var facing := Vector2(arrow).normalized()
+			var side := Vector2(-facing.y, facing.x) * 3
+			draw_colored_polygon(PackedVector2Array([tip, tip - facing * 6 + side, tip - facing * 6 - side]), colour)
+		draw_string(ThemeDB.fallback_font, center + Vector2(-4, 4), cue if arrow == Vector2i.ZERO else "", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, colour)
 
 func set_dispatch_hold(id: int, hold: bool) -> String:
 	if not paused: return "Pause before changing dispatch instructions."
@@ -5725,7 +5761,7 @@ func start_passenger_service(id: int, home: String = "a", destination: String = 
 		if not station_definitions().has(destination) or destination == home: return "Choose a different passenger destination."
 		other = destination
 	var configuration := {"name": "Passenger Service %d" % id, "stops": [home, other], "mode": "shuttle", "waypoints": {}}
-	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE), {}, "shuttle", {}, station_definitions())
+	var built := ServiceRoutes.build(tracks, configuration.stops, float(TILE_SIZE), {}, "shuttle", {}, station_definitions(), track_signals)
 	if built.cells.is_empty(): return "Complete track from the starting station to %s first." % station_definitions()[configuration.stops[1]].name
 	var fit := _consist_service_fit(train, configuration)
 	if not fit.is_empty(): return fit
@@ -5749,7 +5785,7 @@ func start_freight_service(id: int) -> String:
 	if not city_builder.is_city_game() or services.has("freight"): return "The freight service already exists."
 	var train := Fleet.find(fleet, id)
 	if train.is_empty() or train.service != "" or Fleet.MODELS[train.model].kind != "freight": return "Choose a stored freight locomotive."
-	var cells := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, [])
+	var cells := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, [], track_signals)
 	if cells.is_empty(): return "Connect the forest loading tile to the terminal loading tile first."
 	var configuration: Dictionary = ServiceRoutes.defaults().freight.duplicate(true)
 	var fit := _consist_service_fit(train, configuration)
@@ -5954,12 +5990,22 @@ func _update_inspection() -> void:
 		_update_passing_loop_fit()
 		_update_loop_waypoint_controls()
 		inspection_panel.plan_summary.text = "Draft: %d tracks / %d signals\nBuild £%d | Refund £%d | Net £%d\n%s" % [construction_plan.changes.size(), construction_plan.signal_changes.size(), quote.cost, quote.refund, quote.net, "Ready to apply as one action." if error.is_empty() else error]
+		var detail := construction_plan.quote_details()
+		inspection_panel.plan_summary.text += "\nTrack £%d | Switches £%d | Bridge extras £%d\nRefunds: track £%d | switches £%d | bridge £%d\n%d signal edits: £0 (prototype controls)" % [detail.track, detail.switch, detail.bridge, detail.track_refund, detail.switch_refund, detail.bridge_refund, detail.signals]
 	inspection_panel.corridor_label.text = "Signal corridor: %s → %s\n%d selected route tiles" % [str(corridor_start), str(corridor_end), corridor_cells.size()]
 	var lines: PackedStringArray = ["Paths: retained train routes; gaps remain visible. Squares mark route origins; circles mark the next destination. Labels use permanent train IDs.", "Reservations: use the toolbar toggle for hatched ownership."]
 	if inspection_panel.blocks:
 		lines.append("Blocks: dotted outlines, B = block ID. Authority includes reservations; it does not mean every tile is occupied.")
+	lines.append_array(construction_analyzer.structural(construction_plan.projected(tracks) if planning_mode else tracks, trains))
 	lines.append("Cell %d,%d" % [hovered_cell.x, hovered_cell.y])
 	if inspection_panel.congestion:
+		var hotspots: Array = traffic_metrics.window_cells.keys()
+		hotspots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			if traffic_metrics.window_cells[a] != traffic_metrics.window_cells[b]: return traffic_metrics.window_cells[a] > traffic_metrics.window_cells[b]
+			return a.y < b.y or (a.y == b.y and a.x < b.x))
+		var hot_lines: PackedStringArray = []
+		for cell in hotspots.slice(0, 3): hot_lines.append("%d,%d: %.1f train-seconds" % [cell.x, cell.y, float(traffic_metrics.window_cells[cell]) / 60.0])
+		lines.append("Recent measured hot spots (~60 simulation seconds): " + ("; ".join(hot_lines) if not hot_lines.is_empty() else "no traffic waits measured") + ". Loading, dwell and intentional holds are excluded. Measurements reset on load.")
 		lines.append("Waiting here: %.1f train-seconds in the last ~60 simulation seconds. Bar length and text represent observed stopped traffic, not a forecast." % (float(traffic_metrics.window_cells.get(hovered_cell, 0)) / 60.0))
 	if reservations.occupied_owners.has(hovered_cell):
 		lines.append("Occupied by train #%d" % int(reservations.occupied_owners[hovered_cell]))
@@ -6340,6 +6386,10 @@ func _place_blueprint(anchor: Vector2i) -> bool:
 	if data.is_empty():
 		_show_notice("Select a saved blueprint first.")
 		return false
+	data = TrackBlueprints.transformed(data, inspection_panel.blueprint_rotation.selected, inspection_panel.blueprint_mirror.button_pressed)
+	if data.is_empty():
+		_show_notice("Transformed blueprint exceeds the supported map dimensions.")
+		return false
 	var proposal: Dictionary = TrackBlueprints.place(data, anchor, construction_plan.projected(tracks), construction_plan.projected_signals(track_signals), Vector2i(MAP_WIDTH, MAP_HEIGHT), _plan_protected)
 	if not proposal.error.is_empty():
 		_show_notice(proposal.error)
@@ -6650,7 +6700,7 @@ func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 	var stops: Array
 	var cells: Array
 	if Fleet.MODELS[train.model].kind == "freight":
-		cells = WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, service.get("waypoints", {}).get("forest>terminal", []))
+		cells = WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, service.get("waypoints", {}).get("forest>terminal", []), track_signals)
 		path = RailRouter.make_path(cells, float(TILE_SIZE))
 		stops = [0.0, path.get_baked_length()]
 		if sawmill.state.installed:
@@ -6662,7 +6712,7 @@ func _consist_service_fit(train: Dictionary, service: Dictionary) -> String:
 			if factory_index <= cells.find(world.cell("industry:sawmill")) or cells.count(world.cell("industry:factory")) != 1: return "Freight must visit the factory at %s after the sawmill." % _industry_coordinate("factory")
 			stops.append(RailRouter.make_path(cells.slice(0, factory_index + 1), float(TILE_SIZE)).get_baked_length())
 	else:
-		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}), station_definitions())
+		var built := ServiceRoutes.build(tracks, service.stops, float(TILE_SIZE), service.get("waypoints", {}), service.get("mode", "shuttle"), service.get("platforms", {}), station_definitions(), track_signals)
 		path = built.path
 		stops = built.distances
 		cells = built.cells
@@ -6861,7 +6911,7 @@ func build_sawmill() -> String:
 	points.clear()
 	for row in ordered: points.append(row.point)
 	if points.size() > 16: return "Remove a waypoint to leave room for the sawmill directive."
-	var candidate := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, points)
+	var candidate := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, points, track_signals)
 	if candidate != cells: return "Review the route: the sawmill directive would change its geometry. Install with a simple connected route first."
 	sawmill.state.installed = true
 	world.set_enabled("industry:sawmill", true)
@@ -6908,7 +6958,7 @@ func build_factory() -> String:
 	points.clear()
 	for row in ordered: points.append(row.point)
 	if points.size() > 16: return "Remove a waypoint to leave room for the factory directive."
-	var candidate := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, points)
+	var candidate := WaypointRouter.find_route(tracks, FOREST_SITE, CARGO_TERMINAL, points, track_signals)
 	if candidate != cells: return "Review the route: the factory directive would change its geometry. Install with a simple connected route first."
 	factory.state.installed = true
 	world.set_enabled("industry:factory", true)

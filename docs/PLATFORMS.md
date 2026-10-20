@@ -58,8 +58,7 @@ Rules:
   stops, or move the first stop to another station.
 - Platform choices for stops removed from a route are dropped automatically.
 
-Platform choice is fixed per service. The automatic rule that picks a free platform
-at arrival time (`Platforms.assign`, below) is not wired to movement yet.
+Fixed choices remain fixed; Auto choices use the departure/approach rules below.
 
 `Platforms.assign` is the basic assignment rule: the lowest-numbered platform that
 fits the whole train and is not busy. It is a pure function with tests; services use
@@ -92,7 +91,7 @@ train stands on its stop tile and no other train's current leg ends there, and i
 fit the train and be routable. If the planned platform is not free, the train
 switches to the first free one: the stored platform and the route are replaced while
 the train stands still, and the train's distance becomes the new distance of the stop it
-is standing at. Shuttle services only; Loop and fixed platforms are never changed. If no
+is standing at. Fixed platforms are never changed; supported Loop services also use safe Auto reselection. If no
 platform is free the train waits at its stop (see below). Tests:
 `tests/test_platform_reroute.gd`.
 
@@ -124,10 +123,18 @@ stands on), so two services sharing one platform at both ends take turns.
 
 ## Not yet implemented
 
-- Switching platform while the train is already moving towards a station; the choice
-  is made when it leaves its previous stop.
-- Platform choice for the first stop, and for freight terminals.
+- Retargeting after a single-track section or junction/lookahead is committed.
+- Choosing a different initial home platform during route edits while the train
+  stands on its current one, and automatic choice for freight terminals.
 - A build tool or overlay for sidings; today they are ordinary track.
 - Vertical or diagonal platforms (the existing rule only accepts horizontal track).
-- Routing consist bodies through planned reversals and repeated paths, which is
-  still the other open item of Phase 1B.
+- Additional repeated-path geometries beyond the supported planned reversals,
+  continuous circuits and crossing figure-eights.
+
+## Safe approach-time reselection
+
+Auto choices can now change on an uncommitted approach for Shuttle and supported
+Loop services. The travelled leg, body poses and reservation lookahead must remain
+identical; an active directional single-track section retains its chosen branch.
+Full-body fit, physical occupancy, claimed destinations and opposing section
+claims are checked. See [batches 1–3](OPERATIONS_BATCHES_1_3.md) for controls and limits.

@@ -42,7 +42,7 @@ func _run() -> void:
 	check(game.construction_plan.signal_changes.get(Vector2i(42, 15)) == "auto" and not game.track_signals.has(Vector2i(42, 15)), "point signal tool must stage while planning")
 	game._use_signal_tool(Vector2i(42, 15))
 	check(game.construction_plan.signal_changes.get(Vector2i(42, 15)) == "stop", "point draft must cycle automatic to manual stop")
-	game._use_signal_tool(Vector2i(42, 15))
+	for click in range(3): game._use_signal_tool(Vector2i(42, 15))
 	check(not game.construction_plan.signal_changes.has(Vector2i(42, 15)), "removing a newly staged signal must cancel its draft change")
 	game._use_signal_tool(Vector2i(42, 15))
 	check(game._apply_draft(), "point signal draft should commit through shared validation")

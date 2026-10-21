@@ -9,12 +9,19 @@ signal pick_blueprint(which: int)
 signal save_blueprint
 signal import_blueprints
 signal export_blueprint
+signal use_loop_waypoint
 signal place_passing_loop
 signal place_blueprint
+var loop_routes: Button
+var loop_route_hint: Label
+var loop_blocks: Label
+var loop_fit: Label
 var loop_length: SpinBox
 var loop_orientation: OptionButton
 var blueprint_name: LineEdit
 var blueprint_search: LineEdit
+var blueprint_rotation: OptionButton
+var blueprint_mirror: CheckButton
 var blueprint_choice: OptionButton
 var blueprint_status: Label
 var blueprint_names: Array[String] = []
@@ -129,6 +136,23 @@ func _ready() -> void:
 	loop_button.tooltip_text = "Nothing is purchased until Apply plan. Matching rails are reused; incompatible track refuses placement."
 	loop_button.pressed.connect(func() -> void: place_passing_loop.emit())
 	plan_controls.add_child(loop_button)
+	loop_fit = Label.new()
+	loop_fit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loop_fit.text = "Place a passing-loop preview to compare owned train lengths."
+	plan_controls.add_child(loop_fit)
+	loop_blocks = Label.new()
+	loop_blocks.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loop_blocks.text = "Place a passing-loop preview to inspect its signal blocks."
+	plan_controls.add_child(loop_blocks)
+	loop_routes = Button.new()
+	loop_routes.text = "Use loop waypoint in Routes"
+	loop_routes.disabled = true
+	loop_routes.pressed.connect(func() -> void: use_loop_waypoint.emit())
+	plan_controls.add_child(loop_routes)
+	loop_route_hint = Label.new()
+	loop_route_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loop_route_hint.text = "Preview and apply a loop first. Then choose a service and leg in Routes; Add waypoint changes only its draft."
+	plan_controls.add_child(loop_route_hint)
 	var blueprint_title := Label.new()
 	blueprint_title.text = "Track blueprints"
 	plan_controls.add_child(blueprint_title)
@@ -157,6 +181,13 @@ func _ready() -> void:
 	blueprint_choice.fit_to_longest_item = false
 	blueprint_choice.focus_mode = Control.FOCUS_NONE
 	plan_controls.add_child(blueprint_choice)
+	blueprint_rotation = OptionButton.new()
+	for angle in [0, 90, 180, 270]: blueprint_rotation.add_item("Rotation: %d°" % angle)
+	plan_controls.add_child(blueprint_rotation)
+	blueprint_mirror = CheckButton.new()
+	blueprint_mirror.text = "Mirror blueprint"
+	blueprint_mirror.tooltip_text = "Reflect horizontally, then apply the selected clockwise rotation. The saved source is unchanged."
+	plan_controls.add_child(blueprint_mirror)
 	var place_design := Button.new()
 	place_design.text = "Place selected blueprint"
 	place_design.focus_mode = Control.FOCUS_NONE

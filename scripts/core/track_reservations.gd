@@ -80,6 +80,29 @@ func rebuild(trains: Array, tracks: Dictionary, tile_size: float, request_ends: 
 				_overlapping[owners[cell]] = true
 			else: owners[cell] = train.id
 	occupied_owners = owners.duplicate()
+	# Physical switch clearance precedes all future requests. Otherwise a
+	# following train can win the stem during a rotated dispatch turn while the
+	# leader still occupies the switch, leaving each blocked by the other.
+	for train in ordered:
+		var occupied := footprint(train.path, train.distance, tile_size, train_length(train))
+		var closed := RouteBody.is_closed(train.path)
+		var spans := _route_spans(train.path, train.cells, tile_size)
+		var half := (train_length(train) - VEHICLE_LENGTH) * 0.5
+		var low := _index_at(spans, RouteBody.distance_on_path(train.path, train.distance - half, closed))
+		var high := _index_at(spans, RouteBody.distance_on_path(train.path, train.distance + half, closed))
+		for i in range(1, train.cells.size() - 1):
+			var cell: Vector2i = train.cells[i]
+			if not _switch_tiles.has(cell) or not occupied.has(cell): continue
+			var in_window := i >= low - 1 and i <= high + 1
+			if closed and low > high: in_window = i >= low - 1 or i <= high + 1
+			if not in_window: continue
+			var state := Geometry.state_for(tracks[cell], train.cells[i - 1] - cell, train.cells[i + 1] - cell)
+			if state < 0: state = Geometry.state_for(tracks[cell], train.cells[i + 1] - cell, train.cells[i - 1] - cell)
+			if state < 0: continue
+			switches[cell] = state
+			switch_owners[cell] = int(train.id)
+			for neighbor in [cell, train.cells[i - 1], train.cells[i + 1]]:
+				if not owners.has(neighbor) or owners[neighbor] == train.id: owners[neighbor] = int(train.id)
 	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return Dispatch.before(a, b, dispatch_order))
 	for train in ordered:
 		requested[int(train.id)] = []

@@ -1,6 +1,7 @@
 extends RefCounted
 ## Signal tiles cut the network into conservative connected blocks. Authority
 ## is seeded from real body occupancy, then requested in the supplied deterministic dispatch order.
+const Rules = preload("res://scripts/core/signal_rules.gd")
 const Dispatch = preload("res://scripts/core/dispatch_order.gd")
 const RouteBody = preload("res://scripts/core/route_body.gd")
 const Geometry = preload("res://scripts/track_geometry.gd")
@@ -66,7 +67,7 @@ func update(trains: Array, occupied: Dictionary, tile_size: float, dispatch_orde
 			var cell: Vector2i = train.cells[index] if not train.cells.is_empty() else Vector2i(-1, -1)
 			if signs.has(cell) and not requested.has(cell):
 				requested[cell] = true
-				if signs[cell] == "stop": break
+				if signs[cell] == "stop" or not Rules.permits(str(signs[cell]), train.cells[clampi(index + direction, 0, train.cells.size() - 1)] - cell): break
 				var block := _downstream(train.cells, index, direction, closed)
 				if block >= 0 and not requested_blocks[int(train.id)].has(block): requested_blocks[int(train.id)].append(block)
 				var owners: Dictionary = block_owners.get(block, {})
@@ -104,17 +105,25 @@ func limit(train: Dictionary, proposed: float, tile_size: float) -> Dictionary:
 					if closed: i = posmod(i, count)
 					if i >= 0 and i < count and train.cells[i] == cell: occurrence = i
 				if occurrence < 0: continue
-				var block := _downstream(train.cells, occurrence, direction, closed)
-				blocked_block = block
-				cause = "block_authority"
-				var owners: Dictionary = block_owners.get(block, {})
-				var others := _other_owner(owners, train.id)
-				if not others.is_empty():
-					cause = "block_busy"
-					owner = int(others[0])
-					reason = "Signal at %d,%d: block held by train #%d" % [cell.x, cell.y, owner]
-				elif block >= 0 and not owners.has(int(train.id)):
-					reason = "Signal at %d,%d: waiting for block authority" % [cell.x, cell.y]
+				var adjacent := occurrence + direction
+				if closed: adjacent = posmod(adjacent, count)
+				var travel: Vector2i = train.cells[adjacent] - cell if adjacent >= 0 and adjacent < count else cell - train.cells[clampi(occurrence - direction, 0, count - 1)]
+				if not Rules.permits(str(signs[cell]), travel):
+					reason = "One-way signal at %d,%d forbids this direction" % [cell.x, cell.y]
+					cause = "oneway_signal"
+				else:
+					var block := _downstream(train.cells, occurrence, direction, closed)
+					blocked_block = block
+					cause = "block_authority"
+					var owners: Dictionary = block_owners.get(block, {})
+					var others := _other_owner(owners, train.id)
+					if not others.is_empty():
+						cause = "block_busy"
+						owner = int(others[0])
+						reason = "Signal at %d,%d: block held by train #%d" % [cell.x, cell.y, owner]
+					elif block >= 0 and not owners.has(int(train.id)):
+						reason = "Signal at %d,%d: waiting for block authority" % [cell.x, cell.y]
+
 			if not reason.is_empty(): return {"distance": allowed, "conflict": {"cell": cell, "owner": owner, "reason": reason, "kind": cause, "block": blocked_block}}
 		allowed = next
 	return {"distance": allowed, "conflict": {}}

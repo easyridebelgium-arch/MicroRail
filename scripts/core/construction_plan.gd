@@ -91,7 +91,7 @@ func validate(live: Dictionary, owners: Dictionary, signals: Dictionary, size: V
 		if not _same(live.get(cell), signal_track_before[cell]): return "Signal track changed at %d,%d since drafting." % [cell.x, cell.y]
 		if not _same(signals.get(cell), signal_before[cell]): return "Signal changed at %d,%d since drafting." % [cell.x, cell.y]
 		if owners.has(cell): return "Signal track %d,%d is reserved by train #%d." % [cell.x, cell.y, int(owners[cell])]
-		if signal_changes[cell] != null and (signal_changes[cell] not in ["auto", "stop"] or not proposed.has(cell) or not Geometry.is_straight(proposed[cell])): return "Planned signals need straight track."
+		if signal_changes[cell] != null and (not preload("res://scripts/core/signal_rules.gd").valid_on(signal_changes[cell], proposed.get(cell)) or not proposed.has(cell) or not Geometry.is_straight(proposed[cell])): return "Planned signals need straight track."
 	for cell in proposed:
 		for port in Geometry.connections(proposed[cell]):
 			if port.x == 0 or port.y == 0: continue
@@ -103,3 +103,19 @@ func validate(live: Dictionary, owners: Dictionary, signals: Dictionary, size: V
 
 static func _same(a: Variant, b: Variant) -> bool:
 	return typeof(a) == typeof(b) and a == b
+
+## Itemised amounts reconcile with quote(); signal edits currently cost nothing.
+func quote_details() -> Dictionary:
+	var result := {"track": 0, "switch": 0, "bridge": 0, "track_refund": 0, "switch_refund": 0, "bridge_refund": 0, "signals": signal_changes.size()}
+	for cell in changes:
+		var old: Variant = before[cell]
+		var next: Variant = changes[cell]
+		if old == null and next != null:
+			result.track += int(prices.track)
+			if terrain != null and terrain.water(cell): result.bridge += terrain.EXTRA_COST
+		if old != null and next == null:
+			result.track_refund += int(prices.refund)
+			if terrain != null and terrain.water(cell): result.bridge_refund += terrain.EXTRA_REFUND
+		if next != null and Geometry.is_switch(next) and not Geometry.is_switch(old): result.switch += int(prices.switch)
+		if old != null and next != null and Geometry.is_switch(old) and not Geometry.is_switch(next): result.switch_refund += int(prices.switch)
+	return result

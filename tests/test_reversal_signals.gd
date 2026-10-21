@@ -46,7 +46,7 @@ func _run() -> void:
 	for step in range(120): tick(game)
 	check(absf(game.route_distance - held_at) < 0.01, "it stays put while the signal is red")
 	game.paused = true
-	game._use_signal_tool(Vector2i(28, 8))
+	for click in range(3): game._use_signal_tool(Vector2i(28, 8))
 	game.paused = false
 	check(not game.track_signals.has(Vector2i(28, 8)), "the signal is removed")
 	check(advance_until(game, func() -> bool: return game.passenger_stop_index == 2), "the train then serves B")

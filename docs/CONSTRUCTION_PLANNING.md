@@ -82,3 +82,8 @@ any old draft. Blueprint storage and additional corridor tools are separate step
 godot --headless --path . --script res://tests/test_construction_plan.gd
 godot --headless --path . --script res://tests/test_planning_integration.gd
 ```
+
+Draft summaries now itemise track, switch and bridge costs/refunds, with prototype
+signal edits explicitly free. Overlays also identifies shared unbranched runs
+and lists measured congestion hot spots. Warnings are advisory structural facts,
+not traffic forecasts. See [the combined update](OPERATIONS_BATCHES_1_3.md).

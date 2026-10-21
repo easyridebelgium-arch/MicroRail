@@ -169,7 +169,7 @@ static func is_valid(value: Variant, station_catalog: Dictionary = STATIONS, pos
 		if not valid_waypoints(service, station_catalog, positions) or not valid_platforms(service, station_catalog) or not valid_auto(service, station_catalog) or not valid_link(value, key) or not valid_priority(service) or not valid_headway(service) or not valid_timetable(service) or not ArrivalTargets.valid_targets(service): return false
 	return true
 
-static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}, station_catalog: Dictionary = STATIONS) -> Dictionary:
+static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints: Dictionary = {}, mode: String = "shuttle", platforms: Dictionary = {}, station_catalog: Dictionary = STATIONS, signals: Dictionary = {}) -> Dictionary:
 	var cells: Array[Vector2i] = []
 	var path := Curve2D.new()
 	path.bake_interval = 1.0
@@ -181,7 +181,7 @@ static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints:
 	for index in range(leg_count(stops, mode)):
 		var from_stop: Dictionary = station_catalog[stops[index]]
 		var to_stop: Dictionary = station_catalog[stops[(index + 1) % stops.size()]]
-		var leg: Array[Vector2i] = WaypointRouter.find_route(tracks, stop_cell(platforms, stops[index], station_catalog), stop_cell(platforms, stops[(index + 1) % stops.size()], station_catalog), waypoints.get(leg_key(stops, index), []))
+		var leg: Array[Vector2i] = WaypointRouter.find_route(tracks, stop_cell(platforms, stops[index], station_catalog), stop_cell(platforms, stops[(index + 1) % stops.size()], station_catalog), waypoints.get(leg_key(stops, index), []), signals)
 		if leg.is_empty():
 			return {"cells": [], "path": Curve2D.new(), "distances": [], "error": "Missing track or waypoint path: %s → %s" % [from_stop["name"], to_stop["name"]]}
 		for cell in leg:
@@ -194,6 +194,9 @@ static func build(tracks: Dictionary, stops: Array, tile_size: float, waypoints:
 			if path.point_count == 0 or path.get_point_position(path.point_count - 1).distance_to(point) > 0.001:
 				path.add_point(point)
 		distances.append(path.get_baked_length())
+	if mode == "shuttle":
+		var opposing := preload("res://scripts/core/signal_rules.gd").route_error(cells, signals, false)
+		if not opposing.is_empty(): return {"cells": [], "path": Curve2D.new(), "distances": [], "error": opposing + " Shuttle retraces its path; use Loop for independent return directives."}
 	return {"cells": cells, "path": path, "distances": distances, "error": ""}
 
 
@@ -214,9 +217,10 @@ static func valid_waypoints(service: Dictionary, station_catalog: Dictionary = S
 		if not key is String or not legs.has(key) or not directives[key] is Array or directives[key].size() > 16: return false
 		var seen: Dictionary = {}
 		for point in directives[key]:
-			if not point is Array or point.size() != 2: return false
+			if not point is Array or point.size() not in [2, 3]: return false
 			for number in point:
 				if typeof(number) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(number)) or float(number) != floor(float(number)): return false
+			if point.size() == 3 and (point[2] < 0 or point[2] > 7): return false
 			if point[0] < 0 or point[0] >= 80 or point[1] < 0 or point[1] >= 50: return false
 			var cell := Vector2i(int(point[0]), int(point[1]))
 			if seen.has(cell) or cell in protected: return false
@@ -226,8 +230,11 @@ static func valid_waypoints(service: Dictionary, station_catalog: Dictionary = S
 
 static func waypoints_in_order(cells: Array[Vector2i], points: Array) -> bool:
 	var progress := 0
-	for cell in cells:
-		if progress < points.size() and cell == Vector2i(int(points[progress][0]), int(points[progress][1])): progress += 1
+	for index in range(cells.size()):
+		var cell := cells[index]
+		if progress < points.size() and cell == Vector2i(int(points[progress][0]), int(points[progress][1])):
+			if points[progress].size() == 3 and (index == 0 or cell - cells[index - 1] != preload("res://scripts/track_geometry.gd").DIRECTIONS[int(points[progress][2])]): continue
+			progress += 1
 	return progress == points.size()
 
 
@@ -237,7 +244,10 @@ static func from_save(value: Dictionary) -> Dictionary:
 		var directives: Dictionary = result[service].get("waypoints", {})
 		for leg in directives:
 			var normalized: Array = []
-			for point in directives[leg]: normalized.append([int(point[0]), int(point[1])])
+			for point in directives[leg]:
+				var row := [int(point[0]), int(point[1])]
+				if point.size() == 3: row.append(int(point[2]))
+				normalized.append(row)
 			directives[leg] = normalized
 		result[service]["waypoints"] = directives
 		result[service]["mode"] = result[service].get("mode", "shuttle")

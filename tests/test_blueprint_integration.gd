@@ -67,6 +67,17 @@ func _run() -> void:
 	mixed[0].name = "Would be new"
 	game.TrackBlueprints.save_library("user://mixed-designs.json", mixed)
 	check(not game._import_blueprints("user://mixed-designs.json") and game.blueprints.size() == 2, "a collision later in a multi-design import must prevent every partial update")
+	game.inspection_panel.plan_toggle.button_pressed = true
+	game.inspection_panel.blueprint_rotation.select(1)
+	game.inspection_panel.blueprint_mirror.button_pressed = true
+	var source: Dictionary = game.blueprints[0].duplicate(true)
+	var cash_before: int = game.money
+	check(game._place_blueprint(Vector2i(60, 30)) and game.money == cash_before and game.blueprints[0] == source, "UI transform drafts a copy without spending or changing the source")
+	game._update_inspection()
+	check(game.inspection_panel.plan_summary.text.contains("Switches £100") and game.inspection_panel.plan_summary.text.contains("signal edits: £0"), "plan panel shows itemised costs")
+	check(game._apply_draft(), "rotated mirrored blueprint applies through normal atomic validation")
+	game._undo_construction()
+	check(game.money == cash_before, "transformed placement undoes as one fully refunded action")
 	var file := FileAccess.open(game.BLUEPRINT_PATH, FileAccess.WRITE)
 	file.store_string('{"version":"invalid","designs":[]}')
 	file.close()

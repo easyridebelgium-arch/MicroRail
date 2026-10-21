@@ -67,7 +67,11 @@ func _run() -> void:
 		check(not game.passenger_held and game.passenger_service_enabled, "actual Resume button releases selected train")
 		game.traffic_dialog.hide()
 		game._use_signal_tool(Vector2i(10, 8))
-		check(not game.track_signals.has(Vector2i(10, 8)), "third click removes signal")
+		check(game.track_signals.get(Vector2i(10, 8)) == "oneway_2", "third click creates eastbound signal")
+		game._use_signal_tool(Vector2i(10, 8))
+		check(game.track_signals.get(Vector2i(10, 8)) == "oneway_6", "fourth click creates westbound signal")
+		game._use_signal_tool(Vector2i(10, 8))
+		check(not game.track_signals.has(Vector2i(10, 8)), "fifth click removes signal")
 		game.paused = false
 		for step in range(120):
 			game.sim_clock.begin_tick()

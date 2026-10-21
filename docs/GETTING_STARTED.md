@@ -1,5 +1,8 @@
 # MicroRail: your first 15 minutes
 
+Sharing feedback? Use the [short playtest checklist](PLAYTEST_CHECKLIST.md), with
+steps for reporting a problem even if you cannot complete a scenario.
+
 **Tutorial mode.** Choose the three-station tutorial in New Game.
 
 **Goal:** connect the stations, run passenger trains and earn enough to grow. Stations A, B and C are

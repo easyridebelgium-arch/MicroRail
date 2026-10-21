@@ -23,7 +23,7 @@ static func valid(data: Variant) -> bool:
 	for row in data.signals:
 		if not _row(row, int(data.width), int(data.height)): return false
 		var cell := Vector2i(int(row[0]), int(row[1]))
-		if signs.has(cell) or not tiles.has(cell) or not Geometry.is_straight(tiles[cell]) or row[2] not in ["auto", "stop"]: return false
+		if signs.has(cell) or not tiles.has(cell) or not Geometry.is_straight(tiles[cell]) or not preload("res://scripts/core/signal_rules.gd").valid_on(row[2], tiles[cell]): return false
 		signs[cell] = row[2]
 	return true
 
@@ -112,3 +112,42 @@ static func _whole(value: Variant, minimum: int, maximum: int) -> bool:
 
 static func _same(a: Variant, b: Variant) -> bool:
 	return typeof(a) == typeof(b) and a == b
+
+## Transform a copy; stored source and library backup remain untouched.
+static func transformed(data: Dictionary, turns: int, mirrored: bool) -> Dictionary:
+	if not valid(data): return {}
+	var result := data.duplicate(true)
+	if mirrored:
+		for row in result.tiles:
+			row[0] = int(result.width) - 1 - int(row[0])
+			row[2] = _transform_kind(row[2], true)
+		for row in result.signals:
+			row[0] = int(result.width) - 1 - int(row[0])
+			row[2] = _transform_signal(row[2], true)
+	for _turn in range(posmod(turns, 4)):
+		var height := int(result.height)
+		for row in result.tiles:
+			var old_x := int(row[0])
+			row[0] = height - 1 - int(row[1])
+			row[1] = old_x
+			row[2] = _transform_kind(row[2], false)
+		for row in result.signals:
+			var old_x := int(row[0])
+			row[0] = height - 1 - int(row[1])
+			row[1] = old_x
+			row[2] = _transform_signal(row[2], false)
+		result.height = result.width
+		result.width = height
+	return result if valid(result) else {}
+
+static func _vector(value: Vector2i, mirrored: bool) -> Vector2i:
+	return Vector2i(-value.x, value.y) if mirrored else Vector2i(-value.y, value.x)
+static func _transform_kind(kind: Variant, mirrored: bool) -> Variant:
+	var ports := Geometry.connections(kind)
+	for i in range(ports.size()): ports[i] = _vector(ports[i], mirrored)
+	if Geometry.is_switch(kind): return "junction_%d_%d_%d" % [Geometry.DIRECTIONS.find(ports[0]), Geometry.DIRECTIONS.find(ports[1]), Geometry.DIRECTIONS.find(ports[2])]
+	if Geometry.is_crossing(kind): return Geometry.crossing_type(ports[0], ports[2])
+	return Geometry.from_ports(ports[0], ports[1])
+static func _transform_signal(mode: String, mirrored: bool) -> String:
+	var direction := preload("res://scripts/core/signal_rules.gd").direction(mode)
+	return mode if direction == Vector2i.ZERO else "oneway_%d" % Geometry.DIRECTIONS.find(_vector(direction, mirrored))

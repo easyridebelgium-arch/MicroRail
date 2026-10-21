@@ -71,7 +71,7 @@ func check_route(game: Node, notify: bool = true) -> void:
 
 func rebuild_at_home(game: Node) -> void:
 	if at_home():
-		var built := Services.build(game.tracks, configuration.stops, float(game.TILE_SIZE), configuration.get("waypoints", {}), configuration.get("mode", "shuttle"), configuration.get("platforms", {}), game.station_definitions())
+		var built := Services.build(game.tracks, configuration.stops, float(game.TILE_SIZE), configuration.get("waypoints", {}), configuration.get("mode", "shuttle"), configuration.get("platforms", {}), game.station_definitions(), game.track_signals)
 		if not built.cells.is_empty() and built.cells != cells: configure(key, configuration, built)
 	check_route(game)
 

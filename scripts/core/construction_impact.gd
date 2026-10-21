@@ -39,3 +39,41 @@ func analyze(tracks: Dictionary, changes: Dictionary, trains: Array, owners: Dic
 		elif not Runtime.connected(cells, proposed): effect = "Current leg clear; a later leg remains incomplete"
 		affected.append({"key": train.key, "id": train.id, "name": train.name, "effect": effect})
 	return {"affected": affected, "blocked": blocked}
+
+var _risk_key: Array = []
+var _risks := PackedStringArray()
+## Conservative structural facts, not a traffic prediction. Cache by geometry
+## and retained route cells; opening the overlay never runs a simulation.
+func structural(tracks: Dictionary, trains: Array) -> PackedStringArray:
+	var signature: Array = [tracks.hash()]
+	for train in trains: signature.append([train.id, train.cells.hash()])
+	if signature == _risk_key: return _risks
+	_risk_key = signature
+	_risks = []
+	var geometry = preload("res://scripts/track_geometry.gd")
+	for a in range(trains.size()):
+		if not Runtime.connected(trains[a].cells, tracks): continue
+		var first: Dictionary = {}
+		for cell in trains[a].cells: first[cell] = true
+		for b in range(a + 1, trains.size()):
+			if not Runtime.connected(trains[b].cells, tracks): continue
+			var shared: Dictionary = {}
+			for cell in trains[b].cells:
+				if first.has(cell) and geometry.connections(tracks.get(cell)).size() == 2: shared[cell] = true
+			var longest: Array[Vector2i] = []
+			while not shared.is_empty():
+				var pending: Array[Vector2i] = [shared.keys()[0]]
+				shared.erase(pending[0])
+				var index := 0
+				while index < pending.size():
+					var cell := pending[index]
+					index += 1
+					for port in geometry.connections(tracks[cell]):
+						var next: Vector2i = cell + port
+						if shared.has(next) and geometry.connections(tracks[next]).has(-port):
+							shared.erase(next)
+							pending.append(next)
+				if pending.size() > longest.size(): longest = pending
+			if longest.size() >= 4:
+				_risks.append("Layout review: #%d and #%d share an unbranched run of %d tiles near %d,%d. Review passing places and approach signals. This identifies shared infrastructure, not a forecast or proof of deadlock." % [trains[a].id, trains[b].id, longest.size(), longest[0].x, longest[0].y])
+	return _risks

@@ -92,3 +92,123 @@ reservation protection and stale drafts.
 `test_passing_loop_options.gd` checks minimum/maximum and even/odd lengths in
 all four orientations, both route directions, signal boundaries, price, above/left
 map edges, ordinary UI options, atomic apply/Undo and real save/load.
+
+## Measured train fit
+
+After placing a guided loop preview, **Overlays** shows **Last loop preview —
+measured train fit** below its controls. It lists both inner holding spans in
+map tiles, followed by every owned train's permanent ID, name, actual consist length
+and **main fits / loop fits** or **TOO SHORT**. Stored trains are labelled too.
+An empty fleet is explained rather than given an unconditional success message.
+
+The span is the route distance inside the two signal boundaries. Fit uses the
+runtime red-signal stopping calculation and the whole train's conservative body
+footprint at **both ends** of each branch, including curved loop geometry. Every
+occupied tile must lie inside the branch, clear of the two signals and switches;
+a 2 px planning allowance is included. Displayed lengths are rounded to one
+decimal tile; the calculation uses full precision. A raw span is not used as a substitute for
+this body test. Current single locomotives and four-coach consists fit the default
+loop; the measurement also supports longer bodies as rolling stock expands.
+
+If a branch is too short, choose a longer length or shorten the consist, discard
+the old draft and preview again. These are advisory local clearance results:
+construction remains subject to ordinary cost/protection/reservation checks, and
+this panel does not assign routes, alter trains, predict traffic or prove that
+surrounding signal blocks are isolated. An incorrectly routed train or shared
+station approach can still deadlock even when every body fits this local siding.
+
+Measurements refresh when the fleet changes. Later edits to template track or
+signals replace the result with **Fit unavailable**, requiring a fresh preview.
+Changing the length/orientation controls affects only the next placement. Applying,
+discarding or loading clears the preview-specific measurement; no new save state
+or gameplay rules are introduced. Measurements are cached between relevant edits
+and never move the simulation or spend money.
+
+`test_passing_loop_fit.gd` covers four orientations, real consist lengths, both
+runtime stopping directions, short/long synthetic clearance cases, graph/fleet
+immutability, row ordering, cache refresh, stale draft detection and cleanup on
+apply/discard/load. Existing running tests continue to verify shared-track safety.
+
+## Loop waypoint shortcut
+
+1. Place a guided loop preview, review cost and fit, then **Apply plan**.
+2. In Overlays, click **Use loop waypoint in Routes**. The helper shows which
+   built loop cell it will use. It opens Routes paused with that cell's X/Y filled
+   in and a persistent instruction beside the waypoint controls.
+3. Choose the intended **service and leg**, then click **Add waypoint**. Existing
+   waypoints remain in order; this appends the loop cell. Use Up/Down if needed.
+4. Review the full route and click **Apply**. Closing/Cancel discards the route
+   draft; the already-built track is a separate construction transaction.
+
+Opening the shortcut makes no purchases, inserts no waypoint and changes no
+service. Choose the train/service that should use the loop; the other service
+can stay on the main branch. Shuttle return trips retrace that leg's selected
+path. Loop mode has separate legs, including the closing leg; choose deliberately.
+A linked service follows its source: select that source or deliberately Unlink
+before editing independently. Existing duplicate/16-point limits and safe route
+application rules remain in force. A running train cannot be teleported or have
+its route changed through this shortcut; finish the trip or physically reverse
+back to its first stop as the normal Routes message explains.
+
+The shortcut requires built, unmodified template geometry/signals, a service and
+no pending construction. Apply or discard other construction first. It never
+applies construction on your behalf or overwrites an already-open dialog draft.
+Undo disables a shortcut whose track disappears; Redo can restore it. An identical
+already-built template can be previewed at no cost to recover the shortcut. The
+last applied template context is temporary and clears on load; an applied service
+waypoint is saved through the ordinary route schema. Editing the length/orientation
+controls does not move the cell associated with an earlier preview.
+
+`test_loop_waypoint_handoff.gd` covers pre-build refusal, Apply/Undo/Redo,
+explicit service selection, draft-only Add, duplicate refusal, protection of an
+open draft, Cancel, normal Apply, running-train restrictions, pending construction,
+ordinary Routes hint reset and saved waypoint persistence without saved handoff state.
+
+## Signal-block isolation in loop previews
+
+The **Last loop preview — signal blocks (draft)** report complements measured
+train fit. It uses the same conservative connected-block partition as operating
+signals, over **all projected track and signals**, including track outside the
+loop. It lists blocks for the main branch, loop branch and both end switches,
+with switch coordinates. Preview block IDs may differ from current live IDs.
+
+The report explains:
+
+- Missing boundary signals, with coordinates and which areas now share a block.
+- Main and loop branches joined through additional track.
+- Both end switches sharing a block through an unsignalled outside connection.
+  Inspect that joining connection and add appropriate boundaries there; keep
+  the platform-to-switch approaches arranged as described in the tested example.
+- Extra signals splitting a branch into multiple holding areas.
+- Manual stop signals that still divide blocks but hold trains until released.
+
+A train that fits the local siding may still hold both approaches if an outside
+connection merges their blocks. Conversely, different block IDs do not establish
+that a train fits, has a valid assigned route, or can never deadlock. These are
+current topology facts, not authority grants, traffic predictions or automatic
+repairs. An isolated template with no outer track yet still needs connecting to
+stations and assigning services. Warnings do not block ordinary construction.
+
+Removing a boundary or adding a junction can still be diagnosed if both original
+branch paths and the two end switches remain identifiable. A missing rail or
+incompatible port makes the block check unavailable, instead of interpreting an
+unrelated new layout. Body-fit checks remain independent and may require a fresh
+unmodified template after such edits. Conservative crossing connectivity is the
+same as in the operating block model; a shared block is not proof a train can turn
+between every port in it. One-way route legality, platform access and occupancy
+remain governed by their normal systems.
+
+Reports refresh with the projected graph and clear with the preview on
+apply/discard/load. No new save state, notification events or simulation decisions
+are introduced. `test_passing_loop_blocks.gd` covers four orientations and three
+lengths, external rejoining/cutting, added central connections, missing/manual/extra
+signals, broken paths, read-only inputs and UI invalidation/cleanup. Existing fit,
+waypoint handoff, template and block-authority tests remain in place.
+
+## Rotation and reflection
+
+Before Place, select Rotation (0/90/180/270°) and optional Mirror blueprint.
+Mirroring is horizontal in the source footprint and precedes clockwise rotation.
+All ports, switch roles and one-way signal directions transform; saved originals
+remain unchanged. The preview uses the ordinary atomic draft/Undo rules. See
+[the combined update](OPERATIONS_BATCHES_1_3.md) for bounds and validation.

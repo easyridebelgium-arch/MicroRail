@@ -100,15 +100,18 @@ func refresh(delta: float, force: bool = false) -> void:
 	if not force and (elapsed < 0.25 or not (dialog.visible or game.objective_panel.visible)): return
 	elapsed = 0.0
 	snapshot = Guide.inspect(game)
-	preview_button.visible = not snapshot.get("freight", false) and snapshot.city_mode and game.station_definitions().is_empty()
+	preview_button.visible = (snapshot.get("shared", false) and not snapshot.complete) or (not snapshot.get("freight", false) and not snapshot.get("shared", false) and snapshot.city_mode and game.station_definitions().is_empty())
+	preview_button.text = "Show challenge stations and loop" if snapshot.get("shared", false) else "Preview suggested connection on map"
 	var lines: PackedStringArray = []
 	for index in range(snapshot.rows.size()):
 		var row: Dictionary = snapshot.rows[index]
 		lines.append(("[Done] " if row.done else "[Next] " if snapshot.next == index else "[ ] ") + str(row.title))
 	heading.text = "First passenger journey complete — %d delivered. Keep improving your railway." % snapshot.delivered if snapshot.delivered > 0 else "Your first city service" if snapshot.city_mode else "Your first tutorial service"
+	if snapshot.get("shared", false): heading.text = "Passing Place — shared-track checklist"
 	if snapshot.get("freight", false): heading.text = "Timber Connection — freight checklist"
 	steps.text = "\n".join(lines)
 	detail.text = snapshot.suggestion + "\n\n" + ("These checks describe the current company. You can reopen this guide at any time; it does not reset progress or pay rewards." if snapshot.complete else str(snapshot.rows[snapshot.next].hint))
+	if snapshot.get("shared", false) and snapshot.complete: detail.text = snapshot.suggestion + "\n\nChallenge completion is saved. You can change the network or retire services without losing this milestone."
 	action_button.visible = not snapshot.complete
 	if not snapshot.complete: action_button.text = snapshot.rows[snapshot.next].button
 
@@ -124,6 +127,24 @@ func clear_preview() -> void:
 func show_preview() -> void:
 	if game.is_dragging or game.right_pending or not game.construction_plan.is_empty():
 		detail.text = "Finish the stroke and apply or discard the draft before previewing a suggestion."
+		return
+	if game.seeded_challenge.state.id == "passing_place":
+		var shared = preload("res://scripts/core/shared_track_challenge.gd")
+		var line: Array[Vector2i] = []
+		for x in range(shared.LEFT.x, shared.RIGHT.x + 1): line.append(Vector2i(x, shared.LEFT.y))
+		var loop: Array[Vector2i] = [shared.ANCHOR]
+		for y in range(15, 18): loop.append(Vector2i(44, y))
+		for x in range(45, 53): loop.append(Vector2i(x, 17))
+		for y in [16, 15, 14]: loop.append(Vector2i(52, y))
+		preview = {"a": shared.LEFT, "b": shared.RIGHT, "cells": line, "loop_cells": loop, "budget": 2040}
+		preview_source = _source().duplicate(true)
+		close_guide(false)
+		game.paused = true
+		hide_preview_button.show()
+		_frame_preview()
+		game._show_notice("Dashed challenge guide only. Original checked setup £2040 including two shuttles; nothing purchased. Use Station, Connect and the loop draft tools to build it.")
+		game._update_toolbar()
+		game.queue_redraw()
 		return
 	if not game.city_builder.is_city_game() or not game.station_definitions().is_empty():
 		clear_preview()
@@ -162,6 +183,9 @@ func draw_preview() -> void:
 	var ink := Color(1.0, 0.95, 0.7, 0.9)
 	for index in range(1, preview.cells.size()):
 		game.draw_dashed_line(game._cell_center(preview.cells[index - 1]), game._cell_center(preview.cells[index]), ink, 2.0, 5.0)
+	var loop_cells: Array = preview.get("loop_cells", [])
+	for index in range(1, loop_cells.size()):
+		game.draw_dashed_line(game._cell_center(loop_cells[index - 1]), game._cell_center(loop_cells[index]), ink, 2.0, 5.0)
 	for stop in [preview.a, preview.b]:
 		for cell in Stations.platform_cells(stop):
 			var rect := Rect2(Vector2(cell) * game.TILE_SIZE, Vector2.ONE * game.TILE_SIZE).grow(-3.0)
@@ -184,6 +208,14 @@ func _perform() -> void:
 		"connect":
 			game.paused = true
 			game._select_straight_track()
+		"shared_preview":
+			game.paused = true
+			game.inspection_button.button_pressed = true
+			game.inspection_panel.plan_toggle.button_pressed = true
+			game.inspection_panel.loop_length.value = 9
+			game.inspection_panel.loop_orientation.select(0)
+			game._draft_passing_loop(Vector2i(44, 14))
+		"shared_routes": game._open_routes_editor(Vector2i(48, 17), "Passing Place: choose the Town 2→Town 3 service and leg, Add waypoint 48,17, review then Apply. Leave Town 3→Town 2 on the main branch. Nothing is added automatically.")
 		"forest":
 			game.paused = true
 			game._inspect_station_at(game.FOREST_SITE)

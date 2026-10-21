@@ -30,7 +30,7 @@ state are stored independently.
 | 4 | `microrail_save_slot_4.json` | `microrail_save_slot_4.backup.json` |
 
 All paths are under `user://`. Slot 1 preserves the existing filenames. The save
-schema is version 51, including amenities, loan state, route appearance,
+schema is version 54, including amenities, loan state, route appearance,
 alert acknowledgements, final destinations carried by connecting trains, and
 station-arrival groups for boarding priority and bounded waiting-satisfaction
 history, gradual demand factor/carry, and original journey clocks with recent
@@ -132,3 +132,22 @@ Version 49 adds saved Low/Normal/High service dispatch priorities. Version 48 co
 Version 50 adds [one-off freight contracts](FREIGHT_CONTRACTS.md), acceptance baselines and deadlines. Version 49 migration creates unused offers without crediting earlier deliveries or changing money, inventory, RNG or train positions.
 
 Version 51 saves a one-time contract deadline warning tick. Version 50 migration leaves the marker unset, retaining deadlines, delivery counts, cash, RNG and physical state. Alert preferences remain in player Settings, defaulting Off for contract deadlines.
+
+
+Version 52 adds `seeded_challenge.evidence` (empty for existing companies and
+other presets). Passing Place stores selected service IDs, pre-attempt final-delivery
+baselines and new per-service delivery counts there. Partial attempts roundtrip;
+completed milestones survive later removal of a measured service. Version 51
+migration adds the empty field without assigning a challenge or changing physical
+state, commands, random state, finances or prior completion ticks. Evidence must
+use distinct passenger service IDs and bounded whole counts backed by company
+final-delivery totals. An unfinished attempt cannot claim completed thresholds;
+a completed one must meet both service targets.
+
+Version 53 adds `seeded_challenge.review` for immutable completion delivery and
+financial counters. Version 52 migration leaves it empty rather than inventing
+historical totals. Completed older scenarios can still open Results with a clearly
+labelled current-company fallback. See [scenario results](SCENARIO_RESULTS.md).
+
+Version 54 supports directional signals and optional waypoint approach directions;
+v53 migration preserves existing geometry, actors, RNG, goals and finances.

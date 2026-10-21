@@ -5,6 +5,7 @@ const Advice = preload("res://scripts/core/first_connection_advice.gd")
 const FleetData = preload("res://scripts/fleet.gd")
 
 static func inspect(game: Node) -> Dictionary:
+	if game.seeded_challenge.state.id == "passing_place": return shared_inspect(game)
 	if game.seeded_challenge.state.id == "timber_connection": return freight_inspect(game)
 	var city_mode: bool = game.city_builder.is_city_game()
 	var stations: Dictionary = game.station_definitions()
@@ -91,3 +92,23 @@ static func freight_inspect(game: Node) -> Dictionary:
 		if rows[index].done: done_count += 1
 		elif next_index == rows.size(): next_index = index
 	return {"freight": true, "city_mode": true, "rows": rows, "next": next_index, "done": done_count, "complete": next_index == rows.size(), "connection": "Industry corridor", "suggestion": "Timber Connection: untimed preparation, then 20 timber within 18 game hours. Normal contract bonus £300; no extra scenario reward.", "delivered": order.delivered}
+
+static func shared_inspect(game: Node) -> Dictionary:
+	var measured: Dictionary = game.shared_track_progress()
+	var finished: bool = int(game.seeded_challenge.state.completed_tick) >= 0
+	var rows: Array[Dictionary] = [
+		{"done": measured.stations, "title": "Build Town 3 Station (30,14) and Town 2 Station (66,14)", "hint": "Pause and use Station to build at those exact cells below the two towns. Each five-tile station costs £300. No stations or trains are provided.", "action": "stations", "button": "Choose Station tool"},
+		{"done": measured.connected, "title": "Connect the two horizontal platform ends", "hint": "Connect along row 14, leaving each platform along its rails. The recommended connecting track costs £310 before the loop.", "action": "connect", "button": "Choose Connect track"},
+		{"done": measured.loop and measured.boundaries, "title": "Draft and apply the passing loop at (44,14)", "hint": "Default 9×4 loop below the main line. Review train fit, signal blocks and £330 extra cost in Overlays, then Apply plan. Keep all four automatic boundaries; the Guide only drafts the geometry.", "action": "shared_preview", "button": "Draft suggested passing loop"},
+		{"done": measured.owns_two, "title": "Buy two Passenger Shuttles (£400 each)", "hint": "Use Fleet. The checked total investment, including stations, track and loop, is £2040. Stay paused until both routes are ready.", "action": "fleet", "button": "Open Fleet"},
+		{"done": measured.opposing, "title": "Start opposite Shuttle services: Town 3→2 and Town 2→3", "hint": "In Fleet start one stored train at Town 3 Station for Town 2 Station, and the other at Town 2 Station for Town 3 Station. Keep Shuttle mode and two stops each. Do not resume yet.", "action": "fleet", "button": "Open Fleet"},
+		{"done": measured.ready, "title": "Give only Town 2→3 the loop waypoint (48,17)", "hint": "Open Routes, select the Town 2→3 service and leg, Add waypoint 48,17, review and Apply. Leave Town 3→2 on the main branch. Existing safe-edit rules apply: both trains should still be empty at their first stops.", "action": "shared_routes", "button": "Open loop waypoint in Routes"},
+		{"done": finished, "title": "Complete ten final passenger journeys with each service", "hint": "Resume when both routes are ready. Boarding and waiting queues do not count. Goals counts new final deliveries after both routes are ready. Keep both routes ready while running; resuming with incomplete setup or a different service pair restarts unfinished progress. Maintain the prescribed loop and signal boundaries until completion; afterwards you can change the company freely.", "action": "run", "button": "Resume and watch both services"}
+	]
+	var next_index := rows.size()
+	var done_count := 0
+	for index in range(rows.size()):
+		if finished: rows[index].done = true
+		if rows[index].done: done_count += 1
+		elif next_index == rows.size(): next_index = index
+	return {"shared": true, "city_mode": true, "rows": rows, "next": next_index, "done": done_count, "complete": finished, "connection": "Town 3 ↔ Town 2", "suggestion": "Passing Place: fixed teaching layout, £5000, £2040 checked setup, no deadline or extra reward. Loans are available. Complete ten final journeys with each correctly configured opposing service.", "delivered": int(measured.direct_finals) + int(measured.bypass_finals)}
